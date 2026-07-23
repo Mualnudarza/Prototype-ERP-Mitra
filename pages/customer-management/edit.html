@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title id="page-title">Registrasi Pelanggan · Dasaria ERP</title>
+<link rel="stylesheet" href="../../assets/css/theme.css" />
+<link rel="stylesheet" href="../../assets/css/customer-management.css" />
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ==================== SIDEBAR ==================== -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark">DA</div>
+      <div>
+        <div class="name">Dasaria ERP</div>
+        <div class="sub">Mitra Panel</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Utama</div>
+      <a class="nav-item" href="../../index.html">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Dashboard
+      </a>
+
+      <div class="nav-section-label">Modul Customer Management</div>
+      <a class="nav-item active" href="index.html">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20c1.4-4 4.2-6 7.5-6s6.1 2 7.5 6"/></svg>
+        Customer Management
+      </a>
+    </nav>
+
+    <div class="sidebar-foot">Astryx UI · tema Neutral</div>
+  </aside>
+
+  <!-- ==================== MAIN ==================== -->
+  <div class="main-col">
+    <header class="topbar">
+      <div class="topbar-crumb">Dashboard / <a href="index.html">Customer Management</a> / <b id="crumb-current">Registrasi Pelanggan</b></div>
+      <div class="topbar-right">
+        <div class="topbar-user">
+          <div class="avatar">AM</div>
+          Admin Mitra
+        </div>
+      </div>
+    </header>
+
+    <main class="page">
+      <div class="page-head">
+        <div>
+          <h1 id="page-heading">Registrasi Pelanggan Baru</h1>
+          <p id="page-subheading">Lengkapi data administrasi dan data teknis sebelum pelanggan dapat diaktifkan.</p>
+          <div class="customer-id-line" id="customer-id-line"></div>
+        </div>
+        <div class="status-actions" id="status-actions"></div>
+      </div>
+
+      <div class="edit-layout">
+        <!-- ===== FORM ===== -->
+        <div class="card">
+          <form id="customer-form">
+            <div class="form-section">
+              <h3>Data Pelanggan</h3>
+              <div class="desc">Identitas dan informasi kontak pelanggan.</div>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="f-name">Nama Lengkap</label>
+                  <input type="text" id="f-name" required placeholder="cth. Budi Santoso" />
+                </div>
+                <div class="form-field">
+                  <label for="f-phone">Nomor WhatsApp</label>
+                  <input type="text" id="f-phone" required placeholder="cth. 0812xxxxxxx" />
+                </div>
+                <div class="form-field">
+                  <label for="f-subscribe">Mulai Berlangganan</label>
+                  <input type="date" id="f-subscribe" required />
+                </div>
+                <div class="form-field">
+                  <label for="f-expired">Expired Date</label>
+                  <input type="date" id="f-expired" required />
+                </div>
+                <div class="form-field span-2">
+                  <label for="f-address">Alamat Pemasangan</label>
+                  <input type="text" id="f-address" required placeholder="cth. Jl. Diponegoro No. 12, Batu" />
+                  <span class="field-hint">Relokasi akan memperbarui alamat ini beserta koordinat di bawah (Rule #5).</span>
+                </div>
+                <div class="form-field">
+                  <label for="f-package">Paket Layanan</label>
+                  <select id="f-package" required></select>
+                  <span class="field-hint">Histori paket sebelumnya tetap tersimpan (Rule #4).</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <div>
+                  <h3>Informasi Teknis</h3>
+                  <div class="desc">Hanya dapat diubah oleh pengguna dengan hak akses teknis (Rule #11).</div>
+                </div>
+                <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; cursor:pointer;">
+                  <input type="checkbox" id="toggle-tech-access" />
+                  Akses Teknis
+                </label>
+              </div>
+              <div class="form-grid">
+                <div class="form-field locked" id="field-pppoe">
+                  <label for="f-pppoe">PPPoE Secret</label>
+                  <input type="text" id="f-pppoe" required placeholder="cth. nama.pelanggan@mitra" disabled />
+                </div>
+                <div class="form-field locked" id="field-modem">
+                  <label for="f-modem">SN Modem</label>
+                  <input type="text" id="f-modem" required disabled />
+                </div>
+                <div class="form-field">
+                  <label for="f-lat">Latitude</label>
+                  <input type="text" id="f-lat" required placeholder="cth. -7.8713" />
+                </div>
+                <div class="form-field">
+                  <label for="f-lng">Longitude</label>
+                  <input type="text" id="f-lng" required placeholder="cth. 112.5240" />
+                </div>
+                <div class="form-field locked" id="field-olt">
+                  <label for="f-olt">Port OLT</label>
+                  <input type="text" id="f-olt" required disabled />
+                </div>
+                <div class="form-field locked" id="field-onu">
+                  <label for="f-onu">Nomor ONU</label>
+                  <input type="text" id="f-onu" required disabled />
+                </div>
+                <div class="form-field locked" id="field-access">
+                  <label for="f-access">Access</label>
+                  <input type="text" id="f-access" required disabled />
+                </div>
+                <div class="form-field locked" id="field-access-port">
+                  <label for="f-access-port">Port Access</label>
+                  <input type="text" id="f-access-port" required disabled />
+                </div>
+              </div>
+              <div class="lock-note mt-8" id="lock-note">🔒 Aktifkan "Akses Teknis" di atas untuk mengubah field teknis.</div>
+            </div>
+
+            <div class="form-section" style="display:flex; justify-content:flex-end; gap:10px;">
+              <a class="btn btn-secondary" href="index.html">Batal</a>
+              <button type="submit" class="btn btn-primary" id="btn-save">Simpan Data Pelanggan</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- ===== SIDE: MAP + HISTORY + LOG ===== -->
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <div class="card" style="padding:16px;">
+            <h3 style="font-size:14px;">Lokasi Pelanggan</h3>
+            <div class="desc" style="font-size:12px; color:var(--color-text-muted); margin-bottom:10px;">Verifikasi titik pemasangan berdasarkan Latitude &amp; Longitude.</div>
+            <div id="map-wrap">
+              <iframe class="map-embed" id="map-frame" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            </div>
+            <div class="coord-row" id="coord-row"></div>
+          </div>
+
+          <div class="card" style="padding:16px;" id="history-card">
+            <h3 style="font-size:14px;">Riwayat Paket &amp; Alamat</h3>
+            <div id="package-history"></div>
+            <div id="address-history" class="mt-8"></div>
+          </div>
+
+          <div class="card" style="padding:16px;" id="activity-card">
+            <h3 style="font-size:14px;">Riwayat Aktivitas</h3>
+            <ul class="activity-list mt-14" id="activity-list"></ul>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+
+<script src="../../assets/js/app.js"></script>
+<script src="../../assets/js/data.js"></script>
+<script src="../../assets/js/customer-management-edit.js"></script>
+</body>
+</html>
