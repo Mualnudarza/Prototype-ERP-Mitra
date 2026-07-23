@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title id="page-title">Tambah Paket Layanan · Dasaria ERP</title>
+<link rel="stylesheet" href="../../assets/css/theme.css" />
+<link rel="stylesheet" href="../../assets/css/sales-service-management.css" />
+</head>
+<body>
+
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark">DA</div>
+      <div>
+        <div class="name">Dasaria ERP</div>
+        <div class="sub">Mitra Panel</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Utama</div>
+      <a class="nav-item" href="../../index.html">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Dashboard
+      </a>
+
+      <div class="nav-section-label">Modul Customer Management</div>
+      <a class="nav-item" href="../../pages/customer-management/index.html">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20c1.4-4 4.2-6 7.5-6s6.1 2 7.5 6"/></svg>
+        Customer Management
+      </a>
+
+      <div class="nav-section-label">Modul Penjualan &amp; Layanan</div>
+      <a class="nav-item active" href="packages.html">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/></svg>
+        Paket Layanan
+      </a>
+      <a class="nav-item" href="customer-packages.html">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+        Paket Pelanggan
+      </a>
+    </nav>
+
+    <div class="sidebar-foot">Astryx UI · tema Neutral</div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <div class="topbar-crumb">Dashboard / <a href="packages.html">Paket Layanan</a> / <b id="crumb-current">Tambah Paket</b></div>
+      <div class="topbar-right">
+        <div class="topbar-user">
+          <div class="avatar">AM</div>
+          Admin Mitra
+        </div>
+      </div>
+    </header>
+
+    <main class="page">
+      <div class="page-head">
+        <div>
+          <h1 id="page-heading">Tambah Paket Layanan Baru</h1>
+          <p id="page-subheading">Lengkapi data paket layanan yang akan ditawarkan kepada pelanggan.</p>
+        </div>
+      </div>
+
+      <div class="edit-layout">
+        <div class="card">
+          <form id="package-form">
+            <div class="form-section">
+              <h3>Informasi Paket</h3>
+              <div class="desc">Data utama paket layanan internet.</div>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="f-code">Kode Paket</label>
+                  <input type="text" id="f-code" required placeholder="cth. PKG-001" />
+                  <span class="field-hint">Kode unik paket layanan.</span>
+                </div>
+                <div class="form-field">
+                  <label for="f-name">Nama Paket</label>
+                  <input type="text" id="f-name" required placeholder="cth. Home 10 Mbps" />
+                </div>
+                <div class="form-field">
+                  <label for="f-bandwidth">Kecepatan Internet</label>
+                  <input type="text" id="f-bandwidth" required placeholder="cth. 10 Mbps" />
+                </div>
+                <div class="form-field">
+                  <label for="f-price">Harga Jual (Rp)</label>
+                  <input type="number" id="f-price" required min="0" placeholder="cth. 150000" />
+                  <span class="field-hint">Harga jual ditentukan mitra sesuai kebijakan bisnis.</span>
+                </div>
+                <div class="form-field">
+                  <label for="f-status">Status Paket</label>
+                  <select id="f-status">
+                    <option value="Aktif">Aktif</option>
+                    <option value="Nonaktif">Nonaktif</option>
+                  </select>
+                  <span class="field-hint">Paket Nonaktif tidak dapat dipilih pelanggan baru.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section" style="display:flex; justify-content:flex-end; gap:10px;">
+              <a class="btn btn-secondary" href="packages.html">Batal</a>
+              <button type="submit" class="btn btn-primary" id="btn-save">Simpan Paket</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card" style="padding:16px;" id="activity-card">
+          <h3 class="card-title">Riwayat Aktivitas</h3>
+          <ul class="activity-list" id="activity-list"></ul>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../assets/js/app.js"></script>
+<script src="../../assets/js/data.js"></script>
+<script src="../../assets/js/sales-service-management-packages-edit.js"></script>
+</body>
+</html>

@@ -64,5 +64,65 @@ const AppUtils = (function () {
       .replace(/"/g, "&quot;");
   }
 
-  return { formatDate, formatDateTime, debounce, toast, qs, escapeHtml };
+  function syncSidebar() {
+    const path = window.location.pathname.replace(/\\/g, "/");
+    
+    // Find the relative root path based on the current depth
+    const depth = (path.match(/\//g) || []).length;
+    let rootPrefix = "./";
+    if (path.includes("/pages/")) {
+      const parts = path.split("/pages/");
+      if (parts.length > 1) {
+         const subdirs = parts[1].split("/").length - 1;
+         rootPrefix = "../".repeat(subdirs + 1);
+      }
+    } else if (depth > 1) {
+      rootPrefix = "../".repeat(depth - 1);
+    }
+    
+    // Some static hostings serves / as /index.html
+    const isRoot = path.endsWith("/") || path.endsWith("/index.html") && !path.includes("/pages/");
+
+    const sidebarNav = document.querySelector(".sidebar-nav");
+    if (!sidebarNav) return;
+    sidebarNav.innerHTML = ""; // Clear existing sidebar
+
+    SIDEBAR_MENU.forEach(section => {
+      const sectionLabel = document.createElement("div");
+      sectionLabel.className = "nav-section-label";
+      sectionLabel.textContent = section.section;
+      sidebarNav.appendChild(sectionLabel);
+
+      section.items.forEach(item => {
+        const navItem = document.createElement("a");
+        navItem.className = "nav-item";
+        
+        // Remove leading slash and prepend root prefix
+        const relativeHref = rootPrefix + item.href.substring(1);
+        navItem.href = relativeHref;
+        
+        navItem.innerHTML = `
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">${item.icon}</svg>
+          ${item.label}
+        `;
+        
+        // Highlight logic
+        if (item.href === "/index.html" && isRoot) {
+          navItem.classList.add("active");
+        } else if (item.href !== "/index.html" && path.includes(item.href)) {
+          navItem.classList.add("active");
+        }
+        
+        sidebarNav.appendChild(navItem);
+      });
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", syncSidebar);
+  } else {
+    syncSidebar();
+  }
+
+  return { formatDate, formatDateTime, debounce, toast, qs, escapeHtml, syncSidebar };
 })();

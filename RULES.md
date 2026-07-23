@@ -24,7 +24,13 @@ File ini berisi panduan, konvensi, dan aturan-aturan arsitektural yang harus dip
 - **Penamaan Variabel JS:** Gunakan *camelCase* untuk variabel lokal dan fungsi (misal: `renderTable`, `customerData`). Gunakan *PascalCase* untuk class atau object global (misal: `CustomerDB`).
 - **Pemisahan Logika:** Hindari menulis logika JS secara *inline* di dalam file HTML (seperti atribut `onclick`). Gunakan *event listener* di file JS terpisah.
 
-## 5. Navigasi dan Label Modul
+## 5. Navigasi Sidebar Dinamis
+- **Definisi Menu:** Seluruh struktur menu sidebar didefinisikan secara terpusat dalam variabel `SIDEBAR_MENU` di `assets/js/data.js`.
+- **Render Otomatis:** Fungsi `syncSidebar()` di `assets/js/app.js` bertanggung jawab untuk membaca `SIDEBAR_MENU`, menghitung *relative path* yang benar berdasarkan kedalaman folder, dan merender HTML sidebar ke dalam container `.sidebar-nav`.
+- **Penanda Menu Aktif:** Fungsi `syncSidebar()` juga secara otomatis mendeteksi URL yang sedang diakses dan menambahkan class `active` pada menu yang bersesuaian.
+- **Implementasi HTML:** File HTML tidak perlu lagi menulis keras (hardcode) item-item menu di dalam `.sidebar-nav`. Cukup sediakan tag `<nav class="sidebar-nav"></nav>` yang kosong, sisanya di-handle oleh JavaScript.
+
+## 6. Navigasi dan Label Modul
 - Modul "Operasional" dinamakan menjadi **"Modul Customer Management"**.
 - Fitur/Menu yang belum tersedia jangan ditampilkan di Sidebar untuk menghindari kebingungan pengguna (seperti menu yang sebelumnya berlabel "Segera"). Hanya tampilkan menu yang sudah dapat digunakan secara fungsional.
 
