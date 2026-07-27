@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title id="page-title">Tambah Paket Dasar · Dasaria ERP</title>
+<link rel="stylesheet" href="../../assets/css/theme.css" />
+<link rel="stylesheet" href="../../assets/css/sales-service-management.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark">DA</div>
+      <div><div class="name">Dasaria ERP</div><div class="sub">Mitra Panel</div></div>
+    </div>
+    <nav class="sidebar-nav"></nav>
+    <div class="sidebar-foot">Astryx UI · tema Neutral</div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <div class="topbar-crumb">Dashboard / <a href="index.html">Base Package</a> / <b id="crumb-current">Tambah Paket Dasar</b></div>
+      <div class="topbar-right"><div class="topbar-user"><div class="avatar">SA</div>Super Admin ISP</div></div>
+    </header>
+
+    <main class="page">
+      <div class="page-head">
+        <div>
+          <h1 id="page-heading">Tambah Paket Dasar Baru</h1>
+          <p id="page-subheading">Paket dasar ISP sebagai batas minimum harga jual Mitra.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <form id="package-form">
+          <div class="form-section">
+            <h3>Informasi Paket Dasar</h3>
+            <div class="desc">Data utama paket dasar ISP.</div>
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="f-name">Nama Paket</label>
+                <input type="text" id="f-name" required placeholder="cth. Home 20 Mbps" />
+              </div>
+              <div class="form-field">
+                <label for="f-bandwidth-down">Bandwidth Download (Mbps)</label>
+                <input type="number" id="f-bandwidth-down" required min="1" placeholder="cth. 20" />
+              </div>
+              <div class="form-field">
+                <label for="f-bandwidth-up">Bandwidth Upload (Mbps)</label>
+                <input type="number" id="f-bandwidth-up" min="0" placeholder="cth. 5" />
+              </div>
+              <div class="form-field">
+                <label for="f-base-price">Harga Dasar (Rp)</label>
+                <input type="number" id="f-base-price" required min="0" placeholder="cth. 130000" />
+                <span class="field-hint">Harga minimum yang dibebankan ISP ke Mitra.</span>
+              </div>
+              <div class="form-field">
+                <label for="f-radius-profile">Radius Profile Name</label>
+                <input type="text" id="f-radius-profile" required placeholder="cth. rp-home-20" />
+                <span class="field-hint">Nama profile bandwidth di FreeRADIUS.</span>
+              </div>
+              <div class="form-field">
+                <label for="f-status">Status</label>
+                <select id="f-status">
+                  <option value="Aktif">Aktif</option>
+                  <option value="Nonaktif">Nonaktif</option>
+                </select>
+                <span class="field-hint">Paket Nonaktif tidak bisa dipakai untuk paket jual Mitra baru.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section" style="display:flex; justify-content:flex-end; gap:10px;">
+            <a class="btn btn-secondary" href="index.html">Batal</a>
+            <button type="submit" class="btn btn-primary" id="btn-save">Simpan Paket Dasar</button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../assets/js/app.js"></script>
+<script src="../../assets/js/data.js"></script>
+<script src="../../assets/js/base-package-edit.js"></script>
+</body>
+</html>

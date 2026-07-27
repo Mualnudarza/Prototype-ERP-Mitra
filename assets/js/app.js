@@ -64,7 +64,23 @@ const AppUtils = (function () {
       .replace(/"/g, "&quot;");
   }
 
+  function syncSidebarBrand() {
+    const brand = document.querySelector(".sidebar-brand");
+    if (!brand || !window.AppRole || brand.querySelector(".role-switch")) return;
+
+    brand.style.flexWrap = "wrap";
+    const select = document.createElement("select");
+    select.className = "role-switch";
+    select.setAttribute("aria-label", "Pilih role");
+    select.style.cssText = "width:100%;margin-top:10px;padding:8px 10px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface);color:var(--color-text);font:inherit;";
+    select.innerHTML = AppRole.all().map(role => `<option value="${escapeHtml(role)}">${escapeHtml(role)}</option>`).join("");
+    select.value = AppRole.get();
+    select.addEventListener("change", () => { AppRole.set(select.value); syncSidebar(); });
+    brand.appendChild(select);
+  }
+
   function syncSidebar() {
+    syncSidebarBrand();
     const path = window.location.pathname.replace(/\\/g, "/");
     
     // Find the relative root path based on the current depth
@@ -87,7 +103,8 @@ const AppUtils = (function () {
     if (!sidebarNav) return;
     sidebarNav.innerHTML = ""; // Clear existing sidebar
 
-    SIDEBAR_MENU.forEach(section => {
+    const menu = window.SIDEBAR_MENUS && window.AppRole ? SIDEBAR_MENUS[AppRole.get()] : SIDEBAR_MENU;
+    menu.forEach(section => {
       const sectionLabel = document.createElement("div");
       sectionLabel.className = "nav-section-label";
       sectionLabel.textContent = section.section;

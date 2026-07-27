@@ -10,7 +10,6 @@
 
 <div class="app-shell">
 
-  <!-- ==================== SIDEBAR ==================== -->
   <aside class="sidebar">
     <div class="sidebar-brand">
       <div class="mark">DA</div>
@@ -19,35 +18,10 @@
         <div class="sub">Mitra Panel</div>
       </div>
     </div>
-
-    <nav class="sidebar-nav">
-      <div class="nav-section-label">Utama</div>
-      <a class="nav-item active" href="index.html">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-        Dashboard
-      </a>
-
-      <div class="nav-section-label">Modul Customer Management</div>
-      <a class="nav-item" href="pages/customer-management/index.html">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20c1.4-4 4.2-6 7.5-6s6.1 2 7.5 6"/></svg>
-        Customer Management
-      </a>
-
-      <div class="nav-section-label">Modul Penjualan & Layanan</div>
-      <a class="nav-item" href="pages/sales-service-management/packages.html">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/></svg>
-        Paket Layanan
-      </a>
-      <a class="nav-item" href="pages/sales-service-management/customer-packages.html">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
-        Paket Pelanggan
-      </a>
-    </nav>
-
+    <nav class="sidebar-nav"></nav>
     <div class="sidebar-foot">Astryx UI · tema Neutral</div>
   </aside>
 
-  <!-- ==================== MAIN ==================== -->
   <div class="main-col">
     <header class="topbar">
       <div class="topbar-crumb"><b>Dashboard</b></div>
@@ -67,9 +41,7 @@
         </div>
       </div>
 
-      <div class="summary-grid" id="dashboard-summary">
-        <!-- diisi oleh app-dashboard.js -->
-      </div>
+      <div class="summary-grid" id="dashboard-summary"></div>
 
       <h3 class="mt-14" style="margin-bottom:12px;">Modul ERP</h3>
       <div class="module-grid">
@@ -82,12 +54,93 @@
           <span class="text-link mt-8">Buka modul →</span>
         </a>
 
+        <a class="module-tile" href="pages/mitra-management/index.html">
+          <div class="mt-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <h4>Mitra Management</h4>
+          <p>Mitra sebagai entitas cabang: kode, rekening settlement, jatuh tempo, dan coverage area.</p>
+          <span class="text-link mt-8">Buka modul →</span>
+        </a>
+
+        <a class="module-tile" href="pages/base-package/index.html">
+          <div class="mt-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/></svg>
+          </div>
+          <h4>Base Package ISP</h4>
+          <p>Paket dasar ISP sebagai batas minimum harga jual Mitra. Bandwidth, harga dasar, Radius profile.</p>
+          <span class="text-link mt-8">Buka modul →</span>
+        </a>
+
         <a class="module-tile" href="pages/sales-service-management/packages.html">
           <div class="mt-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/></svg>
           </div>
           <h4>Penjualan & Layanan</h4>
           <p>Kelola paket layanan internet dan paket pelanggan — harga jual, upgrade/downgrade, histori.</p>
+          <span class="text-link mt-8">Buka modul →</span>
+        </a>
+
+        <a class="module-tile" href="pages/billing/index.html">
+          <div class="mt-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          </div>
+          <h4>Billing / Invoice</h4>
+          <p>Tagihan accrual customer, Virtual Account, status unpaid/paid/expired, simulasi pembayaran.</p>
+          <span class="text-link mt-8">Buka modul →</span>
+        </a>
+
+        <a class="module-tile" href="pages/payment/index.html">
+          <div class="mt-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          </div>
+          <h4>Payment Gateway</h4>
+          <p>Riwayat callback Paspe, validasi transaksi, idempotency check, simulasi callback pembayaran.</p>
+          <span class="text-link mt-8">Buka modul →</span>
+        </a>
+
+        <a class="module-tile" href="pages/settlement/index.html">
+          <div class="mt-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <h4>Settlement Mitra</h4>
+          <p>Saldo hak Mitra, ledger transaksi, pengajuan payout, rekonsiliasi Finance.</p>
+          <span class="text-link mt-8">Buka modul →</span>
+        </a>
+
+        <a class="module-tile" href="pages/radius/index.html">
+          <div class="mt-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2 7 4-14 2 7h5"/></svg>
+          </div>
+          <h4>Radius Logs</h4>
+          <p>Log aksi Radius Control Gateway: provisioning, suspend, re-aktivasi, CoA, status.</p>
+          <span class="text-link mt-8">Buka modul →</span>
+        </a>
+
+        <a class="module-tile" href="pages/olt-management/index.html">
+          <div class="mt-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="20" height="5" rx="1.5"/><rect x="2" y="14" width="20" height="5" rx="1.5"/></svg>
+          </div>
+          <h4>OLT Management</h4>
+          <p>Master OLT, slot, port, kode OLT, dan konfigurasi SNMP read-only.</p>
+          <span class="text-link mt-8">Buka modul →</span>
+        </a>
+
+        <a class="module-tile" href="pages/odp-management/index.html">
+          <div class="mt-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 11 15.5 7M8.5 13l7 4"/></svg>
+          </div>
+          <h4>ODP / Splitter</h4>
+          <p>Mapping ODP, kapasitas port access, nomor ONU, dan koordinat lokasi.</p>
+          <span class="text-link mt-8">Buka modul →</span>
+        </a>
+
+        <a class="module-tile" href="pages/monitoring-olt/index.html">
+          <div class="mt-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2 7 4-14 2 7h5"/></svg>
+          </div>
+          <h4>Monitoring OLT</h4>
+          <p>Status ONU dan redaman customer via SNMP read-only untuk troubleshooting NOC.</p>
           <span class="text-link mt-8">Buka modul →</span>
         </a>
 
@@ -99,24 +152,6 @@
           <h4>Work Order</h4>
           <p>Penjadwalan dan pelacakan pekerjaan instalasi maupun gangguan teknisi lapangan.</p>
         </div>
-
-        <div class="module-tile disabled">
-          <div class="mt-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-          </div>
-          <span class="tag-soon">Segera hadir</span>
-          <h4>Billing</h4>
-          <p>Penagihan, invoice, dan riwayat pembayaran pelanggan.</p>
-        </div>
-
-        <div class="module-tile disabled">
-          <div class="mt-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2 7 4-14 2 7h5"/></svg>
-          </div>
-          <span class="tag-soon">Segera hadir</span>
-          <h4>Monitoring</h4>
-          <p>Pemantauan status jaringan dan kondisi perangkat pelanggan secara real-time.</p>
-        </div>
       </div>
     </main>
   </div>
@@ -126,28 +161,30 @@
 <script src="assets/js/data.js"></script>
 <script>
   (function () {
-    const s = CustomerDB.summary();
-    const grid = document.getElementById("dashboard-summary");
-    grid.innerHTML = `
+    const cs = CustomerDB.summary();
+    const is = InvoiceDB.summary();
+    const ps = PaymentDB.summary();
+    const ss = SettlementDB.summary();
+    document.getElementById("dashboard-summary").innerHTML = `
       <div class="summary-card total">
         <div class="label">Total Pelanggan</div>
-        <div class="value">${s.total}</div>
+        <div class="value">${cs.total}</div>
         <div class="hint">Seluruh pelanggan terdaftar</div>
       </div>
       <div class="summary-card active">
         <div class="label">Pelanggan Aktif</div>
-        <div class="value">${s.active}</div>
+        <div class="value">${cs.active}</div>
         <div class="hint">Status Active</div>
       </div>
       <div class="summary-card isolir">
-        <div class="label">Pelanggan Isolir</div>
-        <div class="value">${s.isolir}</div>
-        <div class="hint">Layanan disuspend sementara</div>
+        <div class="label">Invoice Unpaid</div>
+        <div class="value">${is.unpaid + is.expired}</div>
+        <div class="hint">Belum dibayar + expired</div>
       </div>
       <div class="summary-card terminate">
-        <div class="label">Pelanggan Terminate</div>
-        <div class="value">${s.terminate}</div>
-        <div class="hint">Layanan dihentikan permanen</div>
+        <div class="label">Saldo Pending</div>
+        <div class="value">Rp${new Intl.NumberFormat("id-ID").format(ss.totalPendingAmount)}</div>
+        <div class="hint">Hak Mitra belum dicairkan</div>
       </div>
     `;
   })();

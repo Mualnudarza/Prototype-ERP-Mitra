@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Settlement · Dasaria ERP</title>
+<link rel="stylesheet" href="../../assets/css/theme.css" />
+<link rel="stylesheet" href="../../assets/css/sales-service-management.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark">DA</div>
+      <div><div class="name">Dasaria ERP</div><div class="sub">Mitra Panel</div></div>
+    </div>
+    <nav class="sidebar-nav"></nav>
+    <div class="sidebar-foot">Astryx UI · tema Neutral</div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <div class="topbar-crumb">Dashboard / <b>Settlement</b></div>
+      <div class="topbar-right"><div class="topbar-user"><div class="avatar">AM</div>Admin Mitra</div></div>
+    </header>
+
+    <main class="page">
+      <div class="page-head">
+        <div>
+          <h1>Settlement Mitra</h1>
+          <p>Hak pendapatan Mitra tercatat otomatis setiap invoice lunas. Mitra dapat mengajukan pencairan (payout) saldo.</p>
+        </div>
+        <button class="btn btn-primary" id="btn-request-payout">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Ajukan Payout
+        </button>
+      </div>
+
+      <div class="summary-grid" id="summary-grid"></div>
+
+      <h3 style="margin-bottom:10px;">Ledger Transaksi</h3>
+      <div class="card" style="padding:16px 18px; margin-bottom:24px;">
+        <div class="toolbar">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" id="ledger-search" placeholder="Cari Invoice atau Customer…" />
+          </div>
+          <select id="ledger-filter-status" class="filter-select">
+            <option value="">Semua Status</option>
+            <option value="pending">Pending</option>
+            <option value="settled">Settled</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" id="ledger-reset-filter">Reset</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Customer</th>
+                <th>Selling Price</th>
+                <th>Base Price (ISP)</th>
+                <th>Gateway Fee</th>
+                <th>Hak Mitra</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="ledger-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination"><span id="ledger-result-count"></span></div>
+      </div>
+
+      <h3 style="margin-bottom:10px;">Riwayat Payout</h3>
+      <div class="card" style="padding:16px 18px;">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tanggal Ajukan</th>
+                <th>Amount</th>
+                <th>Bank Tujuan</th>
+                <th>Status</th>
+                <th>Bukti Transfer</th>
+                <th>Tanggal Bayar</th>
+              </tr>
+            </thead>
+            <tbody id="payout-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<script src="../../assets/js/app.js"></script>
+<script src="../../assets/js/data.js"></script>
+<script src="../../assets/js/settlement-list.js"></script>
+</body>
+</html>

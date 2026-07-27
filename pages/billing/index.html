@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Invoice / Billing · Dasaria ERP</title>
+<link rel="stylesheet" href="../../assets/css/theme.css" />
+<link rel="stylesheet" href="../../assets/css/sales-service-management.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark">DA</div>
+      <div><div class="name">Dasaria ERP</div><div class="sub">Mitra Panel</div></div>
+    </div>
+    <nav class="sidebar-nav"></nav>
+    <div class="sidebar-foot">Astryx UI · tema Neutral</div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <div class="topbar-crumb">Dashboard / <b>Invoice / Billing</b></div>
+      <div class="topbar-right"><div class="topbar-user"><div class="avatar">AM</div>Admin Mitra</div></div>
+    </header>
+
+    <main class="page">
+      <div class="page-head">
+        <div>
+          <h1>Invoice / Billing</h1>
+          <p>Daftar tagihan accrual customer. Invoice dibuat otomatis sesuai siklus penagihan. Customer membayar melalui Virtual Account (VA).</p>
+        </div>
+        <button class="btn btn-primary" id="btn-simulate-generate">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Generate Invoice (Simulasi)
+        </button>
+      </div>
+
+      <div class="summary-grid" id="summary-grid"></div>
+
+      <div class="card" style="padding:16px 18px;">
+        <div class="toolbar">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" id="search-input" placeholder="Cari Nomor Invoice, Customer, atau VA…" />
+          </div>
+          <select id="filter-status" class="filter-select">
+            <option value="">Semua Status</option>
+            <option value="unpaid">Unpaid</option>
+            <option value="paid">Paid</option>
+            <option value="expired">Expired</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" id="btn-reset-filter">Reset</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="sortable" data-key="invoice_number">Nomor Invoice <span class="sort-arrow">↕</span></th>
+                <th class="sortable" data-key="customer_name">Customer <span class="sort-arrow">↕</span></th>
+                <th class="sortable" data-key="period_start">Periode <span class="sort-arrow">↕</span></th>
+                <th class="sortable" data-key="due_date">Jatuh Tempo <span class="sort-arrow">↕</span></th>
+                <th class="sortable" data-key="amount">Nominal <span class="sort-arrow">↕</span></th>
+                <th class="sortable" data-key="status">Status <span class="sort-arrow">↕</span></th>
+                <th>Virtual Account</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+        <div class="pagination"><span id="result-count"></span></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../assets/js/app.js"></script>
+<script src="../../assets/js/data.js"></script>
+<script src="../../assets/js/billing-list.js"></script>
+</body>
+</html>

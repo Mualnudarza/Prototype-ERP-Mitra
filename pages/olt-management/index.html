@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OLT Management · Dasaria ERP</title>
+<link rel="stylesheet" href="../../assets/css/theme.css" />
+<link rel="stylesheet" href="../../assets/css/sales-service-management.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark">DA</div>
+      <div><div class="name">Dasaria ERP</div><div class="sub">Mitra Panel</div></div>
+    </div>
+    <nav class="sidebar-nav"></nav>
+    <div class="sidebar-foot">Astryx UI · tema Neutral</div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <div class="topbar-crumb">Dashboard / <b>OLT Management</b></div>
+      <div class="topbar-right"><div class="topbar-user"><div class="avatar">NO</div>NOC</div></div>
+    </header>
+
+    <main class="page">
+      <div class="page-head">
+        <div>
+          <h1>OLT Management</h1>
+          <p>Master OLT, slot, port, dan kode OLT. Registrasi OLT hanya pencatatan perangkat, bukan provisioning otomatis. Validasi utama customer tetap PPPoE.</p>
+        </div>
+        <div class="status-actions">
+          <button class="btn btn-secondary">Test SNMP</button>
+          <button class="btn btn-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Tambah OLT
+          </button>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-card total"><div class="label">Total OLT</div><div class="value">2</div><div class="hint">Perangkat terdaftar</div></div>
+        <div class="summary-card active"><div class="label">OLT Aktif</div><div class="value">2</div><div class="hint">Siap monitoring</div></div>
+        <div class="summary-card isolir"><div class="label">Maintenance</div><div class="value">0</div><div class="hint">Tidak dipakai customer baru</div></div>
+        <div class="summary-card total"><div class="label">Total Port</div><div class="value">24</div><div class="hint">Slot/port terdaftar</div></div>
+      </div>
+
+      <h3 style="margin-bottom:10px;">Daftar OLT</h3>
+      <div class="card" style="padding:16px 18px; margin-bottom:24px;">
+        <div class="toolbar">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" placeholder="Cari Nama OLT atau Host…" />
+          </div>
+          <select class="filter-select">
+            <option value="">Semua Branch</option>
+            <option>Batu</option>
+            <option>Malang</option>
+          </select>
+          <select class="filter-select">
+            <option value="">Semua Status</option>
+            <option>Aktif</option>
+            <option>Maintenance</option>
+            <option>Nonaktif</option>
+          </select>
+          <button class="btn btn-ghost btn-sm">Reset</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nama OLT</th>
+                <th>Branch</th>
+                <th>Type</th>
+                <th>Host SNMP</th>
+                <th>Port SNMP</th>
+                <th>VLAN PPPoE</th>
+                <th>Jumlah Port</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cell-strong">OLT-BTU-01</td>
+                <td>Batu</td>
+                <td>ZTE C320</td>
+                <td class="cell-muted">103.184.19.104</td>
+                <td>10161</td>
+                <td>1220</td>
+                <td>16</td>
+                <td><span class="badge badge-active">Aktif</span></td>
+                <td><button class="btn btn-secondary btn-sm">Detail</button></td>
+              </tr>
+              <tr>
+                <td class="cell-strong">OLT-MLG-02</td>
+                <td>Malang</td>
+                <td>ZTE C300</td>
+                <td class="cell-muted">103.184.19.108</td>
+                <td>10161</td>
+                <td>1230</td>
+                <td>8</td>
+                <td><span class="badge badge-active">Aktif</span></td>
+                <td><button class="btn btn-secondary btn-sm">Detail</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination"><span>Menampilkan 2 dari 2 OLT</span></div>
+      </div>
+
+      <h3 style="margin-bottom:10px;">OLT Port &amp; Kode OLT</h3>
+      <div class="card" style="padding:16px 18px;">
+        <div class="toolbar">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" placeholder="Cari Label Port atau Kode OLT…" />
+          </div>
+          <select class="filter-select">
+            <option value="">Semua OLT</option>
+            <option>OLT-BTU-01</option>
+            <option>OLT-MLG-02</option>
+          </select>
+          <button class="btn btn-ghost btn-sm">Reset</button>
+          <button class="btn btn-primary btn-sm">Tambah Slot/Port</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>OLT</th>
+                <th>Slot</th>
+                <th>Port</th>
+                <th>Label</th>
+                <th>Kode OLT</th>
+                <th>Coverage Area</th>
+                <th>Jumlah ODP</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>OLT-BTU-01</td>
+                <td>1</td>
+                <td>2</td>
+                <td><span class="package-code-tag">1/1/2</span></td>
+                <td class="cell-muted">268501248</td>
+                <td>Batu Center</td>
+                <td>2</td>
+                <td><span class="badge badge-active">Aktif</span></td>
+                <td><button class="btn btn-secondary btn-sm">Edit</button></td>
+              </tr>
+              <tr>
+                <td>OLT-BTU-01</td>
+                <td>1</td>
+                <td>3</td>
+                <td><span class="package-code-tag">1/1/3</span></td>
+                <td class="cell-muted">268501504</td>
+                <td>Batu Center</td>
+                <td>1</td>
+                <td><span class="badge badge-active">Aktif</span></td>
+                <td><button class="btn btn-secondary btn-sm">Edit</button></td>
+              </tr>
+              <tr>
+                <td>OLT-BTU-01</td>
+                <td>1</td>
+                <td>6</td>
+                <td><span class="package-code-tag">1/1/6</span></td>
+                <td class="cell-muted">268502272</td>
+                <td>Batu Selatan</td>
+                <td>1</td>
+                <td><span class="badge badge-active">Aktif</span></td>
+                <td><button class="btn btn-secondary btn-sm">Edit</button></td>
+              </tr>
+              <tr>
+                <td>OLT-MLG-02</td>
+                <td>1</td>
+                <td>4</td>
+                <td><span class="package-code-tag">1/1/4</span></td>
+                <td class="cell-muted">268501760</td>
+                <td>Malang Utara</td>
+                <td>3</td>
+                <td><span class="badge badge-active">Aktif</span></td>
+                <td><button class="btn btn-secondary btn-sm">Edit</button></td>
+              </tr>
+              <tr>
+                <td>OLT-MLG-02</td>
+                <td>1</td>
+                <td>7</td>
+                <td><span class="package-code-tag">1/1/7</span></td>
+                <td class="cell-muted">268502528</td>
+                <td class="cell-muted">-</td>
+                <td>0</td>
+                <td><span class="badge badge-isolir">Maintenance</span></td>
+                <td><button class="btn btn-secondary btn-sm">Edit</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination"><span>Menampilkan 5 dari 24 port</span></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../assets/js/app.js"></script>
+<script src="../../assets/js/data.js"></script>
+</body>
+</html>

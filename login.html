@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Login · Dasaria ERP</title>
+<link rel="stylesheet" href="assets/css/theme.css" />
+<style>
+  .login-shell{ display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--color-bg); }
+  .login-card{ width:100%; max-width:400px; padding:36px 32px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); box-shadow:var(--shadow-md); }
+  .login-brand{ display:flex; align-items:center; gap:10px; margin-bottom:28px; }
+  .login-brand .mark{ width:36px; height:36px; border-radius:9px; background:var(--color-accent); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; color:#fff; font-size:16px; }
+  .login-brand .name{ font-family:var(--font-display); font-weight:600; font-size:18px; }
+  .login-brand .sub{ font-size:12px; color:var(--color-text-muted); }
+  .login-form{ display:flex; flex-direction:column; gap:16px; }
+  .login-form .form-field{ display:flex; flex-direction:column; gap:5px; }
+  .login-form label{ font-size:12.5px; font-weight:600; }
+  .login-form input{ padding:10px 12px; font-size:14px; }
+  .role-selector{ display:flex; gap:8px; flex-wrap:wrap; }
+  .role-chip{ padding:8px 14px; border-radius:var(--radius-sm); border:1px solid var(--color-border-strong); font-size:12.5px; font-weight:600; cursor:pointer; transition:all .12s; background:var(--color-surface); }
+  .role-chip.active{ background:var(--color-accent); color:#fff; border-color:var(--color-accent); }
+  .login-hint{ font-size:12px; color:var(--color-text-faint); text-align:center; margin-top:12px; }
+</style>
+</head>
+<body>
+
+<div class="login-shell">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="mark">DA</div>
+      <div>
+        <div class="name">Dasaria ERP</div>
+        <div class="sub">Mitra Panel · Login</div>
+      </div>
+    </div>
+
+    <form class="login-form" id="login-form">
+      <div class="form-field">
+        <label>Email</label>
+        <input type="email" id="f-email" required placeholder="admin@dasarata.id" value="admin@dasarata.id" />
+      </div>
+      <div class="form-field">
+        <label>Password</label>
+        <input type="password" id="f-password" required placeholder="••••••••" value="admin123" />
+      </div>
+      <div class="form-field">
+        <label>Login sebagai</label>
+        <div class="role-selector" id="role-selector">
+          <div class="role-chip active" data-role="super_admin">Super Admin ISP</div>
+          <div class="role-chip" data-role="mitra_admin">Admin Mitra</div>
+          <div class="role-chip" data-role="finance">Finance</div>
+          <div class="role-chip" data-role="noc">NOC</div>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; margin-top:8px;">Login</button>
+    </form>
+
+    <p class="login-hint">Prototype only — pilih role lalu klik Login untuk masuk ke dashboard.</p>
+  </div>
+</div>
+
+<script>
+  let selectedRole = "super_admin";
+  document.querySelectorAll(".role-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll(".role-chip").forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      selectedRole = chip.dataset.role;
+    });
+  });
+
+  document.getElementById("login-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const email = document.getElementById("f-email").value.trim();
+    const password = document.getElementById("f-password").value.trim();
+    if (!email || !password) { alert("Email dan password wajib diisi."); return; }
+    localStorage.setItem("erp_session", JSON.stringify({ email, role: selectedRole, loginAt: new Date().toISOString() }));
+    window.location.href = "index.html";
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title id="page-title">Tambah Mitra · Dasaria ERP</title>
+<link rel="stylesheet" href="../../assets/css/theme.css" />
+<link rel="stylesheet" href="../../assets/css/customer-management.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark">DA</div>
+      <div><div class="name">Dasaria ERP</div><div class="sub">Mitra Panel</div></div>
+    </div>
+    <nav class="sidebar-nav"></nav>
+    <div class="sidebar-foot">Astryx UI · tema Neutral</div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <div class="topbar-crumb">Dashboard / <a href="index.html">Mitra Management</a> / <b id="crumb-current">Tambah Mitra</b></div>
+      <div class="topbar-right"><div class="topbar-user"><div class="avatar">SA</div>Super Admin ISP</div></div>
+    </header>
+
+    <main class="page">
+      <div class="page-head">
+        <div>
+          <h1 id="page-heading">Tambah Mitra Baru</h1>
+          <p id="page-subheading">Lengkapi data Mitra sebagai entitas cabang: kode, rekening settlement, jatuh tempo, dan coverage area.</p>
+        </div>
+        <div class="status-actions" id="status-actions"></div>
+      </div>
+
+      <div class="edit-layout">
+        <div class="card">
+          <form id="mitra-form">
+            <div class="form-section">
+              <h3>Informasi Mitra</h3>
+              <div class="desc">Identitas dan kontak Mitra.</div>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="f-code">Kode Mitra</label>
+                  <input type="text" id="f-code" required placeholder="cth. DSR" />
+                  <span class="field-hint">Kode cabang Mitra, dipakai pada penomoran dan pelaporan.</span>
+                </div>
+                <div class="form-field">
+                  <label for="f-name">Nama Mitra / Brand</label>
+                  <input type="text" id="f-name" required placeholder="cth. Dasarata Net" />
+                </div>
+                <div class="form-field">
+                  <label for="f-legal-name">Nama Badan Hukum</label>
+                  <input type="text" id="f-legal-name" placeholder="cth. PT Dasarata Network" />
+                </div>
+                <div class="form-field">
+                  <label for="f-pic">Nama PIC</label>
+                  <input type="text" id="f-pic" required placeholder="cth. Pak Joko" />
+                </div>
+                <div class="form-field">
+                  <label for="f-phone">Nomor Telepon</label>
+                  <input type="text" id="f-phone" required placeholder="cth. 081234500001" />
+                </div>
+                <div class="form-field">
+                  <label for="f-email">Email</label>
+                  <input type="email" id="f-email" placeholder="cth. joko@dasarata.id" />
+                </div>
+                <div class="form-field">
+                  <label for="f-status">Status</label>
+                  <select id="f-status">
+                    <option value="Aktif">Aktif</option>
+                    <option value="Nonaktif">Nonaktif</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h3>Kerja Sama B2B</h3>
+              <div class="desc">Data legal, periode berlaku, dokumen, dan kebutuhan operasional kerja sama.</div>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="f-agreement-name">Nama Kerja Sama</label>
+                  <input type="text" id="f-agreement-name" required placeholder="cth. Kemitraan Reseller FTTH Batu" />
+                </div>
+                <div class="form-field">
+                  <label for="f-agreement-number">Nomor Dokumen / PKS</label>
+                  <input type="text" id="f-agreement-number" placeholder="cth. PKS/DSR/001/2026" />
+                </div>
+                <div class="form-field">
+                  <label for="f-agreement-start">Mulai Berlaku</label>
+                  <input type="date" id="f-agreement-start" required />
+                </div>
+                <div class="form-field">
+                  <label for="f-agreement-end">Aktif Sampai / Berakhir</label>
+                  <input type="date" id="f-agreement-end" required />
+                </div>
+                <div class="form-field">
+                  <label for="f-agreement-document">Dokumen Kerja Sama</label>
+                  <input type="text" id="f-agreement-document" placeholder="cth. Google Drive / nama file PKS.pdf" />
+                </div>
+                <div class="form-field">
+                  <label for="f-business-type">Model Kerja Sama</label>
+                  <select id="f-business-type">
+                    <option value="Reseller">Reseller</option>
+                    <option value="Revenue Share">Revenue Share</option>
+                    <option value="White Label">White Label</option>
+                    <option value="Wholesale">Wholesale</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label for="f-tax-id">NPWP / NIB</label>
+                  <input type="text" id="f-tax-id" placeholder="cth. 12.345.678.9-012.000" />
+                </div>
+                <div class="form-field">
+                  <label for="f-commission">Skema Komisi / Margin</label>
+                  <input type="text" id="f-commission" placeholder="cth. 30% revenue share atau Rp50.000/pelanggan" />
+                </div>
+                <div class="form-field span-2">
+                  <label for="f-mitra-needs">Kebutuhan Mitra</label>
+                  <textarea id="f-mitra-needs" rows="4" placeholder="cth. akses portal, billing, provisioning Radius, settlement bulanan, materi marketing, SLA support"></textarea>
+                  <span class="field-hint">Isi kebutuhan B2B: akses sistem, teknis jaringan, billing, support, legal, pelaporan, settlement.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h3>Rekening Settlement</h3>
+              <div class="desc">Rekening bank untuk transfer pendapatan Mitra.</div>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="f-bank-name">Nama Bank</label>
+                  <input type="text" id="f-bank-name" required placeholder="cth. BCA" />
+                </div>
+                <div class="form-field">
+                  <label for="f-bank-account-number">Nomor Rekening</label>
+                  <input type="text" id="f-bank-account-number" required placeholder="cth. 1234567890" />
+                </div>
+                <div class="form-field span-2">
+                  <label for="f-bank-account-name">Nama Pemilik Rekening</label>
+                  <input type="text" id="f-bank-account-name" required placeholder="cth. PT Dasarata Network" />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h3>Konfigurasi Jatuh Tempo</h3>
+              <div class="desc">Default rule jatuh tempo untuk customer Mitra ini.</div>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="f-due-type">Tipe Jatuh Tempo</label>
+                  <select id="f-due-type">
+                    <option value="fixed_day">Tanggal Tetap</option>
+                    <option value="days_after_issue">Jangka Waktu setelah Invoice</option>
+                    <option value="running_day">Hari Berjalan (Pro-rata)</option>
+                    <option value="plus_30_days">Jatuh Tempo + 30 Hari</option>
+                    <option value="activation_date_cycle">Siklus Tanggal Aktivasi</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label for="f-due-value">Nilai</label>
+                  <input type="text" id="f-due-value" placeholder="cth. 15 (untuk tanggal 15) atau 7 (untuk H+7)" />
+                  <span class="field-hint">Isi sesuai tipe jatuh tempo yang dipilih.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section" style="display:flex; justify-content:flex-end; gap:10px;">
+              <a class="btn btn-secondary" href="index.html">Batal</a>
+              <button type="submit" class="btn btn-primary" id="btn-save">Simpan Mitra</button>
+            </div>
+          </form>
+
+          <div class="form-section" id="coverage-section">
+            <h3>Coverage Area Mitra</h3>
+            <div class="desc">Area layanan milik Mitra ini. Customer hanya dapat didaftarkan pada coverage area yang aktif.</div>
+
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Nama Coverage</th>
+                    <th>OLT</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="coverage-body"></tbody>
+              </table>
+            </div>
+
+            <div class="form-grid mt-14">
+              <div class="form-field">
+                <label for="f-cov-name">Nama Coverage Baru</label>
+                <input type="text" id="f-cov-name" placeholder="cth. Batu Center" />
+              </div>
+              <div class="form-field">
+                <label for="f-cov-olt">OLT</label>
+                <input type="text" id="f-cov-olt" placeholder="cth. OLT-BTU-01" />
+              </div>
+            </div>
+            <div class="mt-8" style="display:flex; justify-content:flex-end;">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-add-coverage">Tambah Coverage Area</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="padding:16px;" id="activity-card">
+          <h3 class="card-title">Riwayat Aktivitas</h3>
+          <ul class="activity-list" id="activity-list"></ul>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<script src="../../assets/js/app.js"></script>
+<script src="../../assets/js/data.js"></script>
+<script src="../../assets/js/mitra-management-edit.js"></script>
+</body>
+</html>

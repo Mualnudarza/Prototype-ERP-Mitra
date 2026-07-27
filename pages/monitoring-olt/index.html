@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Monitoring OLT · Dasaria ERP</title>
+<link rel="stylesheet" href="../../assets/css/theme.css" />
+<link rel="stylesheet" href="../../assets/css/sales-service-management.css" />
+<style>
+  .onu-status-chip {
+    display:inline-flex; align-items:center; gap:5px;
+    padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600;
+  }
+  .onu-status-chip::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .status-working { background:var(--color-success-soft); color:var(--color-success); }
+  .status-los { background:var(--color-danger-soft); color:var(--color-danger); }
+  .status-offline { background:var(--color-surface-alt); color:var(--color-text-muted); }
+  .status-authfailed { background:#FFF3E0; color:#E65100; }
+  .status-dyinggasp { background:#FCE4EC; color:#C62828; }
+  .status-syncing { background:var(--color-warning-soft); color:var(--color-warning); }
+  .rx-level { font-family: var(--font-display); font-weight:600; font-size:13px; }
+  .rx-ok { color:var(--color-success); }
+  .rx-warn { color:var(--color-warning); }
+  .rx-bad { color:var(--color-danger); }
+  .monitoring-header { display:flex; align-items:center; gap:10px; margin-bottom:20px; }
+  .monitoring-header .olt-tag { font-size:13px; font-weight:600; background:var(--color-accent-soft); color:var(--color-accent); padding:4px 12px; border-radius:6px; }
+  .last-checked { font-size:12px; color:var(--color-text-muted); }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark">DA</div>
+      <div><div class="name">Dasaria ERP</div><div class="sub">Mitra Panel</div></div>
+    </div>
+    <nav class="sidebar-nav"></nav>
+    <div class="sidebar-foot">Astryx UI · tema Neutral</div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <div class="topbar-crumb">Dashboard / <b>Monitoring OLT</b></div>
+      <div class="topbar-right"><div class="topbar-user"><div class="avatar">NO</div>NOC</div></div>
+    </header>
+
+    <main class="page">
+      <div class="page-head">
+        <div>
+          <h1>Monitoring OLT</h1>
+          <p>Monitoring status ONU dan redaman customer via SNMP read-only. Data ini hanya untuk troubleshooting NOC — tidak mengubah status layanan atau billing.</p>
+        </div>
+        <div class="status-actions">
+          <select class="filter-select">
+            <option>Semua Branch</option>
+            <option>Batu</option>
+            <option>Malang</option>
+          </select>
+          <select class="filter-select">
+            <option>Semua Coverage</option>
+            <option>Batu Center</option>
+            <option>Malang Utara</option>
+          </select>
+          <button class="btn btn-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 7 4-14 2 7h5"/></svg>
+            Refresh SNMP
+          </button>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-card active"><div class="label">ONU Working</div><div class="value">186</div><div class="hint">Status normal</div></div>
+        <div class="summary-card terminate"><div class="label">ONU Los / Offline</div><div class="value">3</div><div class="hint">Perlu pengecekan</div></div>
+        <div class="summary-card isolir"><div class="label">Auth Failed</div><div class="value">1</div><div class="hint">Gagal autentikasi OLT</div></div>
+        <div class="summary-card terminate"><div class="label">Tidak Terdeteksi</div><div class="value">7</div><div class="hint">Tidak ada di SNMP</div></div>
+      </div>
+
+      <div class="card" style="padding:16px 18px;">
+        <div class="monitoring-header">
+          <span class="olt-tag">OLT-BTU-01 / Batu Center</span>
+          <span class="last-checked">Terakhir dicek: 26 Jul 2026, 14:22 WIB</span>
+        </div>
+        <div class="toolbar">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" placeholder="Cari PPPoE, Nama Customer…" />
+          </div>
+          <select class="filter-select">
+            <option value="">Semua Status ONU</option>
+            <option>Working</option>
+            <option>Los</option>
+            <option>Offline</option>
+            <option>AuthFailed</option>
+            <option>Dyinggasp</option>
+            <option>Logging</option>
+          </select>
+          <button class="btn btn-ghost btn-sm">Reset</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>PPPoE Username</th>
+                <th>Nama Customer</th>
+                <th>ODP</th>
+                <th>Port</th>
+                <th>No. ONU</th>
+                <th>Rx Redaman (dBm)</th>
+                <th>Status ONU</th>
+                <th>SNMP Desc</th>
+                <th>Mitra</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="pppoe-tag">budi.santoso@mitra</span></td>
+                <td class="cell-strong">Budi Santoso</td>
+                <td>ODP-BTU-001</td>
+                <td>AP-04</td>
+                <td>231</td>
+                <td><span class="rx-level rx-ok">-18.54</span></td>
+                <td><span class="onu-status-chip status-working">Working</span></td>
+                <td class="cell-muted">budi.santoso@mitra</td>
+                <td>Dasarata Net</td>
+              </tr>
+              <tr>
+                <td><span class="pppoe-tag">siti.rahma@mitra</span></td>
+                <td class="cell-strong">Siti Rahmawati</td>
+                <td>ODP-BTU-001</td>
+                <td>AP-11</td>
+                <td>455</td>
+                <td><span class="rx-level rx-warn">-25.10</span></td>
+                <td><span class="onu-status-chip status-working">Working</span></td>
+                <td class="cell-muted">siti.rahma@mitra</td>
+                <td>Dasarata Net</td>
+              </tr>
+              <tr>
+                <td><span class="pppoe-tag">agus.wijaya@mitra</span></td>
+                <td class="cell-strong">Agus Wijaya</td>
+                <td>ODP-BTU-003</td>
+                <td>AP-02</td>
+                <td>902</td>
+                <td><span class="rx-level rx-bad">-30.12</span></td>
+                <td><span class="onu-status-chip status-los">Los</span></td>
+                <td class="cell-muted">agus.wijaya@mitra</td>
+                <td>Dasarata Net</td>
+              </tr>
+              <tr>
+                <td><span class="pppoe-tag">masjid.alfalah@mitra</span></td>
+                <td class="cell-strong">Masjid Al-Falah</td>
+                <td>ODP-BTU-001</td>
+                <td>AP-05</td>
+                <td>500</td>
+                <td><span class="rx-level rx-ok">-20.32</span></td>
+                <td><span class="onu-status-chip status-working">Working</span></td>
+                <td class="cell-muted">masjid.alfalah@mitra</td>
+                <td>Dasarata Net</td>
+              </tr>
+              <tr>
+                <td><span class="pppoe-tag">hendra.susanto@kios</span></td>
+                <td class="cell-strong">Hendra Susanto</td>
+                <td>ODP-BTU-002</td>
+                <td>AP-01</td>
+                <td>112</td>
+                <td><span class="rx-level rx-bad">-</span></td>
+                <td><span class="onu-status-chip status-authfailed">AuthFailed</span></td>
+                <td class="cell-muted">hendra.susanto@kios</td>
+                <td>Kiosnet</td>
+              </tr>
+              <tr>
+                <td><span class="pppoe-tag">rina.wati@kios</span></td>
+                <td class="cell-strong">Rina Wati</td>
+                <td>ODP-BTU-002</td>
+                <td>AP-03</td>
+                <td>333</td>
+                <td><span class="rx-level rx-ok">-19.87</span></td>
+                <td><span class="onu-status-chip status-working">Working</span></td>
+                <td class="cell-muted">rina.wati@kios</td>
+                <td>Kiosnet</td>
+              </tr>
+              <tr style="background:var(--color-danger-soft);">
+                <td><span class="pppoe-tag">-</span></td>
+                <td class="cell-muted">-</td>
+                <td class="cell-muted">-</td>
+                <td class="cell-muted">-</td>
+                <td class="cell-muted">-</td>
+                <td class="rx-level rx-bad">-</td>
+                <td><span class="onu-status-chip status-offline">Offline</span></td>
+                <td class="cell-muted" style="font-size:11px; word-break:break-all;">unkown.device.001</td>
+                <td class="cell-muted">Tidak dikenal</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" style="display:flex; justify-content:space-between;">
+          <span>Menampilkan 7 dari 197 ONU</span>
+          <div style="font-size:12px; color:var(--color-text-muted);">
+            Monitoring bersifat <b>read-only</b> — tidak mengubah status customer atau billing.
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../assets/js/app.js"></script>
+<script src="../../assets/js/data.js"></script>
+</body>
+</html>
