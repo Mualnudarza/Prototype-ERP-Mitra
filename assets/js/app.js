@@ -85,9 +85,22 @@ const AppUtils = (function () {
 
     const sidebarNav = document.querySelector(".sidebar-nav");
     if (!sidebarNav) return;
+    const activeRole = localStorage.getItem("erp_active_role") || "Admin Mitra";
+    const brand = document.querySelector(".sidebar-brand");
+    if (brand && !document.querySelector(".user-switcher")) {
+      const switcher = document.createElement("div");
+      switcher.className = "user-switcher";
+      switcher.innerHTML = `<select id="role-switcher" aria-label="Pilih user"><option value="Admin Mitra">Admin Mitra</option><option value="Super User Dasaria">Super User Dasaria</option></select>`;
+      brand.insertAdjacentElement("afterend", switcher);
+      switcher.querySelector("select").value = activeRole;
+      switcher.querySelector("select").addEventListener("change", function () {
+        localStorage.setItem("erp_active_role", this.value);
+        window.location.href = rootPrefix + "index.html";
+      });
+    }
     sidebarNav.innerHTML = ""; // Clear existing sidebar
 
-    SIDEBAR_MENU.forEach(section => {
+    SIDEBAR_MENU.filter(section => !section.superUserOnly || activeRole === "Super User Dasaria").forEach(section => {
       const sectionLabel = document.createElement("div");
       sectionLabel.className = "nav-section-label";
       sectionLabel.textContent = section.section;

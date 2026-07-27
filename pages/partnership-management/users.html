@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Manajemen Pengguna Mitra · Dasaria ERP</title>
+<link rel="stylesheet" href="../../assets/css/theme.css" />
+<style>
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--color-border);margin-bottom:16px;}
+.tab-btn{padding:10px 20px;font-size:13.5px;font-weight:600;color:var(--color-text-muted);background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all .15s;}
+.tab-btn:hover{color:var(--color-text);}
+.tab-btn.active{color:var(--color-accent);border-bottom-color:var(--color-accent);}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+.log-list{list-style:none;margin:0;padding:0;}
+.log-item{display:flex;gap:12px;padding:0 0 14px;position:relative;}
+.log-item:last-child{padding-bottom:0;}
+.log-item::before{content:"";position:absolute;left:5px;top:16px;bottom:0;width:1px;background:var(--color-border);}
+.log-item:last-child::before{display:none;}
+.log-dot{width:10px;height:10px;border-radius:50%;background:var(--color-accent-soft);border:2px solid var(--color-accent);flex-shrink:0;margin-top:4px;}
+.log-body .log-title{font-size:13px;font-weight:600;}
+.log-body .log-detail{font-size:12.5px;color:var(--color-text-muted);margin-top:1px;}
+.log-body .log-time{font-size:11px;color:var(--color-text-faint);margin-top:3px;}
+.modal-box{max-width:480px;}
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark">DA</div>
+      <div>
+        <div class="name">Dasaria ERP</div>
+        <div class="sub">Super User Panel</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav"></nav>
+    <div class="sidebar-foot">Astryx UI · tema Neutral</div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <div class="topbar-crumb"><b>Manajemen Pengguna</b></div>
+      <div class="topbar-right">
+        <div class="topbar-user">
+          <div class="avatar">SU</div>
+          Super User Dasaria
+        </div>
+      </div>
+    </header>
+
+    <main class="page">
+      <div class="page-head">
+        <div>
+          <h1>Manajemen Pengguna</h1>
+          <p>Kelola akun pengguna seluruh mitra yang terdaftar pada ERP Dasaria.</p>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input id="search" placeholder="Cari nama pengguna atau username..." />
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table class="data-table" id="user-table">
+            <thead>
+              <tr>
+                <th data-sort="user_name" class="sortable">Nama Pengguna <span class="sort-arrow"></span></th>
+                <th data-sort="username" class="sortable">Username <span class="sort-arrow"></span></th>
+                <th data-sort="partner_name" class="sortable">Identitas Mitra <span class="sort-arrow"></span></th>
+                <th data-sort="last_login" class="sortable">Last Login <span class="sort-arrow"></span></th>
+                <th style="width:100px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="user-body"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <div id="user-count"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Modal Edit User -->
+<div class="modal-overlay" id="modal-form" style="display:none;">
+  <div class="modal-box">
+    <h3 id="modal-title">Edit Pengguna</h3>
+
+    <div class="tab-bar" style="margin-top:14px;">
+      <button class="tab-btn active" data-tab="tab-edit">Edit Data</button>
+      <button class="tab-btn" data-tab="tab-log">Log Aktivitas</button>
+    </div>
+
+    <!-- Tab Edit Data -->
+    <div class="tab-content active" id="tab-edit">
+      <form id="form-user">
+        <input type="hidden" id="form-id" />
+        <div class="form-field" style="margin-bottom:12px;">
+          <label>Nama Pengguna</label>
+          <input type="text" id="form-name" required placeholder="Nama lengkap..." />
+        </div>
+        <div class="form-field" style="margin-bottom:12px;">
+          <label>Username</label>
+          <input type="text" id="form-username" required placeholder="Username login..." />
+        </div>
+        <div class="form-field" style="margin-bottom:12px;">
+          <label>Identitas Mitra</label>
+          <input type="text" id="form-partner" required placeholder="Nama mitra..." />
+        </div>
+        <div class="form-field" style="margin-bottom:16px;">
+          <label>Email</label>
+          <input type="text" id="form-email" placeholder="Email pengguna..." />
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger" id="btn-reset-pw" style="margin-right:auto;">Reset Password</button>
+          <button type="button" class="btn btn-ghost" id="btn-cancel">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Tab Log Aktivitas -->
+    <div class="tab-content" id="tab-log">
+      <ul class="log-list" id="activity-log-list">
+        <li style="text-align:center;padding:24px;color:var(--color-text-faint);font-size:13px;">Pilih pengguna untuk melihat log aktivitas</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script src="../../assets/js/app.js"></script>
+<script src="../../assets/js/data.js"></script>
+<script>
+(function () {
+  const STORAGE_KEY = "erp_users_v1";
+  const state = { q: '', sort: 'user_name', dir: 'asc' };
+
+  function list() { return PartnerDB.getUsers(); }
+  function save(arr) { localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }
+  function uid() { return ("USR-" + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 6)).toUpperCase(); }
+
+  function seedLogs(user) {
+    return [
+      { timestamp: user.last_login || new Date().toISOString(), action: "Login", detail: `${user.user_name} melakukan login ke sistem.` },
+      { timestamp: new Date(Date.now() - 86400000 * 3).toISOString(), action: "Akses Modul", detail: `${user.user_name} mengakses modul Customer Management.` },
+      { timestamp: new Date(Date.now() - 86400000 * 7).toISOString(), action: "Ubah Data", detail: `${user.user_name} memperbarui data pelanggan CUST-0003.` },
+    ];
+  }
+
+  function render() {
+    let rows = list();
+    if (state.q) {
+      const q = state.q.toLowerCase();
+      rows = rows.filter(u => (u.user_name + u.username + u.partner_name).toLowerCase().includes(q));
+    }
+    rows.sort((a, b) => String(a[state.sort] || '').localeCompare(String(b[state.sort] || '')));
+    if (state.dir === 'desc') rows.reverse();
+
+    document.getElementById('user-body').innerHTML = rows.length === 0
+      ? '<tr class="empty-row"><td colspan="5">Tidak ada data pengguna</td></tr>'
+      : rows.map(u => `
+        <tr>
+          <td class="cell-strong">${AppUtils.escapeHtml(u.user_name)}</td>
+          <td class="cell-muted">${AppUtils.escapeHtml(u.username)}</td>
+          <td>${AppUtils.escapeHtml(u.partner_name)}</td>
+          <td class="cell-muted">${AppUtils.formatDateTime(u.last_login)}</td>
+          <td><button class="btn btn-sm btn-secondary" data-act="edit" data-id="${u.id}">Edit</button></td>
+        </tr>
+      `).join('');
+
+    document.getElementById('user-count').textContent = `Menampilkan ${rows.length} pengguna`;
+    document.querySelectorAll('#user-table thead th.sortable').forEach(th => {
+      th.classList.toggle('sort-active', th.dataset.sort === state.sort);
+      th.querySelector('.sort-arrow').textContent = th.dataset.sort === state.sort ? (state.dir === 'asc' ? '↑' : '↓') : '';
+    });
+  }
+
+  function openModal(user) {
+    document.getElementById('form-id').value = user?.id || '';
+    document.getElementById('form-name').value = user?.user_name || '';
+    document.getElementById('form-username').value = user?.username || '';
+    document.getElementById('form-partner').value = user?.partner_name || '';
+    document.getElementById('form-email').value = user?.email || '';
+
+    const logs = user ? seedLogs(user) : [];
+    document.getElementById('activity-log-list').innerHTML = logs.length === 0
+      ? '<li style="text-align:center;padding:24px;color:var(--color-text-faint);font-size:13px;">Belum ada log aktivitas</li>'
+      : logs.map(l => `
+        <li class="log-item">
+          <div class="log-dot"></div>
+          <div class="log-body">
+            <div class="log-title">${AppUtils.escapeHtml(l.action)}</div>
+            <div class="log-detail">${AppUtils.escapeHtml(l.detail)}</div>
+            <div class="log-time">${AppUtils.formatDateTime(l.timestamp)}</div>
+          </div>
+        </li>
+      `).join('');
+
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+      b.classList.toggle('active', i === 0);
+      document.getElementById(`tab-${i === 0 ? 'edit' : 'log'}`).classList.toggle('active', i === 0);
+    });
+
+    document.getElementById('modal-form').style.display = 'flex';
+  }
+
+  function closeModal() { document.getElementById('modal-form').style.display = 'none'; }
+
+  document.getElementById('search').addEventListener('input', function () { state.q = this.value; render(); });
+  document.getElementById('btn-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-form').addEventListener('click', function (e) { if (e.target === this) closeModal(); });
+
+  document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      this.classList.add('active');
+      document.getElementById(`tab-${['edit', 'log'][idx]}`).classList.add('active');
+    });
+  });
+
+  document.getElementById('user-body').addEventListener('click', function (e) {
+    const btn = e.target.closest('button[data-act="edit"]');
+    if (!btn) return;
+    openModal(list().find(u => u.id === btn.dataset.id));
+  });
+
+  document.getElementById('btn-reset-pw').addEventListener('click', function () {
+    const id = document.getElementById('form-id').value;
+    if (!id) return;
+    if (!confirm('Reset password pengguna ini?')) return;
+    AppUtils.toast('Password berhasil direset.', 'success');
+  });
+
+  document.getElementById('form-user').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const id = document.getElementById('form-id').value;
+    const rows = list();
+    const data = {
+      user_name: document.getElementById('form-name').value.trim(),
+      username: document.getElementById('form-username').value.trim(),
+      partner_name: document.getElementById('form-partner').value.trim(),
+      email: document.getElementById('form-email').value.trim(),
+    };
+
+    if (!data.user_name || !data.username || !data.partner_name) {
+      return AppUtils.toast('Lengkapi data pengguna.', 'danger');
+    }
+
+    const user = rows.find(u => u.id === id);
+    if (user) Object.assign(user, data);
+
+    save(rows);
+    closeModal();
+    render();
+    AppUtils.toast('Data pengguna disimpan.', 'success');
+  });
+
+  document.querySelectorAll('#user-table thead th.sortable').forEach(th => {
+    th.addEventListener('click', function () {
+      const key = this.dataset.sort;
+      if (state.sort === key) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+      else { state.sort = key; state.dir = 'asc'; }
+      render();
+    });
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

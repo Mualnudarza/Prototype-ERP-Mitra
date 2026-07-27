@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Performa Mitra · Dasaria ERP</title>
+<link rel="stylesheet" href="../../assets/css/theme.css" />
+<style>
+.stat-bar{display:flex;flex-direction:column;gap:6px;}
+.stat-row{display:flex;align-items:center;gap:10px;}
+.stat-label{min-width:84px;font-size:12px;color:var(--color-text-muted);font-weight:600;}
+.stat-fill{height:8px;border-radius:999px;background:var(--color-surface-sunken);flex:1;overflow:hidden;}
+.stat-fill-bar{height:100%;border-radius:999px;background:var(--color-accent);}
+.stat-value{font-size:12px;font-weight:700;min-width:42px;text-align:right;}
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark">DA</div>
+      <div>
+        <div class="name">Dasaria ERP</div>
+        <div class="sub">Super User Panel</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav"></nav>
+    <div class="sidebar-foot">Astryx UI · tema Neutral</div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <div class="topbar-crumb"><b>Performa Mitra</b></div>
+      <div class="topbar-right">
+        <div class="topbar-user">
+          <div class="avatar">SU</div>
+          Super User Dasaria
+        </div>
+      </div>
+    </header>
+
+    <main class="page">
+      <div class="page-head">
+        <div>
+          <h1>Performa Mitra</h1>
+          <p>Pantau kondisi bisnis dan ringkasan operasional mitra secara menyeluruh.</p>
+        </div>
+      </div>
+
+      <div class="summary-grid" id="perf-summary"></div>
+
+      <div class="toolbar">
+        <select id="filter-bulan">
+          <option value="7">Juli 2026</option>
+          <option value="6">Juni 2026</option>
+          <option value="5">Mei 2026</option>
+        </select>
+        <select id="filter-settlement-status">
+          <option value="">Semua Status</option>
+          <option value="Selesai">Selesai</option>
+          <option value="Proses">Proses</option>
+          <option value="Tertunda">Tertunda</option>
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px;" id="charts-grid">
+        <div class="card" style="padding:18px;">
+          <h3 style="margin-bottom:12px;">Grafik Pendapatan Bulanan</h3>
+          <div id="chart-revenue" style="height:200px;border:1px dashed var(--color-border-strong);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--color-text-muted);">
+            Visualisasi grafik pendapatan bulan berjalan
+          </div>
+        </div>
+        <div class="card" style="padding:18px;">
+          <h3 style="margin-bottom:12px;">Status Tagihan Pelanggan</h3>
+          <div id="chart-billing" style="height:200px;border:1px dashed var(--color-border-strong);border-radius:var(--radius-sm);display:flex;flex-direction:column;gap:14px;padding:20px;">
+            <div class="stat-row"><div class="stat-label">Lunas</div><div class="stat-fill"><div class="stat-fill-bar" style="width:82%;background:var(--color-success);"></div></div><div class="stat-value" style="color:var(--color-success);">82%</div></div>
+            <div class="stat-row"><div class="stat-label">Belum Dibayar</div><div class="stat-fill"><div class="stat-fill-bar" style="width:18%;background:var(--color-danger);"></div></div><div class="stat-value" style="color:var(--color-danger);">18%</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:18px;margin-bottom:22px;">
+        <h3 style="margin-bottom:14px;">Ringkasan Status Settlement</h3>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+          <div class="summary-card active"><div class="label">Selesai</div><div class="value">2</div></div>
+          <div class="summary-card isolate" style="--bar:var(--color-warning)"><div class="label">Proses</div><div class="value">1</div></div>
+          <div class="summary-card terminate"><div class="label">Tertunda</div><div class="value">1</div></div>
+        </div>
+      </div>
+
+      <h3 style="margin-bottom:12px;">Riwayat Settlement</h3>
+      <div class="card">
+        <div class="table-wrap">
+          <table class="data-table" id="settlement-table">
+            <thead>
+              <tr>
+                <th data-sort="reference_no" class="sortable">Nomor Referensi <span class="sort-arrow"></span></th>
+                <th data-sort="period" class="sortable">Periode Settlement <span class="sort-arrow"></span></th>
+                <th data-sort="amount" class="sortable">Nominal Settlement <span class="sort-arrow"></span></th>
+                <th data-sort="settlement_status" class="sortable">Status Settlement <span class="sort-arrow"></span></th>
+                <th data-sort="settlement_date" class="sortable">Tanggal Settlement <span class="sort-arrow"></span></th>
+                <th style="width:100px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="settlement-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../assets/js/app.js"></script>
+<script src="../../assets/js/data.js"></script>
+<script>
+(function () {
+  const perf = PartnerDB.performance();
+  const partners = PartnerDB.getAll();
+  const topPartner = partners.reduce((best, p) => p.monthly_revenue > (best?.monthly_revenue || 0) ? p : best, null);
+
+  document.getElementById('perf-summary').innerHTML = `
+    <div class="summary-card active"><div class="label">Pendapatan Bulan Berjalan</div><div class="value">${new Intl.NumberFormat('id-ID', {style:'currency', currency:'IDR', maximumFractionDigits:0}).format(perf.monthly_revenue)}</div><div class="hint">Total dari seluruh mitra aktif</div></div>
+    <div class="summary-card terminate"><div class="label">Total Tagihan Belum Dibayar</div><div class="value">${new Intl.NumberFormat('id-ID', {style:'currency', currency:'IDR', maximumFractionDigits:0}).format(perf.unpaid_invoice_total)}</div><div class="hint">Belum jatuh tempo / overdue</div></div>
+    <div class="summary-card" style="--bar:var(--color-accent)"><div class="label">Total Pelanggan Aktif</div><div class="value">${perf.active_customers.toLocaleString('id-ID')}</div><div class="hint">Seluruh mitra</div></div>
+    <div class="summary-card" style="--bar:var(--color-text-muted)"><div class="label">Status Settlement Terakhir</div><div class="value" style="font-size:18px;">${perf.settlement_status}</div><div class="hint">${topPartner ? topPartner.partner_name + ' · Rp' + new Intl.NumberFormat('id-ID').format(topPartner.monthly_revenue) : '-'}</div></div>
+  `;
+
+  const state = { status: '', sort: 'reference_no', dir: 'desc' };
+
+  function render() {
+    let list = PartnerDB.getSettlements();
+    if (state.status) list = list.filter(s => s.settlement_status === state.status);
+
+    list.sort((a, b) => {
+      const va = a[state.sort], vb = b[state.sort];
+      const type = typeof va === 'number' ? 'num' : 'str';
+      const cmp = type === 'num' ? va - vb : String(va).localeCompare(String(vb));
+      return state.dir === 'asc' ? cmp : -cmp;
+    });
+
+    const body = document.getElementById('settlement-body');
+    body.innerHTML = list.length === 0 ? '<tr class="empty-row"><td colspan="6">Tidak ada data settlement</td></tr>' : list.map(r => `
+      <tr>
+        <td class="cell-strong">${AppUtils.escapeHtml(r.reference_no)}</td>
+        <td>${AppUtils.escapeHtml(r.period)}</td>
+        <td class="cell-strong">${new Intl.NumberFormat('id-ID', {style:'currency', currency:'IDR', maximumFractionDigits:0}).format(r.amount)}</td>
+        <td><span class="badge ${r.settlement_status === 'Selesai' ? 'badge-active' : r.settlement_status === 'Proses' ? 'badge-warning' : 'badge-terminate'}">${r.settlement_status}</span></td>
+        <td class="cell-muted">${AppUtils.formatDate(r.settlement_date)}</td>
+        <td><button class="btn btn-sm btn-ghost">Detail</button></td>
+      </tr>
+    `).join('');
+
+    document.querySelectorAll('#settlement-table thead th.sortable').forEach(th => {
+      th.classList.toggle('sort-active', th.dataset.sort === state.sort);
+      const arrow = th.querySelector('.sort-arrow');
+      if (th.dataset.sort === state.sort) arrow.textContent = state.dir === 'asc' ? '↑' : '↓';
+      else arrow.textContent = '';
+    });
+  }
+
+  document.getElementById('filter-settlement-status').addEventListener('change', function () { state.status = this.value; render(); });
+
+  document.querySelectorAll('#settlement-table thead th.sortable').forEach(th => {
+    th.addEventListener('click', function () {
+      const key = this.dataset.sort;
+      if (state.sort === key) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+      else { state.sort = key; state.dir = 'asc'; }
+      render();
+    });
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

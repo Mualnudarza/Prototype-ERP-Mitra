@@ -7,7 +7,10 @@
 (function (global) {
   const CUSTOMER_STORAGE_KEY = "erp_customers_v1";
   const SERVICE_STORAGE_KEY = "erp_service_packages_v1";
-  const ACTOR = "Admin Mitra";
+  const PARTNER_STORAGE_KEY = "erp_partners_v1";
+  const USER_STORAGE_KEY = "erp_users_v1";
+  const SETTLEMENT_STORAGE_KEY = "erp_settlements_v1";
+  let ACTOR = localStorage.getItem("erp_active_role") || "Admin Mitra";
 
   const PACKAGES = [
     "Home 10 Mbps",
@@ -111,6 +114,38 @@
     setStatus(id, package_status) { const list = this.getAll(); const current = list.find((p) => p.id === id); if (!current) throw new Error("Paket tidak ditemukan."); current.package_status = package_status; current.activity_log.push({ timestamp: nowISO(), action: "Ubah Status", detail: `Status paket diubah ke ${package_status}.`, actor: ACTOR }); saveList(SERVICE_STORAGE_KEY, list); return current; },
   };
 
+  function seedPartners() {
+    return [
+      { id: uid("PTR"), partner_code: "MTR-001", partner_name: "Mitra Batu Net", company_name: "PT Mitra Batu Digital", phone_number: "0341-551100", email: "admin@mitrabatu.id", address: "Jl. Diponegoro No. 12, Batu", operational_area: "Batu", business_configuration: "Retail Broadband", minimum_price_rule: "10 Mbps ≥ Rp150.000; 20 Mbps ≥ Rp200.000; 50 Mbps ≥ Rp325.000", billing_scheme: "Tanggal tetap: 25 setiap bulan", status: "Aktif", user_count: 8, monthly_revenue: 18500000, unpaid_invoice_total: 4250000, active_customers: 124, settlement_status: "Selesai" },
+      { id: uid("PTR"), partner_code: "MTR-002", partner_name: "Mitra Malang Fiber", company_name: "CV Malang Fiber Media", phone_number: "0341-778899", email: "support@malangfiber.id", address: "Jl. Soekarno-Hatta No. 45, Malang", operational_area: "Malang", business_configuration: "Retail & Business Broadband", minimum_price_rule: "20 Mbps ≥ Rp210.000; 50 Mbps ≥ Rp350.000; 100 Mbps ≥ Rp700.000", billing_scheme: "Rentang hari berjalan: 1-10", status: "Aktif", user_count: 12, monthly_revenue: 32750000, unpaid_invoice_total: 8900000, active_customers: 218, settlement_status: "Proses" },
+      { id: uid("PTR"), partner_code: "MTR-003", partner_name: "Mitra Kediri Online", company_name: "PT Kediri Online Nusantara", phone_number: "0354-223344", email: "halo@kediri-online.id", address: "Jl. Dhoho No. 20, Kediri", operational_area: "Kediri", business_configuration: "Retail Broadband", minimum_price_rule: "10 Mbps ≥ Rp145.000; 20 Mbps ≥ Rp195.000", billing_scheme: "Plus 30 hari", status: "Nonaktif", user_count: 4, monthly_revenue: 0, unpaid_invoice_total: 1300000, active_customers: 0, settlement_status: "Tertunda" },
+    ];
+  }
+
+  function seedPartnerUsers() {
+    return [
+      { id: uid("USR"), user_name: "Andi Pratama", username: "andi.admin", partner_name: "Mitra Batu Net", role_name: "Administrator Mitra", user_status: "Aktif", last_login: "2026-07-26T09:30:00.000Z" },
+      { id: uid("USR"), user_name: "Rina Wulandari", username: "rina.ops", partner_name: "Mitra Malang Fiber", role_name: "Operator Customer", user_status: "Aktif", last_login: "2026-07-25T14:15:00.000Z" },
+      { id: uid("USR"), user_name: "Dimas Saputra", username: "dimas.billing", partner_name: "Mitra Malang Fiber", role_name: "Billing Staff", user_status: "Nonaktif", last_login: "2026-06-18T10:05:00.000Z" },
+    ];
+  }
+
+  function seedSettlements() {
+    return [
+      { id: uid("SET"), reference_no: "SET-202607-001", period: "Juli 2026", amount: 14250000, settlement_status: "Selesai", settlement_date: "2026-07-25" },
+      { id: uid("SET"), reference_no: "SET-202606-001", period: "Juni 2026", amount: 13100000, settlement_status: "Selesai", settlement_date: "2026-06-25" },
+      { id: uid("SET"), reference_no: "SET-202605-001", period: "Mei 2026", amount: 12800000, settlement_status: "Tertunda", settlement_date: "2026-05-30" },
+    ];
+  }
+
+  const PartnerDB = {
+    getAll() { return loadList(PARTNER_STORAGE_KEY, seedPartners); },
+    getUsers() { return loadList(USER_STORAGE_KEY, seedPartnerUsers); },
+    getSettlements() { return loadList(SETTLEMENT_STORAGE_KEY, seedSettlements); },
+    summary() { const partners = this.getAll(); const users = this.getUsers(); return { total: partners.length, active: partners.filter(p => p.status === "Aktif").length, inactive: partners.filter(p => p.status === "Nonaktif").length, users: users.length, userActive: users.filter(u => u.user_status === "Aktif").length, userInactive: users.filter(u => u.user_status === "Nonaktif").length, roles: new Set(users.map(u => u.role_name)).size }; },
+    performance() { const partners = this.getAll(); return { monthly_revenue: partners.reduce((n, p) => n + p.monthly_revenue, 0), unpaid_invoice_total: partners.reduce((n, p) => n + p.unpaid_invoice_total, 0), active_customers: partners.reduce((n, p) => n + p.active_customers, 0), settlement_status: "Proses" }; },
+  };
+
   const InfraDB = {
     OLT_STATUS, OLT_TYPES,
     getMonitoringData() {
@@ -174,6 +209,7 @@
   global.CustomerDB = CustomerDB;
   global.ServiceDB = ServiceDB;
   global.InfraDB = InfraDB;
+  global.PartnerDB = PartnerDB;
 
   global.SIDEBAR_MENU = [
     { section: "Utama", items: [
@@ -181,6 +217,11 @@
     ]},
     { section: "Modul Customer Management", items: [
       { label: "Customer Management", href: "/pages/customer-management/index.html", icon: "<circle cx=\"12\" cy=\"8\" r=\"3.4\"/><path d=\"M4.5 20c1.4-4 4.2-6 7.5-6s6.1 2 7.5 6\"/>" }
+    ]},
+    { section: "Modul Partnership Management", superUserOnly: true, items: [
+      { label: "Data Mitra", href: "/pages/partnership-management/index.html", icon: "<path d=\"M4 20V8l8-4 8 4v12\"/><path d=\"M9 20v-6h6v6\"/><path d=\"M7 12h10\"/>" },
+      { label: "Manajemen Pengguna", href: "/pages/partnership-management/users.html", icon: "<circle cx=\"12\" cy=\"8\" r=\"3.2\"/><path d=\"M4.5 20c1.3-3.8 4.1-5.8 7.5-5.8s6.2 2 7.5 5.8\"/>" },
+      { label: "Performa Mitra", href: "/pages/partnership-management/performance.html", icon: "<path d=\"M4 19V5\"/><path d=\"M4 19h16\"/><path d=\"M7 15l4-4 3 2 5-6\"/>" }
     ]},
     { section: "Modul Penjualan & Layanan", items: [
       { label: "Paket Layanan", href: "/pages/sales-service-management/packages.html", icon: "<path d=\"M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z\"/><polyline points=\"3.27 6.96 12 12.01 20.73 6.96\"/>" },
