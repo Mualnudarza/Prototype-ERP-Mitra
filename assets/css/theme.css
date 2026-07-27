@@ -19,6 +19,12 @@
   --color-accent-hover:  #2563EB;
   --color-accent-soft:   #EFF6FF;
   --color-accent-soft-strong: #DBEAFE;
+  --color-success:       #16A34A;
+  --color-success-soft:  #DCFCE7;
+  --color-warning:       #D97706;
+  --color-warning-soft:  #FEF3C7;
+  --color-danger:        #DC2626;
+  --color-danger-soft:   #FEE2E2;
 
   --color-sidebar-bg:     #FFFFFF;
   --color-sidebar-bg-alt: #FAFAFA;
@@ -260,6 +266,7 @@ table.data-table tbody tr:last-child td{ border-bottom:none; }
 .badge::before{ content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
 .badge-active{ background: var(--color-success-soft); color: var(--color-success); }
 .badge-isolir{ background: var(--color-warning-soft); color: var(--color-warning); }
+.badge-warning{ background: var(--color-warning-soft); color: var(--color-warning); }
 .badge-terminate{ background: var(--color-danger-soft); color: var(--color-danger); }
 
 /* Pagination */

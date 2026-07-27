@@ -8,32 +8,52 @@
   const resultCount = document.getElementById("result-count");
 
   function renderSummary() {
-    const s = CustomerDB.summary();
+    const list = InfraDB.getMonitoringData();
+    const s = {
+      total: list.length,
+      working: list.filter(c => c.olt_status === InfraDB.OLT_STATUS.WORKING).length,
+      warning: list.filter(c => c.olt_status === InfraDB.OLT_STATUS.WARNING).length,
+      offline: list.filter(c => c.olt_status === InfraDB.OLT_STATUS.OFFLINE).length,
+    };
     document.getElementById("summary-grid").innerHTML = `
       <div class="summary-card total">
-        <div class="label">Total Pelanggan</div>
+        <div class="label">Total Perangkat</div>
         <div class="value">${s.total}</div>
-        <div class="hint">Seluruh pelanggan terdaftar</div>
+        <div class="hint">Jumlah perangkat yang dimonitor</div>
       </div>
       <div class="summary-card active">
-        <div class="label">Pelanggan Aktif</div>
-        <div class="value">${s.active}</div>
-        <div class="hint">Status Active</div>
+        <div class="label">Status Working</div>
+        <div class="value">${s.working}</div>
+        <div class="hint">Perangkat berfungsi normal</div>
       </div>
       <div class="summary-card isolir">
-        <div class="label">Pelanggan Isolir</div>
-        <div class="value">${s.isolir}</div>
-        <div class="hint">Layanan disuspend sementara</div>
+        <div class="label">Status Warning</div>
+        <div class="value">${s.warning}</div>
+        <div class="hint">Perlu perhatian</div>
       </div>
       <div class="summary-card terminate">
-        <div class="label">Belum Diregistrasi</div>
-        <div class="value">${s.pending_reg || 0}</div>
-        <div class="hint">Menunggu registrasi ONU</div>
+        <div class="label">Status Offline</div>
+        <div class="value">${s.offline}</div>
+        <div class="hint">Perangkat tidak terhubung</div>
       </div>
     `;
   }
 
-  function badgeFor(status) {
+  function badgeForOltStatus(status) {
+    const map = {
+      Working: "badge-active",
+      Warning: "badge-warning",
+      Offline: "badge-terminate",
+    };
+    const textMap = {
+      Working: "Working",
+      Warning: "Warning",
+      Offline: "Offline",
+    };
+    return `<span class="badge ${map[status] || ""}">${textMap[status] || status}</span>`;
+  }
+
+  function badgeForCustomerStatus(status) {
     const map = {
       Active: "badge-active",
       Isolir: "badge-isolir",
@@ -44,25 +64,28 @@
   }
 
   function getFilteredSorted() {
-    let list = CustomerDB.getAll();
+    let list = InfraDB.getMonitoringData();
 
     if (searchTerm) {
       const t = searchTerm.toLowerCase();
       list = list.filter(
         (c) =>
-          c.pppoe_secret.toLowerCase().includes(t) ||
           c.customer_name.toLowerCase().includes(t) ||
-          c.phone_number.toLowerCase().includes(t)
+          c.customer_id.toLowerCase().includes(t) ||
+          c.olt_port.toLowerCase().includes(t) ||
+          c.olt_slot.toLowerCase().includes(t) ||
+          c.olt_pon.toLowerCase().includes(t) ||
+          c.odp_name.toLowerCase().includes(t)
       );
     }
     if (statusFilter) {
-      list = list.filter((c) => c.customer_status === statusFilter);
+      list = list.filter((c) => c.olt_status === statusFilter);
     }
 
     list.sort((a, b) => {
       let va = a[sortKey];
       let vb = b[sortKey];
-      if (sortKey === "expired_date") {
+      if (sortKey === "subscribe_date") {
         va = new Date(va).getTime();
         vb = new Date(vb).getTime();
       } else if (typeof va === "string") {
@@ -81,28 +104,29 @@
     const list = getFilteredSorted();
 
     if (list.length === 0) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="7">Tidak ada pelanggan yang cocok dengan pencarian/filter.</td></tr>`;
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="10">Tidak ada data monitoring yang cocok dengan pencarian/filter.</td></tr>`;
     } else {
       tbody.innerHTML = list
         .map(
           (c) => `
         <tr>
-          <td><span class="pppoe-tag">${AppUtils.escapeHtml(c.pppoe_secret)}</span></td>
           <td class="cell-strong">${AppUtils.escapeHtml(c.customer_name)}</td>
-          <td>${AppUtils.escapeHtml(c.phone_number)}</td>
-          <td>${AppUtils.formatDate(c.expired_date)}</td>
-          <td>${AppUtils.escapeHtml(c.package_name)}</td>
-          <td>${badgeFor(c.customer_status)}</td>
-          <td>
-            <a class="btn btn-secondary btn-sm" href="edit.html?id=${c.id}">Edit</a>
-          </td>
+          <td>${AppUtils.escapeHtml(c.customer_id)}</td>
+          <td>${AppUtils.escapeHtml(c.onu_number)}</td>
+          <td>${badgeForCustomerStatus(c.customer_status)}</td>
+          <td>${AppUtils.formatDate(c.subscribe_date)}</td>
+          <td>${AppUtils.escapeHtml(c.odp_name)}</td>
+          <td>${AppUtils.escapeHtml(c.access_port)}</td>
+          <td><span class="olt-rx-label">${c.olt_rx_register} dBm</span></td>
+          <td><span class="olt-rx-label">${c.olt_rx_current} dBm</span></td>
+          <td>${badgeForOltStatus(c.olt_status)}</td>
         </tr>
       `
         )
         .join("");
     }
 
-    resultCount.textContent = `Menampilkan ${list.length} dari ${CustomerDB.getAll().length} pelanggan`;
+    resultCount.textContent = `Menampilkan ${list.length} dari ${InfraDB.getMonitoringData().length} perangkat`;
 
     document.querySelectorAll("th.sortable").forEach((th) => {
       th.classList.toggle("sort-active", th.dataset.key === sortKey);
@@ -147,10 +171,6 @@
     document.getElementById("search-input").value = "";
     document.getElementById("filter-status").value = "";
     renderTable();
-  });
-
-  document.getElementById("btn-add-customer").addEventListener("click", () => {
-    window.location.href = "edit.html";
   });
 
   renderSummary();

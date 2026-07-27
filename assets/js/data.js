@@ -1,5 +1,5 @@
 /* ============================================================
-   ERP Data Layer — Customer Management + Sales & Service
+   ERP Data Layer — Customer Management + Sales & Service + Infrastructure Monitoring
    Menyimpan data menggunakan localStorage sehingga prototype
    ini punya "database" yang persist di browser tanpa backend.
    ============================================================ */
@@ -18,6 +18,7 @@
   ];
 
   const STATUS = {
+    PENDING_REG: "Belum Diregistrasi",
     ACTIVE: "Active",
     ISOLIR: "Isolir",
     TERMINATE: "Terminate",
@@ -27,6 +28,18 @@
     ACTIVE: "Aktif",
     INACTIVE: "Nonaktif",
   };
+
+  const OLT_STATUS = {
+    WORKING: "Working",
+    WARNING: "Warning",
+    OFFLINE: "Offline",
+  };
+
+  const OLT_TYPES = [
+    "Huawei MA5800",
+    "ZTE C320",
+    "Fiberhome AN5516",
+  ];
 
   function uid(prefix) {
     return (prefix + "-" + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 6)).toUpperCase();
@@ -54,9 +67,11 @@
     const today = new Date();
     const addDays = (d) => { const t = new Date(today); t.setDate(t.getDate() + d); return t.toISOString().slice(0, 10); };
     return [
-      { customer_name: "Budi Santoso", pppoe_secret: "budi.santoso@mitra", phone_number: "081234500011", subscribe_date: addDays(-420), expired_date: addDays(18), installation_address: "Jl. Diponegoro No. 12, Batu, Jawa Timur", package_name: "Home 20 Mbps", customer_status: STATUS.ACTIVE, modem_serial_number: "SN-ONT-88213", latitude: -7.8713, longitude: 112.5240, olt_port: "OLT-BTU-01/1/2", onu_number: "ONU-0231", access_name: "Access-Batu-Center", access_port: "AP-04" },
-      { customer_name: "Siti Rahmawati", pppoe_secret: "siti.rahma@mitra", phone_number: "082199912233", subscribe_date: addDays(-260), expired_date: addDays(6), installation_address: "Jl. Ir. Soekarno No. 45, Malang, Jawa Timur", package_name: "Home 50 Mbps", customer_status: STATUS.ACTIVE, modem_serial_number: "SN-ONT-77410", latitude: -7.9316, longitude: 112.6100, olt_port: "OLT-MLG-02/1/4", onu_number: "ONU-0455", access_name: "Access-Malang-Utara", access_port: "AP-11" },
-      { customer_name: "Agus Wijaya", pppoe_secret: "agus.wijaya@mitra", phone_number: "085711122334", subscribe_date: addDays(-90), expired_date: addDays(-3), installation_address: "Jl. Panglima Sudirman No. 8, Batu, Jawa Timur", package_name: "Business 100 Mbps", customer_status: STATUS.ISOLIR, modem_serial_number: "SN-ONT-91002", latitude: -7.8676, longitude: 112.5320, olt_port: "OLT-BTU-01/1/6", onu_number: "ONU-0902", access_name: "Access-Batu-Center", access_port: "AP-02" },
+      { customer_name: "Budi Santoso", pppoe_secret: "budi.santoso@mitra", phone_number: "081234500011", subscribe_date: addDays(-420), expired_date: addDays(18), installation_address: "Jl. Diponegoro No. 12, Batu, Jawa Timur", package_name: "Home 20 Mbps", customer_status: STATUS.ACTIVE, modem_serial_number: "SN-ONT-88213", latitude: -7.8713, longitude: 112.5240, olt_port: "OLT-BTU-01/1/2", onu_number: "ONU-0231", access_name: "Access-Batu-Center", access_port: "AP-04", odp_name: "ODP-Batu-01", customer_id: "CUST-0001", olt_type: "Huawei MA5800", olt_slot: "1", olt_pon: "2", olt_rx_register: -22.5, olt_rx_current: -23.1, olt_status: OLT_STATUS.WORKING },
+      { customer_name: "Siti Rahmawati", pppoe_secret: "siti.rahma@mitra", phone_number: "082199912233", subscribe_date: addDays(-260), expired_date: addDays(6), installation_address: "Jl. Ir. Soekarno No. 45, Malang, Jawa Timur", package_name: "Home 50 Mbps", customer_status: STATUS.ACTIVE, modem_serial_number: "SN-ONT-77410", latitude: -7.9316, longitude: 112.6100, olt_port: "OLT-MLG-02/1/4", onu_number: "ONU-0455", access_name: "Access-Malang-Utara", access_port: "AP-11", odp_name: "ODP-Malang-02", customer_id: "CUST-0002", olt_type: "ZTE C320", olt_slot: "1", olt_pon: "4", olt_rx_register: -24.0, olt_rx_current: -26.8, olt_status: OLT_STATUS.WARNING },
+      { customer_name: "Agus Wijaya", pppoe_secret: "agus.wijaya@mitra", phone_number: "085711122334", subscribe_date: addDays(-90), expired_date: addDays(-3), installation_address: "Jl. Panglima Sudirman No. 8, Batu, Jawa Timur", package_name: "Business 100 Mbps", customer_status: STATUS.ISOLIR, modem_serial_number: "SN-ONT-91002", latitude: -7.8676, longitude: 112.5320, olt_port: "OLT-BTU-01/1/6", onu_number: "ONU-0902", access_name: "Access-Batu-Center", access_port: "AP-02", odp_name: "ODP-Batu-01", customer_id: "CUST-0003", olt_type: "Huawei MA5800", olt_slot: "1", olt_pon: "6", olt_rx_register: -21.8, olt_rx_current: -29.5, olt_status: OLT_STATUS.OFFLINE },
+      { customer_name: "Dewi Lestari", pppoe_secret: "dewi.lestari@mitra", phone_number: "081333344556", subscribe_date: addDays(-5), expired_date: addDays(25), installation_address: "Jl. Soekarno-Hatta No. 100, Malang, Jawa Timur", package_name: "Home 10 Mbps", customer_status: STATUS.PENDING_REG, modem_serial_number: "SN-ONT-55678", latitude: -7.9450, longitude: 112.6300, olt_port: "OLT-MLG-02/2/1", onu_number: "", access_name: "Access-Malang-Selatan", access_port: "AP-07", odp_name: "ODP-Malang-03", customer_id: "CUST-0004", olt_type: "ZTE C320", olt_slot: "2", olt_pon: "1", olt_rx_register: null, olt_rx_current: null, olt_status: OLT_STATUS.OFFLINE },
+      { customer_name: "Eko Prasetyo", pppoe_secret: "eko.prasetyo@mitra", phone_number: "087812345678", subscribe_date: addDays(-2), expired_date: addDays(28), installation_address: "Jl. Ahmad Yani No. 55, Batu, Jawa Timur", package_name: "Business 200 Mbps", customer_status: STATUS.PENDING_REG, modem_serial_number: "SN-ONT-99887", latitude: -7.8800, longitude: 112.5400, olt_port: "OLT-BTU-01/2/3", onu_number: "", access_name: "Access-Batu-Barat", access_port: "AP-15", odp_name: "ODP-Batu-02", customer_id: "CUST-0005", olt_type: "Huawei MA5800", olt_slot: "2", olt_pon: "3", olt_rx_register: null, olt_rx_current: null, olt_status: OLT_STATUS.OFFLINE },
     ].map((c) => ({ id: uid("CUST"), ...c, package_history: [{ package_name: c.package_name, changed_at: c.subscribe_date + "T00:00:00.000Z", note: "Paket awal saat registrasi" }], activity_log: [{ timestamp: c.subscribe_date + "T00:00:00.000Z", action: "Registrasi", detail: `Pelanggan ${c.customer_name} didaftarkan dengan paket ${c.package_name}.`, actor: ACTOR }] }));
   }
 
@@ -71,12 +86,94 @@
     return base.map((p) => ({ id: uid("SRV"), ...p, activity_log: [{ timestamp: nowISO(), action: "Seed", detail: `Paket ${p.package_name} disiapkan.`, actor: ACTOR }] }));
   }
 
-  const CustomerDB = { STATUS, PACKAGES, getAll() { return loadList(CUSTOMER_STORAGE_KEY, seedCustomers); }, getById(id) { return this.getAll().find((c) => c.id === id) || null; }, isPppoeTaken(pppoe, excludeId) { return this.getAll().some((c) => c.pppoe_secret === pppoe && c.id !== excludeId); }, summary() { const list = this.getAll(); return { total: list.length, active: list.filter((c) => c.customer_status === STATUS.ACTIVE).length, isolir: list.filter((c) => c.customer_status === STATUS.ISOLIR).length, terminate: list.filter((c) => c.customer_status === STATUS.TERMINATE).length }; }, create(data) { const list = this.getAll(); if (this.isPppoeTaken(data.pppoe_secret)) throw new Error("PPPoE Secret sudah digunakan pelanggan lain."); const record = { id: uid("CUST"), ...data, customer_status: STATUS.ACTIVE, latitude: parseFloat(data.latitude), longitude: parseFloat(data.longitude), package_history: [{ package_name: data.package_name, changed_at: nowISO(), note: "Paket awal saat registrasi" }], activity_log: [{ timestamp: nowISO(), action: "Registrasi", detail: `Pelanggan ${data.customer_name} berhasil didaftarkan dengan paket ${data.package_name}.`, actor: ACTOR }] }; list.push(record); saveList(CUSTOMER_STORAGE_KEY, list); return record; }, update(id, data) { const list = this.getAll(); const idx = list.findIndex((c) => c.id === id); if (idx === -1) throw new Error("Pelanggan tidak ditemukan."); const current = list[idx]; if (data.pppoe_secret !== current.pppoe_secret && this.isPppoeTaken(data.pppoe_secret, id)) throw new Error("PPPoE Secret sudah digunakan pelanggan lain."); if (data.package_name !== current.package_name) { current.package_history.push({ package_name: data.package_name, changed_at: nowISO(), note: `Perubahan dari ${current.package_name} ke ${data.package_name}` }); current.activity_log.push({ timestamp: nowISO(), action: "Perubahan Paket", detail: `Paket layanan diubah dari ${current.package_name} menjadi ${data.package_name}.`, actor: ACTOR }); } Object.assign(current, { ...data, latitude: parseFloat(data.latitude), longitude: parseFloat(data.longitude) }); list[idx] = current; saveList(CUSTOMER_STORAGE_KEY, list); return current; }, suspend(id) { const list = this.getAll(); const c = list.find((x) => x.id === id); if (!c) throw new Error("Pelanggan tidak ditemukan."); c.customer_status = STATUS.ISOLIR; c.activity_log.push({ timestamp: nowISO(), action: "Suspend", detail: "Layanan disuspend (Isolir).", actor: ACTOR }); saveList(CUSTOMER_STORAGE_KEY, list); return c; }, reactivate(id) { const list = this.getAll(); const c = list.find((x) => x.id === id); if (!c) throw new Error("Pelanggan tidak ditemukan."); c.customer_status = STATUS.ACTIVE; c.activity_log.push({ timestamp: nowISO(), action: "Aktivasi Kembali", detail: "Status pelanggan dikembalikan menjadi Active.", actor: ACTOR }); saveList(CUSTOMER_STORAGE_KEY, list); return c; }, terminate(id) { const list = this.getAll(); const c = list.find((x) => x.id === id); if (!c) throw new Error("Pelanggan tidak ditemukan."); c.customer_status = STATUS.TERMINATE; c.activity_log.push({ timestamp: nowISO(), action: "Terminate", detail: "Layanan dihentikan permanen.", actor: ACTOR }); saveList(CUSTOMER_STORAGE_KEY, list); return c; }, resetSeed() { const seeded = seedCustomers(); saveList(CUSTOMER_STORAGE_KEY, seeded); return seeded; } };
+  const CustomerDB = {
+    STATUS, PACKAGES,
+    getAll() { return loadList(CUSTOMER_STORAGE_KEY, seedCustomers); },
+    getById(id) { return this.getAll().find((c) => c.id === id) || null; },
+    isPppoeTaken(pppoe, excludeId) { return this.getAll().some((c) => c.pppoe_secret === pppoe && c.id !== excludeId); },
+    summary() { const list = this.getAll(); return { total: list.length, active: list.filter((c) => c.customer_status === STATUS.ACTIVE).length, isolir: list.filter((c) => c.customer_status === STATUS.ISOLIR).length, terminate: list.filter((c) => c.customer_status === STATUS.TERMINATE).length, pending_reg: list.filter((c) => c.customer_status === STATUS.PENDING_REG).length }; },
+    create(data) { const list = this.getAll(); if (this.isPppoeTaken(data.pppoe_secret)) throw new Error("PPPoE Secret sudah digunakan pelanggan lain."); const record = { id: uid("CUST"), ...data, customer_status: STATUS.PENDING_REG, latitude: parseFloat(data.latitude), longitude: parseFloat(data.longitude), package_history: [{ package_name: data.package_name, changed_at: nowISO(), note: "Paket awal saat registrasi" }], activity_log: [{ timestamp: nowISO(), action: "Registrasi Awal", detail: `Pelanggan ${data.customer_name} ditambahkan dengan paket ${data.package_name}. Menunggu registrasi ONU.`, actor: ACTOR }] }; list.push(record); saveList(CUSTOMER_STORAGE_KEY, list); return record; },
+    update(id, data) { const list = this.getAll(); const idx = list.findIndex((c) => c.id === id); if (idx === -1) throw new Error("Pelanggan tidak ditemukan."); const current = list[idx]; if (data.pppoe_secret !== current.pppoe_secret && this.isPppoeTaken(data.pppoe_secret, id)) throw new Error("PPPoE Secret sudah digunakan pelanggan lain."); if (data.package_name !== current.package_name) { current.package_history.push({ package_name: data.package_name, changed_at: nowISO(), note: `Perubahan dari ${current.package_name} ke ${data.package_name}` }); current.activity_log.push({ timestamp: nowISO(), action: "Perubahan Paket", detail: `Paket layanan diubah dari ${current.package_name} menjadi ${data.package_name}.`, actor: ACTOR }); } if (data.installation_address !== current.installation_address) { current.address_history = current.address_history || []; current.address_history.push({ address: data.installation_address, changed_at: nowISO(), note: `Perubahan alamat dari ${current.installation_address}` }); current.activity_log.push({ timestamp: nowISO(), action: "Relokasi", detail: `Alamat pemasangan diubah ke ${data.installation_address}.`, actor: ACTOR }); } Object.assign(current, { customer_name: data.customer_name, phone_number: data.phone_number, subscribe_date: data.subscribe_date, expired_date: data.expired_date, installation_address: data.installation_address, package_name: data.package_name, pppoe_secret: data.pppoe_secret, modem_serial_number: data.modem_serial_number, latitude: parseFloat(data.latitude), longitude: parseFloat(data.longitude), olt_port: data.olt_port, onu_number: data.onu_number, access_name: data.access_name, access_port: data.access_port, odp_name: data.odp_name, customer_id: data.customer_id, olt_type: data.olt_type, olt_slot: data.olt_slot, olt_pon: data.olt_pon, olt_rx_register: data.olt_rx_register === "" ? null : data.olt_rx_register, olt_rx_current: data.olt_rx_current === "" ? null : data.olt_rx_current, olt_status: data.olt_status }); current.activity_log.push({ timestamp: nowISO(), action: "Update Data", detail: "Data pelanggan diperbarui.", actor: ACTOR }); list[idx] = current; saveList(CUSTOMER_STORAGE_KEY, list); return current; },
+    suspend(id) { const list = this.getAll(); const current = list.find((c) => c.id === id); if (!current) throw new Error("Pelanggan tidak ditemukan."); current.customer_status = STATUS.ISOLIR; current.activity_log.push({ timestamp: nowISO(), action: "Suspend", detail: "Layanan disuspend (Isolir).", actor: ACTOR }); saveList(CUSTOMER_STORAGE_KEY, list); return current; },
+    reactivate(id) { const list = this.getAll(); const current = list.find((c) => c.id === id); if (!current) throw new Error("Pelanggan tidak ditemukan."); current.customer_status = STATUS.ACTIVE; current.activity_log.push({ timestamp: nowISO(), action: "Aktifkan Kembali", detail: "Layanan diaktifkan kembali.", actor: ACTOR }); saveList(CUSTOMER_STORAGE_KEY, list); return current; },
+    terminate(id) { const list = this.getAll(); const current = list.find((c) => c.id === id); if (!current) throw new Error("Pelanggan tidak ditemukan."); current.customer_status = STATUS.TERMINATE; current.activity_log.push({ timestamp: nowISO(), action: "Terminasi", detail: "Layanan dihentikan permanen.", actor: ACTOR }); saveList(CUSTOMER_STORAGE_KEY, list); return current; },
+    completeRegistration(id, registrationData) { const list = this.getAll(); const idx = list.findIndex((c) => c.id === id); if (idx === -1) throw new Error("Pelanggan tidak ditemukan."); const current = list[idx]; current.customer_status = STATUS.ACTIVE; current.onu_number = registrationData.onu_number; current.olt_rx_register = registrationData.olt_rx_register; current.olt_rx_current = registrationData.olt_rx_register; current.olt_status = OLT_STATUS.WORKING; current.register_date = nowISO(); current.activity_log.push({ timestamp: nowISO(), action: "Registrasi ONU", detail: `ONU ${registrationData.onu_number} diregistrasi ke OLT Slot ${registrationData.olt_slot} PON ${registrationData.olt_pon}. RX: ${registrationData.olt_rx_register} dBm`, actor: ACTOR }); list[idx] = current; saveList(CUSTOMER_STORAGE_KEY, list); return current; },
+  };
 
-  const ServiceDB = { STATUS: PACKAGE_STATUS, getAll() { return loadList(SERVICE_STORAGE_KEY, seedServicePackages); }, getById(id) { return this.getAll().find((p) => p.id === id) || null; }, summary() { const list = this.getAll(); return { total: list.length, active: list.filter((p) => p.package_status === PACKAGE_STATUS.ACTIVE).length, inactive: list.filter((p) => p.package_status === PACKAGE_STATUS.INACTIVE).length }; }, isCodeTaken(code, excludeId) { return this.getAll().some((p) => p.package_code === code && p.id !== excludeId); }, create(data) { const list = this.getAll(); if (this.isCodeTaken(data.package_code)) throw new Error("Kode Paket sudah digunakan."); const record = { id: uid("SRV"), package_code: data.package_code, package_name: data.package_name, bandwidth: data.bandwidth, selling_price: Number(data.selling_price), package_status: data.package_status || PACKAGE_STATUS.ACTIVE, activity_log: [{ timestamp: nowISO(), action: "Tambah Paket", detail: `Paket ${data.package_name} dibuat.`, actor: ACTOR }] }; list.push(record); saveList(SERVICE_STORAGE_KEY, list); return record; }, update(id, data) { const list = this.getAll(); const idx = list.findIndex((p) => p.id === id); if (idx === -1) throw new Error("Paket tidak ditemukan."); const current = list[idx]; if (data.package_code !== current.package_code && this.isCodeTaken(data.package_code, id)) throw new Error("Kode Paket sudah digunakan."); Object.assign(current, { package_code: data.package_code, package_name: data.package_name, bandwidth: data.bandwidth, selling_price: Number(data.selling_price), package_status: data.package_status }); current.activity_log.push({ timestamp: nowISO(), action: "Ubah Paket", detail: `Paket ${current.package_name} diperbarui.`, actor: ACTOR }); list[idx] = current; saveList(SERVICE_STORAGE_KEY, list); return current; }, setStatus(id, package_status) { const list = this.getAll(); const current = list.find((p) => p.id === id); if (!current) throw new Error("Paket tidak ditemukan."); current.package_status = package_status; current.activity_log.push({ timestamp: nowISO(), action: "Ubah Status", detail: `Status paket diubah menjadi ${package_status}.`, actor: ACTOR }); saveList(SERVICE_STORAGE_KEY, list); return current; }, activeOptions() { return this.getAll().filter((p) => p.package_status === PACKAGE_STATUS.ACTIVE); }, resetSeed() { const seeded = seedServicePackages(); saveList(SERVICE_STORAGE_KEY, seeded); return seeded; } };
+  const ServiceDB = {
+    STATUS: PACKAGE_STATUS,
+    getAll() { return loadList(SERVICE_STORAGE_KEY, seedServicePackages); },
+    getById(id) { return this.getAll().find((p) => p.id === id) || null; },
+    summary() { const list = this.getAll(); return { total: list.length, active: list.filter((p) => p.package_status === PACKAGE_STATUS.ACTIVE).length, inactive: list.filter((p) => p.package_status === PACKAGE_STATUS.INACTIVE).length }; },
+    isCodeTaken(code, excludeId) { return this.getAll().some((p) => p.package_code === code && p.id !== excludeId); },
+    create(data) { const list = this.getAll(); if (this.isCodeTaken(data.package_code)) throw new Error("Kode Paket sudah digunakan."); const record = { id: uid("SRV"), package_code: data.package_code, package_name: data.package_name, bandwidth: data.bandwidth, selling_price: Number(data.selling_price), package_status: data.package_status || PACKAGE_STATUS.ACTIVE, activity_log: [{ timestamp: nowISO(), action: "Tambah Paket", detail: `Paket ${data.package_name} dibuat.`, actor: ACTOR }] }; list.push(record); saveList(SERVICE_STORAGE_KEY, list); return record; },
+    update(id, data) { const list = this.getAll(); const idx = list.findIndex((p) => p.id === id); if (idx === -1) throw new Error("Paket tidak ditemukan."); const current = list[idx]; if (data.package_code !== current.package_code && this.isCodeTaken(data.package_code, id)) throw new Error("Kode Paket sudah digunakan."); Object.assign(current, { package_code: data.package_code, package_name: data.package_name, bandwidth: data.bandwidth, selling_price: Number(data.selling_price), package_status: data.package_status }); current.activity_log.push({ timestamp: nowISO(), action: "Ubah Paket", detail: `Paket ${current.package_name} diperbarui.`, actor: ACTOR }); list[idx] = current; saveList(SERVICE_STORAGE_KEY, list); return current; },
+    setStatus(id, package_status) { const list = this.getAll(); const current = list.find((p) => p.id === id); if (!current) throw new Error("Paket tidak ditemukan."); current.package_status = package_status; current.activity_log.push({ timestamp: nowISO(), action: "Ubah Status", detail: `Status paket diubah ke ${package_status}.`, actor: ACTOR }); saveList(SERVICE_STORAGE_KEY, list); return current; },
+  };
+
+  const InfraDB = {
+    OLT_STATUS, OLT_TYPES,
+    getMonitoringData() {
+      const list = CustomerDB.getAll();
+      return list.filter(c => c.customer_status !== STATUS.PENDING_REG || c.onu_number).map(c => ({
+        ...c,
+        olt_rx_register: c.olt_rx_register !== null ? c.olt_rx_register : "-",
+        olt_rx_current: c.olt_rx_current !== null ? c.olt_rx_current : "-",
+        olt_status: c.olt_status || OLT_STATUS.OFFLINE,
+      }));
+    },
+    getRegistrableCustomers() {
+      const list = CustomerDB.getAll();
+      return list.filter(c => c.customer_status === STATUS.PENDING_REG && c.olt_type && c.olt_slot && c.olt_pon);
+    },
+    generateRegistrationScripts(customer, selectedSlot, selectedPon) {
+      const slot = selectedSlot || customer.olt_slot;
+      const pon = selectedPon || customer.olt_pon;
+      const type = customer.olt_type || "Huawei MA5800";
+      const isHuawei = type.includes("Huawei");
+      const isZTE = type.includes("ZTE");
+      const isFiberhome = type.includes("Fiberhome");
+
+      const sn = customer.modem_serial_number || "AUTO-DETECT";
+      const onuId = parseInt(pon) * 128 + (parseInt(slot) - 1) * 16;
+      const pppoeUser = customer.pppoe_secret;
+      const vlan = 100 + parseInt(slot);
+
+      let scripts = [];
+
+      if (isHuawei) {
+        scripts = [
+          { title: "Script Scan Modem", code: `display ont autofind ${slot} ${pon}\n` },
+          { title: "Script Registrasi Modem", code: `interface gpon ${slot}/${pon}\n ont add ${onuId} sn-auth ${sn} omci ont-lineprofile-id 10 ont-srvprofile-id 10 desc "${customer.customer_name}"\n ont confirm ${onuId}\n quit\n` },
+          { title: "Script Pemeriksaan Redaman", code: `display ont optical-info ${slot} ${pon} ${onuId}\n` },
+          { title: "Script Konfigurasi Profile ONU", code: `interface gpon ${slot}/${pon}\n ont modify ${onuId} ont-lineprofile-id 10 ont-srvprofile-id 10\n quit\n` },
+          { title: "Script Konfigurasi PPPoE", code: `service-port vlan ${vlan} gpon ${slot}/${pon} ont ${onuId} gemport 1 multi-service user-vlan ${vlan} tag-transform translate\n` },
+        ];
+      } else if (isZTE) {
+        scripts = [
+          { title: "Script Scan Modem", code: `show pon onu-unregister gpon_olt-${slot}/${pon}\n` },
+          { title: "Script Registrasi Modem", code: `configure terminal\n interface gpon_olt-${slot}/${pon}\n  onu ${onuId} type ZTE-F660 sn ${sn}\n  onu ${onuId} profile lineprofile ${onuId} create\n  onu ${onuId} tcont 1 profile 10\n  onu ${onuId} gemport 1 tcont 1\n  onu ${onuId} service 1 gemport 1 vlan ${vlan} translate\n exit\n exit\n` },
+          { title: "Script Pemeriksaan Redaman", code: `show pon power attenuation gpon_olt-${slot}/${pon} onu_id ${onuId}\n` },
+          { title: "Script Konfigurasi Profile ONU", code: `configure terminal\n interface gpon_olt-${slot}/${pon}\n  onu ${onuId} lineprofile 10\n  onu ${onuId} srvprofile 10\n exit\n exit\n` },
+          { title: "Script Konfigurasi PPPoE", code: `configure terminal\n interface gpon_olt-${slot}/${pon}\n  onu ${onuId} pppoe 1 user ${pppoeUser} password ${customer.customer_name.replace(/\s+/g, '')}123\n exit\n exit\n` },
+        ];
+      } else {
+        scripts = [
+          { title: "Script Scan Modem", code: `show pon onu unregister interface gpon ${slot}/${pon}\n` },
+          { title: "Script Registrasi Modem", code: `configure terminal\n interface gpon ${slot}/${pon}\n  onu ${onuId} sn ${sn}\n  onu ${onuId} line profile 10\n  onu ${onuId} service profile 10\n  onu ${onuId} vlan mode tag ${vlan}\n exit\n exit\n` },
+          { title: "Script Pemeriksaan Redaman", code: `show pon optical-rx interface gpon ${slot}/${pon} onu ${onuId}\n` },
+          { title: "Script Konfigurasi Profile ONU", code: `configure terminal\n interface gpon ${slot}/${pon}\n  onu ${onuId} line profile 10\n  onu ${onuId} service profile 10\n exit\n exit\n` },
+          { title: "Script Konfigurasi PPPoE", code: `configure terminal\n interface gpon ${slot}/${pon}\n  onu ${onuId} pppoe username ${pppoeUser} password ${customer.customer_name.replace(/\s+/g, '')}123\n exit\n exit\n` },
+        ];
+      }
+
+      return scripts.map(s => ({ ...s, type }));
+    },
+  };
 
   global.CustomerDB = CustomerDB;
   global.ServiceDB = ServiceDB;
+  global.InfraDB = InfraDB;
 
   global.SIDEBAR_MENU = [
     { section: "Utama", items: [
@@ -88,6 +185,10 @@
     { section: "Modul Penjualan & Layanan", items: [
       { label: "Paket Layanan", href: "/pages/sales-service-management/packages.html", icon: "<path d=\"M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z\"/><polyline points=\"3.27 6.96 12 12.01 20.73 6.96\"/>" },
       { label: "Paket Pelanggan", href: "/pages/sales-service-management/customer-packages.html", icon: "<path d=\"M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2\"/><circle cx=\"8.5\" cy=\"7\" r=\"4\"/><polyline points=\"17 11 19 13 23 9\"/>" }
+    ]},
+    { section: "Modul Monitoring Infrastruktur", items: [
+      { label: "Monitoring OLT", href: "/pages/infrastructure-monitoring/monitoring.html", icon: "<path d=\"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z\"/><path d=\"M12 16a4 4 0 0 0-4-4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4 4z\"/>" },
+      { label: "Registrasi ONU", href: "/pages/infrastructure-monitoring/register.html", icon: "<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><line x1=\"12\" y1=\"17\" x2=\"12\" y2=\"11\"/><line x1=\"9\" y1=\"14\" x2=\"15\" y2=\"14\"/>" }
     ]}
   ];
 })(window);
