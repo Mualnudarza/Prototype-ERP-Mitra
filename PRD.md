@@ -131,19 +131,19 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-28 — Initial prototype, status sync antara radius dan customers
 
 #### Topologi Infrastruktur (`infra.topologi`)
-- **Fungsi**: Menampilkan pohon topologi infrastruktur jaringan: OLT → Input Splitter → Output Splitter. Mendukung expand/collapse, seleksi node, panel detail (lat/lng, kapasitas, progress bar). Tiga tombol terpisah: "Tambah OLT" (hanya Super User), "Tambah Input Splitter", "Tambah Output Splitter" (kedua role) yang mengarah ke halaman form baru. Setiap node di pohon juga memiliki tombol "Edit" dan "Hapus" (role-based access).
-- **Lokasi file**: `app-modules.js:1306-1770` (list), `app-modules.js:1208-1300` (`renderEditNodePage`), data di `app-data.js` (`DB.infrastructure`)
+- **Fungsi**: Menampilkan pohon topologi infrastruktur jaringan: OLT → Input Splitter → Output Splitter. Mendukung expand/collapse, seleksi node, panel detail (lat/lng, kapasitas, progress bar). Tiga tombol terpisah: "Tambah OLT" (hanya Super User), "Tambah Input Splitter", "Tambah Output Splitter" (kedua role). Modal Output Splitter menggunakan cascading OLT → Input Splitter. Node dapat diedit dan dihapus melalui panel detail (Admin User tidak dapat mengedit/menghapus OLT).
+- **Lokasi file**: `app-modules.js:1208-1557`, data di `app-data.js` (`DB.infrastructure`)
 - **Data yang dibutuhkan**:
   - Input (OLT): id, label, partner_id, olt_type (Huawei MA5800/ZTE C320/Fiberhome AN5516), lat, lng, address
-  - Input (Input Splitter): lat, lng, address, capacity, connected, status
+  - Input (Input Splitter): lat, lng, address, capacity, connected
   - Input (Output Splitter): lat, lng, address, capacity (2/8/16), connected, status (Aktif/Penuh)
-  - Tampil: KPI (total OLT, total splitter, titik tersedia, total pelanggan), pohon interaktif, panel detail node dengan lat/lng editor, progress bar kapasitas. Halaman form terpisah untuk tambah/edit node dengan cascading selector untuk input/output splitter.
-- **Ketergantungan**: `DB.infrastructure`, `DB.customers`, `allInputSplitters()`, `allOutputSplitters()`, `findOltNode()`, `renderKPIs`
+  - Tampil: KPI (total OLT, total splitter, titik tersedia, total pelanggan), pohon interaktif, panel detail node dengan lat/lng editor, progress bar kapasitas, serta tombol Edit dan Hapus (berdasarkan role permission)
+- **Ketergantungan**: `DB.infrastructure`, `DB.customers`, `allInputSplitters()`, `allOutputSplitters()`, `findOltNode()`, `renderKPIs`, `Modal`
 - **Status**: Selesai
 - **Catatan Perubahan**:
   - 2026-07-28 — Initial prototype, 3 OLT nodes dengan tree interaktif
   - 2026-07-28 — Pecah tombol "Tambah Titik" menjadi 3 tombol terpisah. Tambah OLT hanya untuk Super User. Input Splitter menambahkan field lat/lng/address. Output Splitter modal menambahkan selector OLT induk → cascading Input Splitter.
-  - 2026-07-28 — Implementasi fitur Edit & Hapus node topologi (page-based form, bukan modal). Penegakan role-based access: Super User bisa edit/hapus semua, Admin Mitra hanya Input/Output Splitter. Tombol Edit/Hapus ditambahkan di setiap node tree.
+  - 2026-07-28 — Tambah fitur Edit & Hapus node pada topologi dengan role-based access control (RBAC). Super User untuk semua tipe, Admin User hanya untuk tipe Splitter.
 
 #### Data Perangkat (`infra.perangkat`)
 - **Fungsi**: Menampilkan daftar flat (rata) dari seluruh perangkat dalam topologi infrastruktur — OLT, Input Splitter, dan Output Splitter — dalam satu tabel.
