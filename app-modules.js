@@ -1427,20 +1427,8 @@ Views['infra.topologi'] = function(root){
           <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${node.address||'-'}</span></div>
         </div>
         <div class="cap-bar" style="width:100%;height:8px;margin-bottom:16px;"><span style="width:${node.connected/node.capacity*100}%;background:${node.connected>=node.capacity?'var(--badge-red-fg)':'var(--color-accent)'}"></span></div>
-        <div class="field-row">
-          <div class="field"><label>Latitude</label><input class="input" id="pLat" type="number" step="0.0001" value="${node.lat||0}"></div>
-          <div class="field"><label>Longitude</label><input class="input" id="pLng" type="number" step="0.0001" value="${node.lng||0}"></div>
-        </div>
-        <div class="map-placeholder" style="margin-bottom:14px;">${ic('mapPin','pin')}<span>Lokasi splitter di peta</span><span style="font-family:var(--font-family-mono);font-size:11px;">${node.lat||0}, ${node.lng||0}</span></div>
-        <button class="btn btn-primary" id="pSaveLoc" style="width:100%;">${ic('check')}Simpan Lokasi</button>
         ${actionBar}
       `;
-      panelCard.querySelector('#pSaveLoc').addEventListener('click', ()=>{
-        node.lat = parseFloat(document.getElementById('pLat').value)||node.lat;
-        node.lng = parseFloat(document.getElementById('pLng').value)||node.lng;
-        pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `memperbarui koordinat lokasi ${node.label}`);
-        toast('Koordinat lokasi splitter diperbarui'); paintPanel();
-      });
     } else if(node.type === 'input'){
       const inputConnected = (node.children||[]).reduce((s,c)=>s+(c.connected||0),0);
       const inputCapacity = (node.children||[]).reduce((s,c)=>s+(c.capacity||0),0);
@@ -1455,20 +1443,8 @@ Views['infra.topologi'] = function(root){
           <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${node.address||'-'}</span></div>
         </div>
         ${inputCapacity > 0 ? `<div class="cap-bar" style="width:100%;height:8px;margin-bottom:16px;"><span style="width:${inputConnected/inputCapacity*100}%;background:${inputConnected>=inputCapacity?'var(--badge-red-fg)':'var(--color-accent)'}"></span></div>` : ''}
-        <div class="field-row">
-          <div class="field"><label>Latitude</label><input class="input" id="pLat" type="number" step="0.0001" value="${node.lat||0}"></div>
-          <div class="field"><label>Longitude</label><input class="input" id="pLng" type="number" step="0.0001" value="${node.lng||0}"></div>
-        </div>
-        <div class="map-placeholder" style="margin-bottom:14px;">${ic('mapPin','pin')}<span>Lokasi input splitter di peta</span><span style="font-family:var(--font-family-mono);font-size:11px;">${node.lat||0}, ${node.lng||0}</span></div>
-        <button class="btn btn-primary" id="pSaveLoc" style="width:100%;">${ic('check')}Simpan Lokasi</button>
         ${actionBar}
       `;
-      panelCard.querySelector('#pSaveLoc').addEventListener('click', ()=>{
-        node.lat = parseFloat(document.getElementById('pLat').value)||node.lat;
-        node.lng = parseFloat(document.getElementById('pLng').value)||node.lng;
-        pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `memperbarui koordinat lokasi ${node.label}`);
-        toast('Koordinat lokasi input splitter diperbarui'); paintPanel();
-      });
     } else {
       panelCard.innerHTML = `
         <h3 style="margin:0 0 4px 0;font-size:14.5px;">${node.label}</h3>
@@ -1478,20 +1454,8 @@ Views['infra.topologi'] = function(root){
           <div class="detail-item"><span class="dl">Total Input Splitter</span><span class="dv">${(node.children||[]).length} unit</span></div>
           <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${node.address||'-'}</span></div>
         </div>
-        <div class="field-row">
-          <div class="field"><label>Latitude</label><input class="input" id="pLat" type="number" step="0.0001" value="${node.lat||0}"></div>
-          <div class="field"><label>Longitude</label><input class="input" id="pLng" type="number" step="0.0001" value="${node.lng||0}"></div>
-        </div>
-        <div class="map-placeholder" style="margin-bottom:14px;">${ic('mapPin','pin')}<span>Lokasi OLT di peta</span><span style="font-family:var(--font-family-mono);font-size:11px;">${node.lat||0}, ${node.lng||0}</span></div>
-        <button class="btn btn-primary" id="pSaveLoc" style="width:100%;">${ic('check')}Simpan Lokasi</button>
         ${actionBar}
       `;
-      panelCard.querySelector('#pSaveLoc').addEventListener('click', ()=>{
-        node.lat = parseFloat(document.getElementById('pLat').value)||node.lat;
-        node.lng = parseFloat(document.getElementById('pLng').value)||node.lng;
-        pushActivity('Super Admin', `memperbarui koordinat lokasi ${node.label}`);
-        toast('Koordinat lokasi OLT diperbarui'); paintPanel();
-      });
     }
 
     panelCard.querySelector('#pEdit')?.addEventListener('click', ()=>openEditNodeForm(node));
