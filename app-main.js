@@ -46,8 +46,9 @@ function isSuperUser(){ return CURRENT_USER.id === 'super'; }
 
 function currentRoute(){
   const hash = window.location.hash.replace('#','');
+  const routeKey = hash.split('?')[0];
   const allowed = isSuperUser() ? ALL_ITEMS : ALL_ITEMS.filter(i=>!PARTNERSHIP_KEYS.includes(i.key));
-  return allowed.some(i=>i.key===hash) ? hash : (isSuperUser() ? DEFAULT_ROUTE : DEFAULT_ROUTE_MITRA);
+  return allowed.some(i=>i.key===routeKey) ? routeKey : (isSuperUser() ? DEFAULT_ROUTE : DEFAULT_ROUTE_MITRA);
 }
 
 function navWithBadges(){

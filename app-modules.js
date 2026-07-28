@@ -517,7 +517,7 @@ Views['customer.pelanggan'] = function(root){
       wrap.querySelectorAll('tbody tr[data-id]').forEach(tr=>{
         const c = DB.customers.find(x=>x.id===tr.dataset.id);
         tr.querySelector('.act-edit')?.addEventListener('click', ()=>openCustomerForm(c));
-        tr.querySelector('.act-reg')?.addEventListener('click', ()=>openRegistrationModal(c, ()=>{ paintBanner(); kpis(); table.refresh(); syncNavBadge(); }));
+        tr.querySelector('.act-reg')?.addEventListener('click', ()=>{ window.location.hash = `customer.registrasi?id=${c.id}`; });
       });
       wrap.querySelector('#btnAddCust')?.addEventListener('click', ()=>openCustomerForm(null));
     }
@@ -603,7 +603,7 @@ Views['customer.pelanggan'] = function(root){
               installation_address:val('c_addr'), partner_id:partnerId, package_id:val('c_pkg'),
               modem_serial_number:'', olt_port:'', onu_number:'', access_name:'', access_port:'',
               latitude:parseFloat(val('c_lat'))||0, longitude:parseFloat(val('c_lng'))||0,
-              olt_id:null, olt_slot:null, olt_pon:null, olt_rx_register:null,
+              olt_id:null, olt_input_id:null, olt_output_id:null, olt_slot:null, olt_pon:null, olt_rx_register:null,
             };
             DB.customers.push(newC);
             DB.radius.push({id:'RAD-'+newC.id, customer_id:newC.id, bandwidth:(DB.packages.find(p=>p.id===newC.package_id)||{}).bandwidth||'-', customer_status:'Unregistered', radius_status:'Offline', isolation_date:null, activation_date:null, last_update:new Date().toISOString()});
@@ -620,11 +620,30 @@ Views['customer.pelanggan'] = function(root){
 
 
 /* ------------------------------------------------------------------------
-   REGISTRASI ONU — modal bersama (dipanggil dari Data Pelanggan & antrian)
+   REGISTRASI ONU — halaman penuh (dipanggil dari antrian registrasi)
    ------------------------------------------------------------------------ */
-function openRegistrationModal(customer, onDone){
+function renderRegistrationPage(root, customer, onDone){
   const olts = allOltNodes();
-  const defaultOlt = olts[0];
+  const defaultOlt = olts.find(o=>o.id===customer.olt_id) || olts[0];
+
+  root.innerHTML = `
+    <div class="page-intro" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <p style="margin:0;">Registrasi ONU untuk pelanggan <strong>${customer.customer_name}</strong> — lengkapi data perangkat untuk mengaktifkan layanan.</p>
+      <button class="btn btn-secondary btn-sm" id="btnBackQueue">${ic('chevronLeft')}Kembali ke Antrian</button>
+    </div>
+    <div id="regPageContent"></div>
+  `;
+
+  root.querySelector('#btnBackQueue')?.addEventListener('click', ()=>{ window.location.hash='customer.registrasi'; });
+
+  function inputOptions(oltId){
+    const inputs = allInputSplitters(oltId);
+    return inputs.length ? inputs.map(i=>({value:i.id, label:i.label})) : [{value:'',label:'-- Belum ada Input Splitter --'}];
+  }
+  function outputOptions(oltId, inputId){
+    const outputs = allOutputSplitters(oltId, inputId);
+    return outputs.length ? outputs.map(o=>({value:o.id, label:`${o.label} (${o.connected}/${o.capacity})`})) : [{value:'',label:'-- Belum ada Output Splitter --'}];
+  }
 
   function scriptsHTML(oltId, slot, pon, snOverride){
     const node = findOltNode(oltId);
@@ -643,105 +662,142 @@ function openRegistrationModal(customer, onDone){
       </div>`).join('');
   }
 
-  Modal.open({
-    title:'Registrasi ONU', subtitle:`${customer.customer_name} · ${pkgName(customer.package_id)}`,
-    size:'xl',
-    bodyHTML:`
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
-        <div>
-          <div class="detail-grid" style="margin-bottom:16px;">
-            <div class="detail-item"><span class="dl">Nama Pelanggan</span><span class="dv">${customer.customer_name}</span></div>
-            <div class="detail-item"><span class="dl">Paket Layanan</span><span class="dv">${pkgName(customer.package_id)}</span></div>
-            <div class="detail-item" style="grid-column:1 / -1;"><span class="dl">Alamat Pemasangan</span><span class="dv">${customer.installation_address}</span></div>
-            <div class="detail-item"><span class="dl">Mitra</span><span class="dv">${partnerName(customer.partner_id)}</span></div>
-            <div class="detail-item"><span class="dl">PPPoE Secret</span><span class="dv" style="font-family:var(--font-family-mono);">${customer.pppoe_secret}</span></div>
-          </div>
-          ${fieldsHTML([{label:'SN Modem', id:'r_sn', value:customer.modem_serial_number, placeholder:'ZTE-XXXXXXX (scan / input manual)'}])}
-          ${fieldsHTML([{label:'Port OLT', id:'r_olt', type:'select', value:customer.olt_id||(defaultOlt&&defaultOlt.id), options:olts.map(o=>({value:o.id, label:`${o.label} (${o.olt_type})`}))}])}
-          ${rowWrap(fieldsHTML([
-            {label:'Slot OLT', id:'r_slot', type:'select', value:customer.olt_slot, options:Array.from({length:16},(_,i)=>({value:String(i+1), label:'Slot '+(i+1)}))},
-            {label:'Terminal (PON)', id:'r_pon', type:'select', value:customer.olt_pon, options:Array.from({length:16},(_,i)=>({value:String(i+1), label:'PON '+(i+1)}))},
-          ]))}
-          <div class="hint">Script di sebelah kanan diperbarui otomatis mengikuti Port OLT, Slot, dan PON yang dipilih.</div>
+  const content = root.querySelector('#regPageContent');
+  content.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
+      <div class="card card-pad">
+        <div class="section-head" style="padding:0 0 14px 0;"><h3>Informasi Pelanggan</h3></div>
+        <div class="detail-grid" style="margin-bottom:16px;">
+          <div class="detail-item"><span class="dl">Nama Pelanggan</span><span class="dv">${customer.customer_name}</span></div>
+          <div class="detail-item"><span class="dl">Paket Layanan</span><span class="dv">${pkgName(customer.package_id)}</span></div>
+          <div class="detail-item" style="grid-column:1 / -1;"><span class="dl">Alamat Pemasangan</span><span class="dv">${customer.installation_address}</span></div>
+          <div class="detail-item"><span class="dl">Mitra</span><span class="dv">${partnerName(customer.partner_id)}</span></div>
+          <div class="detail-item"><span class="dl">PPPoE Secret</span><span class="dv" style="font-family:var(--font-family-mono);">${customer.pppoe_secret}</span></div>
         </div>
-        <div>
-          <h3 style="font-size:13px;margin:0 0 10px 0;">Panduan Registrasi ONU</h3>
-          <div id="regScriptsContainer">${scriptsHTML(customer.olt_id||(defaultOlt&&defaultOlt.id), customer.olt_slot, customer.olt_pon)}</div>
+        <div class="section-head" style="padding:0 0 14px 0;"><h3>Konfigurasi Perangkat</h3></div>
+        ${fieldsHTML([{label:'SN Modem', id:'r_sn', value:customer.modem_serial_number, placeholder:'ZTE-XXXXXXX (scan / input manual)'}])}
+        ${fieldsHTML([{label:'Port OLT', id:'r_olt', type:'select', value:customer.olt_id||(defaultOlt&&defaultOlt.id), options:olts.map(o=>({value:o.id, label:`${o.label} (${o.olt_type})`}))}])}
+        ${fieldsHTML([{label:'Input Splitter', id:'r_input', type:'select', value:customer.olt_input_id||'', options:inputOptions(customer.olt_id||(defaultOlt&&defaultOlt.id))}])}
+        ${fieldsHTML([{label:'Output Splitter', id:'r_output', type:'select', value:customer.olt_output_id||'', options:outputOptions(customer.olt_id||(defaultOlt&&defaultOlt.id), customer.olt_input_id||'')}])}
+        ${rowWrap(fieldsHTML([
+          {label:'Slot OLT', id:'r_slot', type:'select', value:customer.olt_slot, options:Array.from({length:16},(_,i)=>({value:String(i+1), label:'Slot '+(i+1)}))},
+          {label:'Terminal (PON)', id:'r_pon', type:'select', value:customer.olt_pon, options:Array.from({length:16},(_,i)=>({value:String(i+1), label:'PON '+(i+1)}))},
+        ]))}
+        <div class="hint">Script registrasi di sebelah kanan diperbarui otomatis mengikuti konfigurasi yang dipilih.</div>
+        <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+          <button class="btn btn-secondary" id="rCancel">${ic('x')}Batal</button>
+          <button class="btn btn-primary" id="rSave">${ic('check')}Proses Registrasi ONU</button>
         </div>
       </div>
-    `,
-    footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}Proses Registrasi ONU</button>`,
-    onOpen(body, foot){
-      const selOlt = body.querySelector('#r_olt');
-      const selSlot = body.querySelector('#r_slot');
-      const selPon = body.querySelector('#r_pon');
-      const snInput = body.querySelector('#r_sn');
-      const container = body.querySelector('#regScriptsContainer');
+      <div class="card card-pad">
+        <div class="section-head" style="padding:0 0 14px 0;"><h3>Panduan Registrasi ONU</h3></div>
+        <div id="regScriptsContainer">${scriptsHTML(customer.olt_id||(defaultOlt&&defaultOlt.id), customer.olt_slot, customer.olt_pon)}</div>
+      </div>
+    </div>
+  `;
 
-      function refreshScripts(){
-        container.innerHTML = scriptsHTML(selOlt.value, selSlot.value, selPon.value, snInput.value.trim());
-        wireCopyButtons();
-      }
-      function wireCopyButtons(){
-        container.querySelectorAll('.copy-btn').forEach(btn=>{
-          btn.addEventListener('click', ()=>{
-            const idx = btn.dataset.copyIdx;
-            const code = document.getElementById('regScriptCode'+idx).textContent;
-            navigator.clipboard.writeText(code).then(()=>{
-              toast('Script berhasil disalin ke clipboard');
-              btn.classList.add('copied');
-              setTimeout(()=>btn.classList.remove('copied'), 1200);
-            }).catch(()=>{ toast('Gagal menyalin script'); });
-          });
-        });
-      }
-      wireCopyButtons();
-      refreshScripts();
-      selOlt.addEventListener('change', refreshScripts);
-      selSlot.addEventListener('change', refreshScripts);
-      selPon.addEventListener('change', refreshScripts);
-      snInput.addEventListener('input', refreshScripts);
+  const selOlt = content.querySelector('#r_olt');
+  const selInput = content.querySelector('#r_input');
+  const selOutput = content.querySelector('#r_output');
+  const selSlot = content.querySelector('#r_slot');
+  const selPon = content.querySelector('#r_pon');
+  const snInput = content.querySelector('#r_sn');
+  const scriptContainer = content.querySelector('#regScriptsContainer');
 
-      foot.querySelector('#mCancel').addEventListener('click', Modal.close);
-      foot.querySelector('#mSave').addEventListener('click', ()=>{
-        const oltId = selOlt.value, slot = selSlot.value, pon = selPon.value, sn = snInput.value.trim();
-        if(!oltId || !slot || !pon){ toast('Pilih Port OLT, Slot, dan PON terlebih dahulu'); return; }
-        if(!sn){ toast('SN Modem wajib diisi'); return; }
-        const node = findOltNode(oltId);
-        const ok = window.confirm(`Selesaikan registrasi ONU untuk ${customer.customer_name} pada ${node.label}, Slot ${slot}, PON ${pon}?`);
-        if(!ok) return;
-
-        const onuNumber = 'ONU-' + String(Math.floor(Math.random()*9000+1000));
-        const rx = (Math.random() * (-18 - (-24)) + (-24)).toFixed(1);
-
-        customer.modem_serial_number = sn;
-        customer.olt_id = oltId;
-        customer.olt_slot = slot;
-        customer.olt_pon = pon;
-        customer.olt_port = `${oltId}/Slot-${slot}/PON-${pon}`;
-        customer.onu_number = onuNumber;
-        customer.olt_rx_register = parseFloat(rx);
-        customer.access_name = node.label.split('·')[1] ? node.label.split('·')[1].trim() : node.label;
-        customer.access_port = String(slot);
-        customer.customer_status = 'Active';
-
-        const rad = DB.radius.find(r=>r.customer_id===customer.id);
-        if(rad){
-          rad.radius_status = 'Online';
-          rad.customer_status = 'Active';
-          rad.activation_date = new Date().toISOString().slice(0,10);
-          rad.last_update = new Date().toISOString();
-        }
-        pushActivity('Sistem', `menyelesaikan registrasi ONU ${onuNumber} untuk pelanggan ${customer.customer_name} pada ${node.label} Slot ${slot} PON ${pon}`);
-        toast('Registrasi ONU berhasil diselesaikan · layanan pelanggan kini Aktif');
-        Modal.close();
-        if(onDone) onDone();
+  function refreshInputOptions(){
+    selInput.innerHTML = inputOptions(selOlt.value).map(o=>`<option value="${o.value}" ${o.value===selInput.value?'selected':''}>${o.label}</option>`).join('');
+    refreshOutputOptions();
+  }
+  function refreshOutputOptions(){
+    selOutput.innerHTML = outputOptions(selOlt.value, selInput.value).map(o=>`<option value="${o.value}" ${o.value===selOutput.value?'selected':''}>${o.label}</option>`).join('');
+    refreshScripts();
+  }
+  function refreshScripts(){
+    scriptContainer.innerHTML = scriptsHTML(selOlt.value, selSlot.value, selPon.value, snInput.value.trim());
+    wireCopyButtons();
+  }
+  function wireCopyButtons(){
+    scriptContainer.querySelectorAll('.copy-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const idx = btn.dataset.copyIdx;
+        const code = document.getElementById('regScriptCode'+idx).textContent;
+        navigator.clipboard.writeText(code).then(()=>{
+          toast('Script berhasil disalin ke clipboard');
+          btn.classList.add('copied');
+          setTimeout(()=>btn.classList.remove('copied'), 1200);
+        }).catch(()=>{ toast('Gagal menyalin script'); });
       });
+    });
+  }
+  wireCopyButtons();
+  refreshScripts();
+  selOlt.addEventListener('change', refreshInputOptions);
+  selInput.addEventListener('change', refreshOutputOptions);
+  selSlot.addEventListener('change', refreshScripts);
+  selPon.addEventListener('change', refreshScripts);
+  snInput.addEventListener('input', refreshScripts);
+
+  content.querySelector('#rCancel')?.addEventListener('click', ()=>{ window.location.hash='customer.registrasi'; });
+  content.querySelector('#rSave')?.addEventListener('click', ()=>{
+    const oltId = selOlt.value, inputId = selInput.value, outputId = selOutput.value, slot = selSlot.value, pon = selPon.value, sn = snInput.value.trim();
+    if(!oltId || !slot || !pon){ toast('Pilih Port OLT, Slot, dan PON terlebih dahulu'); return; }
+    if(!sn){ toast('SN Modem wajib diisi'); return; }
+    const node = findOltNode(oltId);
+    const outputNode = outputId ? findOutputSplitter(oltId, inputId, outputId) : null;
+    const locationLabel = outputNode ? outputNode.label : node.label;
+    const ok = window.confirm(`Selesaikan registrasi ONU untuk ${customer.customer_name} pada ${locationLabel}, Slot ${slot}, PON ${pon}?`);
+    if(!ok) return;
+
+    const onuNumber = 'ONU-' + String(Math.floor(Math.random()*9000+1000));
+    const rx = (Math.random() * (-18 - (-24)) + (-24)).toFixed(1);
+
+    customer.modem_serial_number = sn;
+    customer.olt_id = oltId;
+    customer.olt_input_id = inputId || null;
+    customer.olt_output_id = outputId || null;
+    customer.olt_slot = slot;
+    customer.olt_pon = pon;
+    customer.olt_port = `${oltId}/Slot-${slot}/PON-${pon}`;
+    customer.onu_number = onuNumber;
+    customer.olt_rx_register = parseFloat(rx);
+    customer.access_name = locationLabel;
+    customer.access_port = String(slot);
+    customer.customer_status = 'Active';
+
+    if(outputNode){
+      outputNode.connected = (outputNode.connected||0) + 1;
+      if(outputNode.connected >= outputNode.capacity) outputNode.status = 'Penuh';
     }
+
+    const rad = DB.radius.find(r=>r.customer_id===customer.id);
+    if(rad){
+      rad.radius_status = 'Online';
+      rad.customer_status = 'Active';
+      rad.activation_date = new Date().toISOString().slice(0,10);
+      rad.last_update = new Date().toISOString();
+    }
+    pushActivity('Sistem', `menyelesaikan registrasi ONU ${onuNumber} untuk pelanggan ${customer.customer_name} pada ${locationLabel} Slot ${slot} PON ${pon}`);
+    toast('Registrasi ONU berhasil diselesaikan · layanan pelanggan kini Aktif');
+    if(onDone) onDone();
+    window.location.hash='customer.registrasi';
   });
 }
 
 Views['customer.registrasi'] = function(root){
+  const hashParts = window.location.hash.split('?');
+  const params = new URLSearchParams(hashParts[1] || '');
+  const customerId = params.get('id');
+
+  if(customerId){
+    const customer = DB.customers.find(c=>c.id===customerId);
+    if(customer && customer.customer_status==='Unregistered'){
+      renderRegistrationPage(root, customer, ()=>{ syncNavBadge(); });
+      return;
+    }
+    window.location.hash = 'customer.registrasi';
+    return;
+  }
+
   root.innerHTML = pageIntro('Daftar pelanggan baru yang telah terdaftar namun belum diregistrasi ke jaringan OLT. Lengkapi Port OLT, Slot, PON, dan SN Modem untuk mengaktifkan layanan.');
 
   const tableMount = document.createElement('div');
@@ -796,7 +852,7 @@ Views['customer.registrasi'] = function(root){
       afterRender(wrap, rows){
         wrap.querySelectorAll('tbody tr[data-id]').forEach(tr=>{
           const c = rows.find(x=>x.id===tr.dataset.id);
-          tr.querySelector('.act-reg')?.addEventListener('click', ()=>openRegistrationModal(c, ()=>{ paint(); syncNavBadge(); }));
+          tr.querySelector('.act-reg')?.addEventListener('click', ()=>{ window.location.hash = `customer.registrasi?id=${c.id}`; });
         });
       }
     });
@@ -1189,9 +1245,9 @@ Views['radius.monitoring'] = function(root){
 function flattenInfra(){
   const rows = [];
   DB.infrastructure.forEach(olt=>{
-    rows.push({id:olt.id, name:olt.label, jenis:'Port OLT', olt:olt.id, parent:'-', lat:'-', lng:'-', status:'Aktif', ref:olt});
+    rows.push({id:olt.id, name:olt.label, jenis:'Port OLT', olt:olt.id, parent:'-', lat:olt.lat||'-', lng:olt.lng||'-', status:'Aktif', ref:olt});
     (olt.children||[]).forEach(inp=>{
-      rows.push({id:inp.id, name:inp.label, jenis:'Input Splitter', olt:olt.id, parent:olt.id, lat:'-', lng:'-', status:'Aktif', ref:inp});
+      rows.push({id:inp.id, name:inp.label, jenis:'Input Splitter', olt:olt.id, parent:olt.id, lat:inp.lat||'-', lng:inp.lng||'-', status:'Aktif', ref:inp});
       (inp.children||[]).forEach(out=>{
         rows.push({id:out.id, name:out.label, jenis:'Output Splitter', olt:olt.id, parent:inp.id, lat:out.lat, lng:out.lng, status:out.status, ref:out});
       });
@@ -1241,7 +1297,7 @@ Views['infra.topologi'] = function(root){
     const hasChildren = node.children && node.children.length;
     const isOpen = expanded.has(node.id);
     const {ico, bg, fg} = nodeIcon(node.type);
-    const meta = node.type==='output' ? `${node.connected}/${node.capacity}` : (node.type==='input' ? `${(node.children||[]).length} output` : `${(node.children||[]).length} input`);
+    const meta = node.type==='output' ? `${node.connected}/${node.capacity}` : (node.type==='input' ? `${node.connected||0}/${node.capacity||'?'} · ${(node.children||[]).length} output` : `${(node.children||[]).length} input`);
     return `
       <div class="tree-node">
         <div class="tree-row ${selectedId===node.id?'selected':''}" data-node="${node.id}">
@@ -1274,9 +1330,15 @@ Views['infra.topologi'] = function(root){
   }
 
   function paintTree(){
+    const addBtns = isSuperUser()
+      ? `<button class="btn btn-primary btn-sm" id="btnAddOlt">${ic('plus')}Tambah OLT</button>
+         <button class="btn btn-secondary btn-sm" id="btnAddInput">${ic('plus')}Tambah Input Splitter</button>
+         <button class="btn btn-secondary btn-sm" id="btnAddOutput">${ic('plus')}Tambah Output Splitter</button>`
+      : `<button class="btn btn-secondary btn-sm" id="btnAddInput">${ic('plus')}Tambah Input Splitter</button>
+         <button class="btn btn-secondary btn-sm" id="btnAddOutput">${ic('plus')}Tambah Output Splitter</button>`;
     treeCard.innerHTML = `
       <div class="section-head"><h3>Topologi Infrastruktur</h3>
-        <button class="btn btn-primary btn-sm" id="btnAddTitik">${ic('plus')}Tambah Titik</button>
+        <div class="btn-group">${addBtns}</div>
       </div>
       <div class="tree" id="treeMount">${DB.infrastructure.map(o=>renderNode(o,0)).join('')}</div>
     `;
@@ -1291,7 +1353,9 @@ Views['infra.topologi'] = function(root){
     treeCard.querySelectorAll('[data-node]').forEach(el=>{
       el.addEventListener('click', ()=>{ selectedId = el.dataset.node; paintTree(); paintPanel(); });
     });
-    document.getElementById('btnAddTitik').addEventListener('click', openAddNodeForm);
+    treeCard.querySelector('#btnAddOlt')?.addEventListener('click', openAddOltForm);
+    treeCard.querySelector('#btnAddInput')?.addEventListener('click', openAddInputSplitterForm);
+    treeCard.querySelector('#btnAddOutput')?.addEventListener('click', openAddOutputSplitterForm);
   }
 
   function paintPanel(){
@@ -1308,70 +1372,191 @@ Views['infra.topologi'] = function(root){
           <div class="detail-item"><span class="dl">Jenis Splitter</span><span class="dv">Output 1:${node.capacity}</span></div>
           <div class="detail-item"><span class="dl">Status</span><span class="dv">${statusBadge(node.status)}</span></div>
           <div class="detail-item"><span class="dl">Kapasitas Terpakai</span><span class="dv">${node.connected}/${node.capacity}</span></div>
-          <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${node.address}</span></div>
+          <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${node.address||'-'}</span></div>
         </div>
         <div class="cap-bar" style="width:100%;height:8px;margin-bottom:16px;"><span style="width:${node.connected/node.capacity*100}%;background:${node.connected>=node.capacity?'var(--badge-red-fg)':'var(--color-accent)'}"></span></div>
         <div class="field-row">
-          <div class="field"><label>Latitude</label><input class="input" id="pLat" type="number" step="0.0001" value="${node.lat}"></div>
-          <div class="field"><label>Longitude</label><input class="input" id="pLng" type="number" step="0.0001" value="${node.lng}"></div>
+          <div class="field"><label>Latitude</label><input class="input" id="pLat" type="number" step="0.0001" value="${node.lat||0}"></div>
+          <div class="field"><label>Longitude</label><input class="input" id="pLng" type="number" step="0.0001" value="${node.lng||0}"></div>
         </div>
-        <div class="map-placeholder" style="margin-bottom:14px;">${ic('mapPin','pin')}<span>Lokasi splitter di peta</span><span style="font-family:var(--font-family-mono);font-size:11px;">${node.lat}, ${node.lng}</span></div>
+        <div class="map-placeholder" style="margin-bottom:14px;">${ic('mapPin','pin')}<span>Lokasi splitter di peta</span><span style="font-family:var(--font-family-mono);font-size:11px;">${node.lat||0}, ${node.lng||0}</span></div>
         <button class="btn btn-primary" id="pSaveLoc" style="width:100%;">${ic('check')}Simpan Lokasi</button>
       `;
       panelCard.querySelector('#pSaveLoc').addEventListener('click', ()=>{
         node.lat = parseFloat(document.getElementById('pLat').value)||node.lat;
         node.lng = parseFloat(document.getElementById('pLng').value)||node.lng;
-        pushActivity('Administrator Mitra', `memperbarui koordinat lokasi ${node.label}`);
+        pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `memperbarui koordinat lokasi ${node.label}`);
         toast('Koordinat lokasi splitter diperbarui'); paintPanel();
       });
     } else if(node.type === 'input'){
+      const inputConnected = (node.children||[]).reduce((s,c)=>s+(c.connected||0),0);
+      const inputCapacity = (node.children||[]).reduce((s,c)=>s+(c.capacity||0),0);
       panelCard.innerHTML = `
         <h3 style="margin:0 0 4px 0;font-size:14.5px;">${node.label}</h3>
         <p style="margin:0 0 14px 0;font-size:12.5px;color:var(--color-text-secondary);">Terhubung ke ${node.olt} · ${(node.children||[]).length} output splitter</p>
-        <div class="empty-state" style="padding:24px 8px;">${ic('splitter')}<div class="es-sub">Pilih output splitter untuk melihat detail lokasi & kapasitas.</div></div>
+        <div class="detail-grid" style="margin-bottom:14px;">
+          <div class="detail-item"><span class="dl">Jenis Splitter</span><span class="dv">Input 1:${node.capacity||'?'}</span></div>
+          <div class="detail-item"><span class="dl">Total Output</span><span class="dv">${(node.children||[]).length} unit</span></div>
+          <div class="detail-item"><span class="dl">Kapasitas Total</span><span class="dv">${inputCapacity} port</span></div>
+          <div class="detail-item"><span class="dl">Port Terpakai</span><span class="dv">${inputConnected}/${inputCapacity}</span></div>
+          <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${node.address||'-'}</span></div>
+        </div>
+        ${inputCapacity > 0 ? `<div class="cap-bar" style="width:100%;height:8px;margin-bottom:16px;"><span style="width:${inputConnected/inputCapacity*100}%;background:${inputConnected>=inputCapacity?'var(--badge-red-fg)':'var(--color-accent)'}"></span></div>` : ''}
+        <div class="field-row">
+          <div class="field"><label>Latitude</label><input class="input" id="pLat" type="number" step="0.0001" value="${node.lat||0}"></div>
+          <div class="field"><label>Longitude</label><input class="input" id="pLng" type="number" step="0.0001" value="${node.lng||0}"></div>
+        </div>
+        <div class="map-placeholder" style="margin-bottom:14px;">${ic('mapPin','pin')}<span>Lokasi input splitter di peta</span><span style="font-family:var(--font-family-mono);font-size:11px;">${node.lat||0}, ${node.lng||0}</span></div>
+        <button class="btn btn-primary" id="pSaveLoc" style="width:100%;">${ic('check')}Simpan Lokasi</button>
       `;
+      panelCard.querySelector('#pSaveLoc').addEventListener('click', ()=>{
+        node.lat = parseFloat(document.getElementById('pLat').value)||node.lat;
+        node.lng = parseFloat(document.getElementById('pLng').value)||node.lng;
+        pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `memperbarui koordinat lokasi ${node.label}`);
+        toast('Koordinat lokasi input splitter diperbarui'); paintPanel();
+      });
     } else {
       panelCard.innerHTML = `
         <h3 style="margin:0 0 4px 0;font-size:14.5px;">${node.label}</h3>
         <p style="margin:0 0 14px 0;font-size:12.5px;color:var(--color-text-secondary);">${partnerName(node.partner_id)} · ${(node.children||[]).length} input splitter</p>
-        <div class="empty-state" style="padding:24px 8px;">${ic('server')}<div class="es-sub">Port OLT sumber distribusi jaringan mitra ini.</div></div>
+        <div class="detail-grid" style="margin-bottom:14px;">
+          <div class="detail-item"><span class="dl">Vendor / Tipe</span><span class="dv">${node.olt_type||'-'}</span></div>
+          <div class="detail-item"><span class="dl">Total Input Splitter</span><span class="dv">${(node.children||[]).length} unit</span></div>
+          <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${node.address||'-'}</span></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Latitude</label><input class="input" id="pLat" type="number" step="0.0001" value="${node.lat||0}"></div>
+          <div class="field"><label>Longitude</label><input class="input" id="pLng" type="number" step="0.0001" value="${node.lng||0}"></div>
+        </div>
+        <div class="map-placeholder" style="margin-bottom:14px;">${ic('mapPin','pin')}<span>Lokasi OLT di peta</span><span style="font-family:var(--font-family-mono);font-size:11px;">${node.lat||0}, ${node.lng||0}</span></div>
+        <button class="btn btn-primary" id="pSaveLoc" style="width:100%;">${ic('check')}Simpan Lokasi</button>
       `;
+      panelCard.querySelector('#pSaveLoc').addEventListener('click', ()=>{
+        node.lat = parseFloat(document.getElementById('pLat').value)||node.lat;
+        node.lng = parseFloat(document.getElementById('pLng').value)||node.lng;
+        pushActivity('Super Admin', `memperbarui koordinat lokasi ${node.label}`);
+        toast('Koordinat lokasi OLT diperbarui'); paintPanel();
+      });
     }
   }
 
-  function openAddNodeForm(){
-    const inputSplitters = flattenInfra().filter(r=>r.jenis==='Input Splitter');
+  function openAddOltForm(){
     Modal.open({
-      title:'Tambah Titik Perangkat', subtitle:'Tambahkan Output Splitter baru pada Input Splitter terpilih',
+      title:'Tambah Port OLT', subtitle:'Daftarkan perangkat OLT baru ke topologi jaringan',
       bodyHTML:`
-        ${fieldsHTML([{label:'Nama Titik Perangkat', id:'n_name', placeholder:'Output Splitter 1:8 — Nama Lokasi'}])}
+        ${fieldsHTML([{label:'Nama Port OLT', id:'n_olt_name', placeholder:'OLT Huawei MA5800 — Kantor Pusat'}])}
         ${rowWrap(fieldsHTML([
-          {label:'Input Splitter Induk', id:'n_parent', type:'select', options:inputSplitters.map(s=>({value:s.id,label:s.name}))},
-          {label:'Jenis Splitter', id:'n_type', type:'select', options:[{value:'8',label:'Output 1:8'},{value:'16',label:'Output 1:16'}]},
+          {label:'Vendor / Tipe OLT', id:'n_olt_type', type:'select', options:[{value:'Huawei MA5800',label:'Huawei MA5800'},{value:'ZTE C320',label:'ZTE C320'},{value:'Fiberhome AN5516',label:'Fiberhome AN5516'}]},
+          {label:'Mitra', id:'n_olt_partner', type:'select', options:DB.partners.map(p=>({value:p.id,label:p.partner_name}))},
         ]))}
-        ${fieldsHTML([{label:'Keterangan / Alamat', id:'n_addr', type:'textarea', placeholder:'Alamat lokasi splitter ujung'}])}
+        ${fieldsHTML([{label:'Alamat / Keterangan', id:'n_olt_addr', type:'textarea', placeholder:'Lokasi pemasangan OLT'}])}
         ${rowWrap(fieldsHTML([
-          {label:'Latitude', id:'n_lat', type:'number', value:'-6.2'},
-          {label:'Longitude', id:'n_lng', type:'number', value:'106.8'},
+          {label:'Latitude', id:'n_olt_lat', type:'number', value:'-6.2'},
+          {label:'Longitude', id:'n_olt_lng', type:'number', value:'106.8'},
         ]))}
       `,
-      footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}Tambah Titik</button>`,
+      footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}Tambah OLT</button>`,
       onOpen(b,f){
         f.querySelector('#mCancel').addEventListener('click', Modal.close);
         f.querySelector('#mSave').addEventListener('click', ()=>{
+          const val = id=>document.getElementById(id).value.trim();
+          const name = val('n_olt_name');
+          if(!name){ toast('Nama Port OLT wajib diisi'); return; }
+          const newOlt = {id:nextId('OLT'), type:'olt', label:name, olt_type:val('n_olt_type')||'Huawei MA5800', partner_id:val('n_olt_partner'), address:val('n_olt_addr'), lat:parseFloat(val('n_olt_lat'))||0, lng:parseFloat(val('n_olt_lng'))||0, children:[]};
+          DB.infrastructure.push(newOlt);
+          expanded.add(newOlt.id);
+          pushActivity('Super Admin', `menambahkan Port OLT baru ${name}`);
+          toast('Port OLT baru berhasil ditambahkan');
+          Modal.close(); selectedId = newOlt.id; kpis(); paintTree(); paintPanel();
+        });
+      }
+    });
+  }
+
+  function openAddInputSplitterForm(){
+    if(DB.infrastructure.length === 0){ toast('Belum ada data OLT. Tambahkan OLT terlebih dahulu.'); return; }
+    Modal.open({
+      title:'Tambah Input Splitter', subtitle:'Tambahkan Input Splitter baru pada Port OLT terpilih',
+      bodyHTML:`
+        ${fieldsHTML([{label:'Nama Input Splitter', id:'n_inp_name', placeholder:'Input Splitter 1:8 — Blok A'}])}
+        ${rowWrap(fieldsHTML([
+          {label:'Port OLT Induk', id:'n_inp_olt', type:'select', options:DB.infrastructure.map(o=>({value:o.id,label:`${o.label} (${o.olt_type})`}))},
+          {label:'Jenis Splitter', id:'n_inp_type', type:'select', options:[{value:'2',label:'Splitter 1:2'},{value:'8',label:'Splitter 1:8'},{value:'16',label:'Splitter 1:16'}]},
+        ]))}
+        ${fieldsHTML([{label:'Keterangan / Alamat', id:'n_inp_addr', type:'textarea', placeholder:'Alamat lokasi input splitter'}])}
+        ${rowWrap(fieldsHTML([
+          {label:'Latitude', id:'n_inp_lat', type:'number', value:'-6.2'},
+          {label:'Longitude', id:'n_inp_lng', type:'number', value:'106.8'},
+        ]))}
+      `,
+      footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}Tambah Input Splitter</button>`,
+      onOpen(b,f){
+        f.querySelector('#mCancel').addEventListener('click', Modal.close);
+        f.querySelector('#mSave').addEventListener('click', ()=>{
+          const val = id=>document.getElementById(id).value.trim();
+          const name = val('n_inp_name');
+          if(!name){ toast('Nama Input Splitter wajib diisi'); return; }
+          const oltId = val('n_inp_olt');
+          const oltNode = findOltNode(oltId);
+          if(!oltNode){ toast('Port OLT induk tidak ditemukan'); return; }
+          const cap = parseInt(val('n_inp_type'),10);
+          const newInput = {id:nextId('SPL'), type:'input', label:name, olt:oltNode.label, capacity:cap, connected:0, address:val('n_inp_addr'), lat:parseFloat(val('n_inp_lat'))||0, lng:parseFloat(val('n_inp_lng'))||0, children:[]};
+          oltNode.children = oltNode.children || [];
+          oltNode.children.push(newInput);
+          expanded.add(oltId);
+          pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `menambahkan Input Splitter baru ${name} ke ${oltNode.label}`);
+          toast('Input Splitter baru berhasil ditambahkan');
+          Modal.close(); selectedId = newInput.id; kpis(); paintTree(); paintPanel();
+        });
+      }
+    });
+  }
+
+  function openAddOutputSplitterForm(){
+    if(DB.infrastructure.length === 0){ toast('Belum ada data OLT. Tambahkan OLT terlebih dahulu.'); return; }
+    function inputOpts(oltId){
+      const inputs = allInputSplitters(oltId);
+      return inputs.length ? inputs.map(i=>({value:i.id,label:i.label})) : [{value:'',label:'-- Belum ada Input Splitter --'}];
+    }
+    Modal.open({
+      title:'Tambah Output Splitter', subtitle:'Tambahkan Output Splitter baru pada Input Splitter terpilih',
+      bodyHTML:`
+        ${fieldsHTML([{label:'Nama Output Splitter', id:'n_out_name', placeholder:'Output Splitter 1:8 — RT 05'}])}
+        ${fieldsHTML([{label:'Port OLT Induk', id:'n_out_olt', type:'select', options:DB.infrastructure.map(o=>({value:o.id,label:`${o.label} (${o.olt_type})`}))}])}
+        ${fieldsHTML([{label:'Input Splitter Induk', id:'n_out_parent', type:'select', options:inputOpts(DB.infrastructure[0]?.id||'')}])}
+        ${fieldsHTML([{label:'Kapasitas', id:'n_out_cap', type:'select', options:[{value:'2',label:'Splitter 1:2'},{value:'8',label:'Output 1:8'},{value:'16',label:'Output 1:16'}]}])}
+        ${fieldsHTML([{label:'Alamat / Keterangan', id:'n_out_addr', type:'textarea', placeholder:'Alamat lokasi splitter ujung'}])}
+        ${rowWrap(fieldsHTML([
+          {label:'Latitude', id:'n_out_lat', type:'number', value:'-6.2'},
+          {label:'Longitude', id:'n_out_lng', type:'number', value:'106.8'},
+        ]))}
+      `,
+      footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}Tambah Output Splitter</button>`,
+      onOpen(b,f){
+        const selOlt = b.querySelector('#n_out_olt');
+        const selParent = b.querySelector('#n_out_parent');
+        function refreshParentOpts(){
+          const opts = inputOpts(selOlt.value);
+          const prev = selParent.value;
+          selParent.innerHTML = opts.map(o=>`<option value="${o.value}" ${o.value===prev?'selected':''}>${o.label}</option>`).join('');
+        }
+        selOlt.addEventListener('change', refreshParentOpts);
+        f.querySelector('#mCancel').addEventListener('click', Modal.close);
+        f.querySelector('#mSave').addEventListener('click', ()=>{
           const val = id=>document.getElementById(id).value;
-          const name = val('n_name').trim();
-          if(!name){ toast('Nama titik perangkat wajib diisi'); return; }
-          const parentId = val('n_parent');
+          const name = val('n_out_name').trim();
+          if(!name){ toast('Nama Output Splitter wajib diisi'); return; }
+          const parentId = val('n_out_parent');
+          if(!parentId){ toast('Pilih Input Splitter induk terlebih dahulu'); return; }
           const parentNode = findNode(parentId);
           if(!parentNode){ toast('Input Splitter induk tidak ditemukan'); return; }
-          const cap = parseInt(val('n_type'),10);
-          const newNode = {id:nextId('SPL'), type:'output', label:name, lat:parseFloat(val('n_lat'))||0, lng:parseFloat(val('n_lng'))||0, address:val('n_addr'), capacity:cap, connected:0, status:'Aktif'};
+          const cap = parseInt(val('n_out_cap'),10);
+          const newNode = {id:nextId('SPL'), type:'output', label:name, lat:parseFloat(val('n_out_lat'))||0, lng:parseFloat(val('n_out_lng'))||0, address:val('n_out_addr'), capacity:cap, connected:0, status:'Aktif'};
           parentNode.children = parentNode.children || [];
           parentNode.children.push(newNode);
           expanded.add(parentId);
-          pushActivity('Administrator Mitra', `menambahkan titik perangkat baru ${name}`);
-          toast('Titik perangkat baru berhasil ditambahkan');
+          pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `menambahkan Output Splitter baru ${name}`);
+          toast('Output Splitter baru berhasil ditambahkan');
           Modal.close(); selectedId = newNode.id; kpis(); paintTree(); paintPanel();
         });
       }
