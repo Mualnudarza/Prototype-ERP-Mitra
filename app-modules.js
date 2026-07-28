@@ -51,7 +51,139 @@ function pushActivity(actor, action){
 
 const Views = {};
 
+function renderMitraForm(root, existing){
+  const isEdit = !!existing;
+  
+  if(!isEdit){
+    document.getElementById('topbarTitle').textContent = 'Tambah Mitra Baru';
+  } else {
+    document.getElementById('topbarTitle').textContent = 'Edit Mitra';
+  }
+
+  root.innerHTML = `
+    <div class="page-intro" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <p style="margin:0;">${isEdit ? `Memperbarui data ${existing.partner_name}` : 'Registrasi entitas mitra baru ke ERP Mitra'}</p>
+      <button class="btn btn-secondary btn-sm" id="btnBackMitra">${ic('chevronLeft')}Kembali ke Daftar Mitra</button>
+    </div>
+    <div id="mitraFormContent"></div>
+  `;
+
+  root.querySelector('#btnBackMitra')?.addEventListener('click', ()=>{ window.location.hash='partnership.mitra'; });
+
+  const content = root.querySelector('#mitraFormContent');
+  content.innerHTML = `
+    <div class="card card-pad" style="max-width:900px;">
+      <div class="section-head" style="padding:0 0 14px 0;"><h3>Informasi Mitra</h3></div>
+      ${rowWrap(fieldsHTML([
+        {label:'Kode Mitra', id:'f_code', value:existing?.partner_code, placeholder:'DSR-XXX-01', hint: isEdit?'':'Dibuat otomatis jika dikosongkan'},
+        {label:'Nama Mitra / Brand', id:'f_name', value:existing?.partner_name, placeholder:'Mitra Nusantara Net'},
+      ]))}
+      ${fieldsHTML([{label:'Nama Badan Hukum', id:'f_company', value:existing?.company_name, placeholder:'PT Nusantara Net Indonesia'}])}
+      ${rowWrap(fieldsHTML([
+        {label:'Nama PIC', id:'f_pic', value:existing?.pic_name, placeholder:'Nama Penanggung Jawab'},
+        {label:'Status', id:'f_status', type:'select', value:existing?.status||'Aktif', options:[{value:'Aktif',label:'Aktif'},{value:'Nonaktif',label:'Nonaktif'}]},
+      ]))}
+      ${rowWrap(fieldsHTML([
+        {label:'Nomor Telepon', id:'f_phone', value:existing?.phone_number, placeholder:'0812-3456-7890'},
+        {label:'Email', id:'f_email', type:'email', value:existing?.email, placeholder:'admin@mitra.id'},
+      ]))}
+
+      <div class="section-head" style="padding:20px 0 14px 0;"><h3>Kerja Sama B2B</h3></div>
+      ${fieldsHTML([{label:'Nama Kerja Sama', id:'f_coop_name', value:existing?.cooperation_name, placeholder:'Contoh: Kerja Sama Distribusi Fiber'}])}
+      ${rowWrap(fieldsHTML([
+        {label:'Nomor Dokumen / PKS', id:'f_coop_doc', value:existing?.cooperation_doc_no, placeholder:'PKS/2024/001'},
+        {label:'NPWP / NIB', id:'f_npwp', value:existing?.npwp_nib, placeholder:'01.234.567.8-901.000'},
+      ]))}
+      ${rowWrap(fieldsHTML([
+        {label:'Mulai Berlaku', id:'f_coop_start', type:'date', value:existing?.cooperation_start},
+        {label:'Aktif Sampai / Berakhir', id:'f_coop_end', type:'date', value:existing?.cooperation_end},
+      ]))}
+      ${fieldsHTML([{label:'Dokumen Kerja Sama', id:'f_coop_file', value:existing?.cooperation_doc_file, placeholder:'Nama file (contoh: PKS_NetIndo.pdf)'}])}
+
+      <div class="section-head" style="padding:20px 0 14px 0;"><h3>Rekening Settlement</h3></div>
+      ${rowWrap(fieldsHTML([
+        {label:'Nama Bank', id:'f_bank', value:existing?.bank_name, placeholder:'Bank Mandiri'},
+        {label:'Nomor Rekening', id:'f_acc_no', value:existing?.bank_account_no, placeholder:'1230007890123'},
+      ]))}
+      ${fieldsHTML([{label:'Nama Pemilik Rekening', id:'f_acc_name', value:existing?.bank_account_name, placeholder:'Sesuai nama rekening'}])}
+
+      <div class="section-head" style="padding:20px 0 14px 0;"><h3>Konfigurasi Jatuh Tempo</h3></div>
+      ${rowWrap(fieldsHTML([
+        {label:'Tipe Jatuh Tempo', id:'f_due_type', type:'select', value:existing?.payment_due_type||'Tanggal Tetap', options:[
+          {value:'Tanggal Tetap',label:'Tanggal Tetap'},
+          {value:'Jatuh Tempo 30 Hari',label:'Jatuh Tempo 30 Hari'},
+          {value:'Rolling Days',label:'Rolling Days'},
+        ]},
+        {label:'Nilai', id:'f_due_value', value:existing?.payment_due_value, placeholder:'Tanggal (1-28) atau jumlah hari'},
+      ]))}
+
+      <div style="margin-top:24px;display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-secondary" id="fCancel">${ic('x')}Batal</button>
+        <button class="btn btn-primary" id="fSave">${ic('check')}${isEdit?'Simpan Perubahan':'Registrasi Mitra'}</button>
+      </div>
+    </div>
+  `;
+
+  const selDueType = content.querySelector('#f_due_type');
+  const valDue = content.querySelector('#f_due_value');
+  
+  function updateDuePlaceholder(){
+    if(selDueType.value === 'Tanggal Tetap') valDue.placeholder = 'Tanggal (1-28)';
+    else if(selDueType.value === 'Jatuh Tempo 30 Hari') valDue.placeholder = 'Otomatis 30 hari dari tanggal tagih';
+    else valDue.placeholder = 'Jumlah hari dari tanggal tagih';
+  }
+  selDueType.addEventListener('change', updateDuePlaceholder);
+  updateDuePlaceholder();
+
+  content.querySelector('#fCancel')?.addEventListener('click', ()=>{ window.location.hash='partnership.mitra'; });
+  content.querySelector('#fSave')?.addEventListener('click', ()=>{
+    const val = id => document.getElementById(id).value.trim();
+    const name = val('f_name');
+    if(!name){ toast('Nama mitra wajib diisi'); return; }
+    
+    const data = {
+      partner_code: val('f_code') || (isEdit ? existing.partner_code : 'DSR-'+name.slice(0,3).toUpperCase()+'-'+String(DB.partners.length+1).padStart(2,'0')),
+      partner_name:name, company_name:val('f_company'), phone_number:val('f_phone'),
+      email:val('f_email'), address:'', operational_area: isEdit ? existing.operational_area : 'Jabodetabek',
+      business_configuration: isEdit ? existing.business_configuration : 'Revenue Share 70/30',
+      status:val('f_status'), pic_name:val('f_pic'),
+      cooperation_name:val('f_coop_name'), cooperation_doc_no:val('f_coop_doc'), cooperation_start:val('f_coop_start'),
+      cooperation_end:val('f_coop_end'), cooperation_doc_file:val('f_coop_file'), npwp_nib:val('f_npwp'),
+      bank_name:val('f_bank'), bank_account_no:val('f_acc_no'), bank_account_name:val('f_acc_name'),
+      payment_due_type:selDueType.value, payment_due_value:valDue.value,
+    };
+
+    if(isEdit){
+      Object.assign(existing, data);
+      pushActivity('Super Admin', `memperbarui profil mitra ${name}`);
+      toast('Perubahan profil mitra disimpan');
+    } else {
+      const newP = {id: nextId('PTR'), users_count:0, created_at:new Date().toISOString().slice(0,10), ...data};
+      DB.partners.push(newP);
+      DB.users.push({id:nextId('USR'), partner_id:newP.id, user_name:name+' Admin', username:(name.split(' ')[0]||'admin').toLowerCase()+'.admin', role_name:'Administrator Mitra', user_status:'Aktif', last_login:new Date().toISOString()});
+      pushActivity('Super Admin', `meregistrasikan mitra baru ${name}`);
+      toast('Mitra baru berhasil diregistrasikan');
+    }
+    window.location.hash='partnership.mitra';
+  });
+}
+
 Views['partnership.mitra'] = function(root){
+  const hashParts = window.location.hash.split('?');
+  const params = new URLSearchParams(hashParts[1] || '');
+  const mitraId = params.get('id');
+
+  if(mitraId === 'add'){
+    renderMitraForm(root, null);
+    return;
+  } else if(mitraId){
+    const partner = DB.partners.find(p=>p.id===mitraId);
+    if(partner){
+      renderMitraForm(root, partner);
+      return;
+    }
+  }
+
   root.innerHTML = pageIntro('Kelola seluruh entitas mitra yang terdaftar pada ERP Mitra — identitas bisnis, wilayah operasional, dan status keaktifan.');
 
   function kpis(){
@@ -96,111 +228,21 @@ Views['partnership.mitra'] = function(root){
       {key:'actions', header:'', align:'right', render:r=>`
         <div class="row-actions">
           <button class="btn btn-secondary btn-sm act-edit">${ic('edit')}Edit</button>
-          <button class="btn btn-ghost btn-sm act-detail">${ic('eye')}Detail</button>
         </div>`},
     ],
     afterRender(wrap){
       wrap.querySelectorAll('tbody tr[data-id]').forEach(tr=>{
         const p = DB.partners.find(x=>x.id===tr.dataset.id);
-        tr.querySelector('.act-edit')?.addEventListener('click', ()=>openMitraForm(p));
-        tr.querySelector('.act-detail')?.addEventListener('click', ()=>openMitraDetail(p));
+        tr.querySelector('.act-edit')?.addEventListener('click', ()=>{ window.location.hash = `partnership.mitra?id=${p.id}`; });
       });
       const addBtn = wrap.querySelector('#btnAddMitra');
-      if(addBtn) addBtn.addEventListener('click', ()=>openMitraForm(null));
+      if(addBtn) addBtn.addEventListener('click', ()=>{ window.location.hash = 'partnership.mitra?id=add'; });
     }
   });
   const cardEl = document.createElement('div');
   cardEl.className = 'card';
   cardEl.appendChild(table);
   tableMount.appendChild(cardEl);
-
-  function openMitraForm(existing){
-    const isEdit = !!existing;
-    Modal.open({
-      title: isEdit ? 'Edit Profil Mitra' : 'Tambah Mitra Baru',
-      subtitle: isEdit ? `Memperbarui data ${existing.partner_name}` : 'Registrasi entitas mitra baru ke ERP Mitra',
-      bodyHTML: `
-        ${rowWrap(fieldsHTML([
-          {label:'Nama Mitra', id:'f_name', value:existing?.partner_name, placeholder:'Mitra Nusantara Net'},
-          {label:'Kode Mitra', id:'f_code', value:existing?.partner_code, placeholder:'DSR-XXX-01', hint: isEdit?'':'Dibuat otomatis jika dikosongkan'},
-        ]))}
-        ${fieldsHTML([{label:'Nama Perusahaan', id:'f_company', value:existing?.company_name, placeholder:'PT Nusantara Net Indonesia'}])}
-        ${rowWrap(fieldsHTML([
-          {label:'Nomor Telepon', id:'f_phone', value:existing?.phone_number, placeholder:'0812-3456-7890'},
-          {label:'Email', id:'f_email', type:'email', value:existing?.email, placeholder:'admin@mitra.id'},
-        ]))}
-        ${fieldsHTML([{label:'Alamat', id:'f_address', type:'textarea', value:existing?.address, placeholder:'Alamat kantor mitra'}])}
-        ${rowWrap(fieldsHTML([
-          {label:'Wilayah Operasional', id:'f_area', type:'select', value:existing?.operational_area, options:WILAYAH_LIST.map(w=>({value:w,label:w}))},
-          {label:'Konfigurasi Bisnis', id:'f_config', type:'select', value:existing?.business_configuration, options:[
-            {value:'Revenue Share 70/30',label:'Revenue Share 70/30'},
-            {value:'Revenue Share 65/35',label:'Revenue Share 65/35'},
-            {value:'Revenue Share 60/40',label:'Revenue Share 60/40'},
-            {value:'Flat Fee Bulanan',label:'Flat Fee Bulanan'},
-          ]},
-        ]))}
-        ${!isEdit ? fieldsHTML([{label:'Status Mitra', id:'f_status', type:'select', value:'Aktif', options:[{value:'Aktif',label:'Aktif'},{value:'Nonaktif',label:'Nonaktif'}], hint:'Akun Administrator Mitra dibuat otomatis setelah registrasi selesai.'}]) : fieldsHTML([{label:'Status Mitra', id:'f_status', type:'select', value:existing?.status, options:[{value:'Aktif',label:'Aktif'},{value:'Nonaktif',label:'Nonaktif'}]}])}
-      `,
-      footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}${isEdit?'Simpan Perubahan':'Registrasi Mitra'}</button>`,
-      onOpen(body, foot){
-        foot.querySelector('#mCancel').addEventListener('click', Modal.close);
-        foot.querySelector('#mSave').addEventListener('click', ()=>{
-          const val = id => document.getElementById(id).value.trim();
-          const name = val('f_name');
-          if(!name){ toast('Nama mitra wajib diisi'); return; }
-          if(isEdit){
-            Object.assign(existing, {
-              partner_name:name, company_name:val('f_company'), phone_number:val('f_phone'),
-              email:val('f_email'), address:val('f_address'), operational_area:val('f_area'),
-              business_configuration:val('f_config'), status:val('f_status'),
-            });
-            pushActivity('Super Admin', `memperbarui profil mitra ${name}`);
-            toast('Perubahan profil mitra disimpan');
-          } else {
-            const code = val('f_code') || ('DSR-'+name.slice(0,3).toUpperCase()+'-'+String(DB.partners.length+1).padStart(2,'0'));
-            const newP = {
-              id: nextId('PTR'), partner_code: code, partner_name:name, company_name:val('f_company'),
-              phone_number:val('f_phone'), email:val('f_email'), address:val('f_address'),
-              operational_area:val('f_area')||WILAYAH_LIST[0], business_configuration:val('f_config')||'Revenue Share 70/30',
-              status:val('f_status')||'Aktif', users_count:1, created_at:new Date().toISOString().slice(0,10),
-            };
-            DB.partners.push(newP);
-            DB.users.push({id:nextId('USR'), partner_id:newP.id, user_name:name+' Admin', username:(name.split(' ')[0]||'admin').toLowerCase()+'.admin', role_name:'Administrator Mitra', user_status:'Aktif', last_login:new Date().toISOString()});
-            pushActivity('Super Admin', `meregistrasikan mitra baru ${name}`);
-            toast('Mitra baru berhasil diregistrasikan');
-          }
-          Modal.close();
-          kpis(); table.refresh();
-        });
-      }
-    });
-  }
-
-  function openMitraDetail(p){
-    const users = DB.users.filter(u=>u.partner_id===p.id);
-    Modal.open({
-      title: p.partner_name, subtitle: `${p.partner_code} · ${p.operational_area}`, size:'lg',
-      bodyHTML:`
-        <div class="detail-grid" style="margin-bottom:18px;">
-          <div class="detail-item"><span class="dl">Nama Perusahaan</span><span class="dv">${p.company_name}</span></div>
-          <div class="detail-item"><span class="dl">Status</span><span class="dv">${statusBadge(p.status)}</span></div>
-          <div class="detail-item"><span class="dl">Email</span><span class="dv">${p.email}</span></div>
-          <div class="detail-item"><span class="dl">Telepon</span><span class="dv">${p.phone_number}</span></div>
-          <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${p.address}</span></div>
-          <div class="detail-item"><span class="dl">Konfigurasi Bisnis</span><span class="dv">${p.business_configuration}</span></div>
-          <div class="detail-item"><span class="dl">Jumlah Pengguna</span><span class="dv">${users.length} akun</span></div>
-          <div class="detail-item"><span class="dl">Terdaftar Sejak</span><span class="dv">${Fmt.date(p.created_at)}</span></div>
-        </div>
-        <div class="section-head" style="padding:0 0 8px 0;"><h3>Aktivitas Terbaru</h3></div>
-        ${activityTimeline(DB.activityLog.slice(0,4))}
-      `,
-      footHTML:`<button class="btn btn-secondary" id="mClose2">Tutup</button><button class="btn btn-primary" id="mEditFromDetail">${ic('edit')}Edit Mitra</button>`,
-      onOpen(body, foot){
-        foot.querySelector('#mClose2').addEventListener('click', Modal.close);
-        foot.querySelector('#mEditFromDetail').addEventListener('click', ()=>openMitraForm(p));
-      }
-    });
-  }
 };
 
 Views['partnership.pengguna'] = function(root){

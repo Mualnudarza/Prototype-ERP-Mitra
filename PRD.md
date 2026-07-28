@@ -18,15 +18,16 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
 ## Daftar Modul
 
 #### Data Mitra (`partnership.mitra`)
-- **Fungsi**: Menampilkan dan mengelola daftar mitra operator (partner) dengan data kode mitra, nama, perusahaan, wilayah operasional, jumlah pengguna, dan status.
-- **Lokasi file**: `app-modules.js:54-204`, data di `app-data.js` (`DB.partners`)
+- **Fungsi**: Mengelola seluruh entitas mitra. Dukung dua mode: (1) Tabel daftar mitra dengan KPI dan filter, (2) Halaman penuh untuk Tambah/Edit mitra (navigasi via hash `#partnership.mitra?id=add` atau `#partnership.mitra?id=PTR-xxxx`). Halaman form mencakup Informasi Mitra, Kerja Sama B2B, Rekening Settlement, dan Konfigurasi Jatuh Tempo.
+- **Lokasi file**: `app-modules.js:54-204` (list), `app-modules.js:47-175` (`renderMitraForm`), data di `app-data.js` (`DB.partners`)
 - **Data yang dibutuhkan**:
-  - Input: partner_code, partner_name, company_name, phone_number, email, address, operational_area (dari `WILAYAH_LIST`: Jabodetabek, Jawa Barat, Jawa Tengah, Jawa Timur, Bali & Nusra, Sumatera Utara, Kalimantan Timur), business_configuration, status
-  - Tampil: KPI grid (total mitra, mitra aktif, total pengguna, wilayah operasional), DataTable dengan kolom kode, nama mitra, nama perusahaan, wilayah, jumlah pengguna, status
-- **Ketergantungan**: `DataTable`, `renderKPIs`, `badge`, `openModal`, `activityTimeline`, `pushActivity`
+  - Input: partner_code, partner_name, company_name, pic_name, phone_number, email, status, cooperation_name, cooperation_doc_no, cooperation_start, cooperation_end, cooperation_doc_file, npwp_nib, bank_name, bank_account_no, bank_account_name, payment_due_type, payment_due_value
+  - Tampil: KPI grid, DataTable dengan kolom kode, nama mitra, nama perusahaan, wilayah, jumlah pengguna, status. Form page dengan section (Informasi, B2B, Rekening, Jatuh Tempo).
+- **Ketergantungan**: `DataTable`, `renderKPIs`, `pushActivity`
 - **Status**: Selesai
 - **Catatan Perubahan**:
   - 2026-07-28 — Initial prototype, 6 mitra dummy data
+  - 2026-07-28 — Konversi form dari modal ke halaman penuh (page view). Field diperbarui sesuai requirement baru (PIC, B2B, Settlement, Jatuh Tempo).
 
 #### Manajemen Pengguna (`partnership.pengguna`)
 - **Fungsi**: Mengelola akun pengguna di bawah masing-masing mitra. Setiap pengguna memiliki role (Administrator Mitra, Staf Billing, Staf Customer Service, Teknisi), status, dan last login.
