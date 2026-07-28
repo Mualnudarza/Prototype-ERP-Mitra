@@ -1303,311 +1303,655 @@ function countInfra(){
   return {olt, splitter, titik, pelanggan};
 }
 
-Views['infra.topologi'] = function(root){
-  root.innerHTML = pageIntro('Visualisasi topologi jaringan mulai dari Port OLT, Input Splitter, hingga Output Splitter yang melayani pelanggan.');
-  root.insertAdjacentHTML('beforeend', `<div id="kpiSlot"></div>`);
-
-  function kpis(){
-    const c = countInfra();
-    root.querySelector('#kpiSlot').outerHTML = `<div id="kpiSlot">${renderKPIs([
-      {label:'Total Port OLT', value:c.olt, icon:'server', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
-      {label:'Total Splitter', value:c.splitter, icon:'splitter', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'},
-      {label:'Total Titik Perangkat', value:c.titik, icon:'network', bg:'var(--badge-cyan-bg)', fg:'var(--badge-cyan-fg)'},
-      {label:'Total Pelanggan Terhubung', value:c.pelanggan, icon:'users', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
-    ])}</div>`;
-  }
-  kpis();
-
-  const layout = document.createElement('div');
-  layout.style.cssText = 'display:grid;grid-template-columns:1.1fr 1fr;gap:12px;align-items:start;';
-  root.appendChild(layout);
-
-  const treeCard = document.createElement('div'); treeCard.className='card';
-  const panelCard = document.createElement('div'); panelCard.className='card card-pad';
-  layout.appendChild(treeCard); layout.appendChild(panelCard);
-
-  let selectedId = null;
-  const expanded = new Set(DB.infrastructure.map(o=>o.id));
-
-  function nodeIcon(type){
-    if(type==='olt') return {ico:'server', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'};
-    if(type==='input') return {ico:'splitter', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'};
-    return {ico:'mapPin', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'};
-  }
-
-  function renderNode(node, depth){
-    const hasChildren = node.children && node.children.length;
-    const isOpen = expanded.has(node.id);
-    const {ico, bg, fg} = nodeIcon(node.type);
-    const meta = node.type==='output' ? `${node.connected}/${node.capacity}` : (node.type==='input' ? `${node.connected||0}/${node.capacity||'?'} · ${(node.children||[]).length} output` : `${(node.children||[]).length} input`);
-    return `
-      <div class="tree-node">
-        <div class="tree-row ${selectedId===node.id?'selected':''}" data-node="${node.id}">
-          <span class="tree-toggle ${hasChildren && isOpen ? 'rot':''}" data-toggle="${node.id}">${hasChildren?ic('chevronRight'):''}</span>
-          <span class="tree-ico" style="background:${bg};color:${fg};">${ic(ico)}</span>
-          <span class="tree-label">${node.label}</span>
-          <span class="tree-meta">${meta}</span>
-        </div>
-        ${hasChildren && isOpen ? `<div class="tree-children">${node.children.map(ch=>renderNode(ch, depth+1)).join('')}</div>` : ''}
-      </div>`;
-  }
-
-  function findNode(id, list){
-    list = list || DB.infrastructure;
-    for(const n of list){
-      if(n.id === id) return n;
-      if(n.children){ const r = findNode(id, n.children); if(r) return r; }
-    }
-    return null;
-  }
-  function findParentArray(id, list){
-    list = list || DB.infrastructure;
-    for(const n of list){
-      if(n.children){
-        if(n.children.some(c=>c.id===id)) return n.children;
-        const r = findParentArray(id, n.children); if(r) return r;
-      }
-    }
-    return null;
-  }
-
-  function paintTree(){
-    const addBtns = isSuperUser()
-      ? `<button class="btn btn-primary btn-sm" id="btnAddOlt">${ic('plus')}Tambah OLT</button>
-         <button class="btn btn-secondary btn-sm" id="btnAddInput">${ic('plus')}Tambah Input Splitter</button>
-         <button class="btn btn-secondary btn-sm" id="btnAddOutput">${ic('plus')}Tambah Output Splitter</button>`
-      : `<button class="btn btn-secondary btn-sm" id="btnAddInput">${ic('plus')}Tambah Input Splitter</button>
-         <button class="btn btn-secondary btn-sm" id="btnAddOutput">${ic('plus')}Tambah Output Splitter</button>`;
-    treeCard.innerHTML = `
-      <div class="section-head"><h3>Topologi Infrastruktur</h3>
-        <div class="btn-group">${addBtns}</div>
-      </div>
-      <div class="tree" id="treeMount">${DB.infrastructure.map(o=>renderNode(o,0)).join('')}</div>
-    `;
-    treeCard.querySelectorAll('[data-toggle]').forEach(el=>{
-      el.addEventListener('click', (e)=>{
-        e.stopPropagation();
-        const id = el.dataset.toggle;
-        if(expanded.has(id)) expanded.delete(id); else expanded.add(id);
-        paintTree();
-      });
-    });
-    treeCard.querySelectorAll('[data-node]').forEach(el=>{
-      el.addEventListener('click', ()=>{ selectedId = el.dataset.node; paintTree(); paintPanel(); });
-    });
-    treeCard.querySelector('#btnAddOlt')?.addEventListener('click', openAddOltForm);
-    treeCard.querySelector('#btnAddInput')?.addEventListener('click', openAddInputSplitterForm);
-    treeCard.querySelector('#btnAddOutput')?.addEventListener('click', openAddOutputSplitterForm);
-  }
-
-  function paintPanel(){
-    const node = selectedId ? findNode(selectedId) : null;
-    if(!node){
-      panelCard.innerHTML = `<div class="empty-state">${ic('network')}<div class="es-title">Pilih titik perangkat</div><div class="es-sub">Klik salah satu node pada topologi untuk melihat detail konfigurasinya.</div></div>`;
-      return;
-    }
-    if(node.type === 'output'){
-      panelCard.innerHTML = `
-        <h3 style="margin:0 0 4px 0;font-size:14.5px;">${node.label}</h3>
-        <p style="margin:0 0 14px 0;font-size:12.5px;color:var(--color-text-secondary);">Splitter ujung · melayani pelanggan langsung</p>
-        <div class="detail-grid" style="margin-bottom:14px;">
-          <div class="detail-item"><span class="dl">Jenis Splitter</span><span class="dv">Output 1:${node.capacity}</span></div>
-          <div class="detail-item"><span class="dl">Status</span><span class="dv">${statusBadge(node.status)}</span></div>
-          <div class="detail-item"><span class="dl">Kapasitas Terpakai</span><span class="dv">${node.connected}/${node.capacity}</span></div>
-          <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${node.address||'-'}</span></div>
-        </div>
-        <div class="cap-bar" style="width:100%;height:8px;margin-bottom:16px;"><span style="width:${node.connected/node.capacity*100}%;background:${node.connected>=node.capacity?'var(--badge-red-fg)':'var(--color-accent)'}"></span></div>
-        <div class="field-row">
-          <div class="field"><label>Latitude</label><input class="input" id="pLat" type="number" step="0.0001" value="${node.lat||0}"></div>
-          <div class="field"><label>Longitude</label><input class="input" id="pLng" type="number" step="0.0001" value="${node.lng||0}"></div>
-        </div>
-        <div class="map-placeholder" style="margin-bottom:14px;">${ic('mapPin','pin')}<span>Lokasi splitter di peta</span><span style="font-family:var(--font-family-mono);font-size:11px;">${node.lat||0}, ${node.lng||0}</span></div>
-        <button class="btn btn-primary" id="pSaveLoc" style="width:100%;">${ic('check')}Simpan Lokasi</button>
-      `;
-      panelCard.querySelector('#pSaveLoc').addEventListener('click', ()=>{
-        node.lat = parseFloat(document.getElementById('pLat').value)||node.lat;
-        node.lng = parseFloat(document.getElementById('pLng').value)||node.lng;
-        pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `memperbarui koordinat lokasi ${node.label}`);
-        toast('Koordinat lokasi splitter diperbarui'); paintPanel();
-      });
-    } else if(node.type === 'input'){
-      const inputConnected = (node.children||[]).reduce((s,c)=>s+(c.connected||0),0);
-      const inputCapacity = (node.children||[]).reduce((s,c)=>s+(c.capacity||0),0);
-      panelCard.innerHTML = `
-        <h3 style="margin:0 0 4px 0;font-size:14.5px;">${node.label}</h3>
-        <p style="margin:0 0 14px 0;font-size:12.5px;color:var(--color-text-secondary);">Terhubung ke ${node.olt} · ${(node.children||[]).length} output splitter</p>
-        <div class="detail-grid" style="margin-bottom:14px;">
-          <div class="detail-item"><span class="dl">Jenis Splitter</span><span class="dv">Input 1:${node.capacity||'?'}</span></div>
-          <div class="detail-item"><span class="dl">Total Output</span><span class="dv">${(node.children||[]).length} unit</span></div>
-          <div class="detail-item"><span class="dl">Kapasitas Total</span><span class="dv">${inputCapacity} port</span></div>
-          <div class="detail-item"><span class="dl">Port Terpakai</span><span class="dv">${inputConnected}/${inputCapacity}</span></div>
-          <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${node.address||'-'}</span></div>
-        </div>
-        ${inputCapacity > 0 ? `<div class="cap-bar" style="width:100%;height:8px;margin-bottom:16px;"><span style="width:${inputConnected/inputCapacity*100}%;background:${inputConnected>=inputCapacity?'var(--badge-red-fg)':'var(--color-accent)'}"></span></div>` : ''}
-        <div class="field-row">
-          <div class="field"><label>Latitude</label><input class="input" id="pLat" type="number" step="0.0001" value="${node.lat||0}"></div>
-          <div class="field"><label>Longitude</label><input class="input" id="pLng" type="number" step="0.0001" value="${node.lng||0}"></div>
-        </div>
-        <div class="map-placeholder" style="margin-bottom:14px;">${ic('mapPin','pin')}<span>Lokasi input splitter di peta</span><span style="font-family:var(--font-family-mono);font-size:11px;">${node.lat||0}, ${node.lng||0}</span></div>
-        <button class="btn btn-primary" id="pSaveLoc" style="width:100%;">${ic('check')}Simpan Lokasi</button>
-      `;
-      panelCard.querySelector('#pSaveLoc').addEventListener('click', ()=>{
-        node.lat = parseFloat(document.getElementById('pLat').value)||node.lat;
-        node.lng = parseFloat(document.getElementById('pLng').value)||node.lng;
-        pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `memperbarui koordinat lokasi ${node.label}`);
-        toast('Koordinat lokasi input splitter diperbarui'); paintPanel();
-      });
+  function renderEditNodePage(root, node){
+    const isEdit = !!node;
+    
+    if(!isEdit){
+      document.getElementById('topbarTitle').textContent = 'Tambah Titik';
     } else {
-      panelCard.innerHTML = `
-        <h3 style="margin:0 0 4px 0;font-size:14.5px;">${node.label}</h3>
-        <p style="margin:0 0 14px 0;font-size:12.5px;color:var(--color-text-secondary);">${partnerName(node.partner_id)} · ${(node.children||[]).length} input splitter</p>
-        <div class="detail-grid" style="margin-bottom:14px;">
-          <div class="detail-item"><span class="dl">Vendor / Tipe</span><span class="dv">${node.olt_type||'-'}</span></div>
-          <div class="detail-item"><span class="dl">Total Input Splitter</span><span class="dv">${(node.children||[]).length} unit</span></div>
-          <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${node.address||'-'}</span></div>
-        </div>
-        <div class="field-row">
-          <div class="field"><label>Latitude</label><input class="input" id="pLat" type="number" step="0.0001" value="${node.lat||0}"></div>
-          <div class="field"><label>Longitude</label><input class="input" id="pLng" type="number" step="0.0001" value="${node.lng||0}"></div>
-        </div>
-        <div class="map-placeholder" style="margin-bottom:14px;">${ic('mapPin','pin')}<span>Lokasi OLT di peta</span><span style="font-family:var(--font-family-mono);font-size:11px;">${node.lat||0}, ${node.lng||0}</span></div>
-        <button class="btn btn-primary" id="pSaveLoc" style="width:100%;">${ic('check')}Simpan Lokasi</button>
-      `;
-      panelCard.querySelector('#pSaveLoc').addEventListener('click', ()=>{
-        node.lat = parseFloat(document.getElementById('pLat').value)||node.lat;
-        node.lng = parseFloat(document.getElementById('pLng').value)||node.lng;
-        pushActivity('Super Admin', `memperbarui koordinat lokasi ${node.label}`);
-        toast('Koordinat lokasi OLT diperbarui'); paintPanel();
-      });
+      document.getElementById('topbarTitle').textContent = 'Edit Titik';
     }
-  }
 
-  function openAddOltForm(){
-    Modal.open({
-      title:'Tambah Port OLT', subtitle:'Daftarkan perangkat OLT baru ke topologi jaringan',
-      bodyHTML:`
-        ${fieldsHTML([{label:'Nama Port OLT', id:'n_olt_name', placeholder:'OLT Huawei MA5800 — Kantor Pusat'}])}
-        ${rowWrap(fieldsHTML([
-          {label:'Vendor / Tipe OLT', id:'n_olt_type', type:'select', options:[{value:'Huawei MA5800',label:'Huawei MA5800'},{value:'ZTE C320',label:'ZTE C320'},{value:'Fiberhome AN5516',label:'Fiberhome AN5516'}]},
-          {label:'Mitra', id:'n_olt_partner', type:'select', options:DB.partners.map(p=>({value:p.id,label:p.partner_name}))},
-        ]))}
-        ${fieldsHTML([{label:'Alamat / Keterangan', id:'n_olt_addr', type:'textarea', placeholder:'Lokasi pemasangan OLT'}])}
-        ${rowWrap(fieldsHTML([
-          {label:'Latitude', id:'n_olt_lat', type:'number', value:'-6.2'},
-          {label:'Longitude', id:'n_olt_lng', type:'number', value:'106.8'},
-        ]))}
-      `,
-      footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}Tambah OLT</button>`,
-      onOpen(b,f){
-        f.querySelector('#mCancel').addEventListener('click', Modal.close);
-        f.querySelector('#mSave').addEventListener('click', ()=>{
-          const val = id=>document.getElementById(id).value.trim();
-          const name = val('n_olt_name');
-          if(!name){ toast('Nama Port OLT wajib diisi'); return; }
-          const newOlt = {id:nextId('OLT'), type:'olt', label:name, olt_type:val('n_olt_type')||'Huawei MA5800', partner_id:val('n_olt_partner'), address:val('n_olt_addr'), lat:parseFloat(val('n_olt_lat'))||0, lng:parseFloat(val('n_olt_lng'))||0, children:[]};
-          DB.infrastructure.push(newOlt);
-          expanded.add(newOlt.id);
-          pushActivity('Super Admin', `menambahkan Port OLT baru ${name}`);
-          toast('Port OLT baru berhasil ditambahkan');
-          Modal.close(); selectedId = newOlt.id; kpis(); paintTree(); paintPanel();
-        });
+    root.innerHTML = `
+      <div class="page-intro" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <p style="margin:0;">${isEdit ? `Edit titik perangkat: ${node.label}` : 'Tambah titik perangkat baru ke topologi jaringan'}</p>
+        <button class="btn btn-secondary btn-sm" id="btnBackInfra">${ic('chevronLeft')}Kembali ke Topologi</button>
+      </div>
+      <div id="infraFormContent"></div>
+    `;
+
+    root.querySelector('#btnBackInfra')?.addEventListener('click', ()=>{ window.location.hash='infra.topologi'; });
+
+    const content = root.querySelector('#infraFormContent');
+    content.innerHTML = `
+      <div class="card card-pad" style="max-width:800px;">
+        ${!isEdit || (node && node.type === 'olt') ? `
+          <div class="section-head" style="padding:0 0 14px 0;"><h3>OLT</h3></div>
+          ${fieldsHTML([
+            {label:'Nama Port OLT', id:'n_olt_name', value:node?.type==='olt'?node.label:'', placeholder:'OLT Huawei MA5800 — Kantor Pusat'},
+          ])}
+          ${rowWrap(fieldsHTML([
+            {label:'Vendor / Tipe OLT', id:'n_olt_type', type:'select', value:node?.type==='olt'?node.olt_type:'Huawei MA5800', options:[
+              {value:'Huawei MA5800',label:'Huawei MA5800'},
+              {value:'ZTE C320',label:'ZTE C320'},
+              {value:'Fiberhome AN5516',label:'Fiberhome AN5516'},
+            ]},
+            {label:'Mitra', id:'n_olt_partner', type:'select', value:node?.type==='olt'?node.partner_id:DB.partners[0].id, options:DB.partners.map(p=>({value:p.id,label:p.partner_name}))},
+          ]))}
+          ${fieldsHTML([{label:'Alamat / Keterangan', id:'n_olt_addr', value:node?.type==='olt'?node.address:'', type:'textarea', placeholder:'Lokasi pemasangan OLT'}])}
+          ${rowWrap(fieldsHTML([
+            {label:'Latitude', id:'n_olt_lat', type:'number', value:node?.type==='olt'?node.lat:'-6.2'},
+            {label:'Longitude', id:'n_olt_lng', type:'number', value:node?.type==='olt'?node.lng:'106.8'},
+          ]))}
+        ` : ''}
+        ${!isEdit || (node && node.type === 'input') ? `
+          <div class="section-head" style="padding:20px 0 14px 0;"><h3>Input Splitter</h3></div>
+          ${fieldsHTML([{label:'Nama Input Splitter', id:'n_inp_name', value:node?.type==='input'?node.label:'', placeholder:'Input Splitter 1:8 — Blok A'}])}
+          ${rowWrap(fieldsHTML([
+            {label:'Port OLT Induk', id:'n_inp_olt', type:'select', options:DB.infrastructure.map(o=>({value:o.id,label:`${o.label} (${o.olt_type})`, selected:o.id===(node?.olt_id||DB.infrastructure[0]?.id)}))},
+            {label:'Jenis Splitter', id:'n_inp_type', type:'select', value:node?.type==='input'?node.capacity:'8', options:[
+              {value:'2',label:'Splitter 1:2'},
+              {value:'8',label:'Splitter 1:8'},
+              {value:'16',label:'Splitter 1:16'},
+            ]},
+          ]))}
+          ${fieldsHTML([{label:'Keterangan / Alamat', id:'n_inp_addr', value:node?.type==='input'?node.address:'', type:'textarea', placeholder:'Alamat lokasi input splitter'}])}
+          ${rowWrap(fieldsHTML([
+            {label:'Latitude', id:'n_inp_lat', type:'number', value:node?.type==='input'?node.lat:'-6.2'},
+            {label:'Longitude', id:'n_inp_lng', type:'number', value:node?.type==='input'?node.lng:'106.8'},
+          ]))}
+          ${node?.type === 'input' ? fieldsHTML([{label:'Status', id:'n_inp_status', type:'select', value:node.status, options:[{value:'Aktif',label:'Aktif'},{value:'Penuh',label:'Penuh'}]}]) : ''}
+        ` : ''}
+        ${!isEdit || (node && node.type === 'output') ? `
+          <div class="section-head" style="padding:20px 0 14px 0;"><h3>Output Splitter</h3></div>
+          ${fieldsHTML([{label:'Nama Output Splitter', id:'n_out_name', value:node?.type==='output'?node.label:'', placeholder:'Output Splitter 1:8 — RT 05'}])}
+          ${fieldsHTML([{label:'Port OLT Induk', id:'n_out_olt', type:'select', options:DB.infrastructure.map(o=>({value:o.id,label:`${o.label} (${o.olt_type})`, selected:o.id===(node?.olt_id||DB.infrastructure[0]?.id)}))}]}])}
+          ${fieldsHTML([{label:'Input Splitter Induk', id:'n_out_parent', type:'select', options:inputOpts(node?.olt_id||DB.infrastructure[0]?.id||'').map(o=>({value:o.value, label:o.label, selected:o.value===(node?.olt_input_id||'')}))}]}])}
+          ${fieldsHTML([{label:'Kapasitas', id:'n_out_cap', type:'select', value:node?.type==='output'?node.capacity:'8', options:[
+            {value:'2',label:'Splitter 1:2'},
+            {value:'8',label:'Output 1:8'},
+            {value:'16',label:'Output 1:16'},
+          ]}])}
+          ${fieldsHTML([{label:'Alamat / Keterangan', id:'n_out_addr', value:node?.type==='output'?node.address:'', type:'textarea', placeholder:'Alamat lokasi splitter ujung'}])}
+          ${rowWrap(fieldsHTML([
+            {label:'Latitude', id:'n_out_lat', type:'number', value:node?.type==='output'?node.lat:'-6.2'},
+            {label:'Longitude', id:'n_out_lng', type:'number', value:node?.type==='output'?node.lng:'106.8'},
+          ]))}
+          ${node?.type === 'output' ? fieldsHTML([{label:'Status', id:'n_out_status', type:'select', value:node.status, options:[{value:'Aktif',label:'Aktif'},{value:'Penuh',label:'Penuh'}]}]) : ''}
+        ` : ''}
+
+        <div style="margin-top:24px;display:flex;gap:8px;justify-content:flex-end;">
+          ${isEdit && (isSuperUser() || node.type !== 'olt') ? `
+            <button class="btn btn-danger" id="fDelete">${ic('trash')}Hapus</button>
+          ` : ''}
+          <button class="btn btn-secondary" id="fCancel">${ic('x')}Batal</button>
+          <button class="btn btn-primary" id="fSave">${ic('check')}${isEdit?'Simpan Perubahan':'Tambah Titik'}</button>
+        </div>
+      </div>
+    `;
+
+    const selOltOut = content.querySelector('#n_out_olt');
+    const selInputOut = content.querySelector('#n_out_parent');
+    if(selOltOut && selInputOut){
+      function refreshInputOutOpts(){
+        const opts = inputOpts(selOltOut.value);
+        const prev = selInputOut.value;
+        selInputOut.innerHTML = opts.map(o=>`<option value="${o.value}" ${o.value===prev?'selected':''}>${o.label}</option>`).join('');
       }
-    });
-  }
+      selOltOut.addEventListener('change', refreshInputOutOpts);
+    }
+    
+    content.querySelector('#fCancel')?.addEventListener('click', ()=>{ window.location.hash='infra.topologi'; });
+    content.querySelector('#fSave')?.addEventListener('click', ()=>{
+      const val = id => document.getElementById(id).value.trim();
+      
+      const data = {};
+      let type;
 
-  function openAddInputSplitterForm(){
-    if(DB.infrastructure.length === 0){ toast('Belum ada data OLT. Tambahkan OLT terlebih dahulu.'); return; }
-    Modal.open({
-      title:'Tambah Input Splitter', subtitle:'Tambahkan Input Splitter baru pada Port OLT terpilih',
-      bodyHTML:`
-        ${fieldsHTML([{label:'Nama Input Splitter', id:'n_inp_name', placeholder:'Input Splitter 1:8 — Blok A'}])}
-        ${rowWrap(fieldsHTML([
-          {label:'Port OLT Induk', id:'n_inp_olt', type:'select', options:DB.infrastructure.map(o=>({value:o.id,label:`${o.label} (${o.olt_type})`}))},
-          {label:'Jenis Splitter', id:'n_inp_type', type:'select', options:[{value:'2',label:'Splitter 1:2'},{value:'8',label:'Splitter 1:8'},{value:'16',label:'Splitter 1:16'}]},
-        ]))}
-        ${fieldsHTML([{label:'Keterangan / Alamat', id:'n_inp_addr', type:'textarea', placeholder:'Alamat lokasi input splitter'}])}
-        ${rowWrap(fieldsHTML([
-          {label:'Latitude', id:'n_inp_lat', type:'number', value:'-6.2'},
-          {label:'Longitude', id:'n_inp_lng', type:'number', value:'106.8'},
-        ]))}
-      `,
-      footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}Tambah Input Splitter</button>`,
-      onOpen(b,f){
-        f.querySelector('#mCancel').addEventListener('click', Modal.close);
-        f.querySelector('#mSave').addEventListener('click', ()=>{
-          const val = id=>document.getElementById(id).value.trim();
-          const name = val('n_inp_name');
-          if(!name){ toast('Nama Input Splitter wajib diisi'); return; }
+      if(node?.type === 'olt' || (!isEdit && val('n_olt_name'))){
+        type = 'olt';
+        data.label = val('n_olt_name');
+        data.olt_type = val('n_olt_type');
+        data.partner_id = val('n_olt_partner');
+        data.address = val('n_olt_addr');
+        data.lat = parseFloat(val('n_olt_lat'))||0;
+        data.lng = parseFloat(val('n_olt_lng'))||0;
+      } else if(node?.type === 'input' || (!isEdit && val('n_inp_name'))){
+        type = 'input';
+        data.label = val('n_inp_name');
+        data.capacity = parseInt(val('n_inp_type'),10);
+        data.address = val('n_inp_addr');
+        data.lat = parseFloat(val('n_inp_lat'))||0;
+        data.lng = parseFloat(val('n_inp_lng'))||0;
+        if(node?.type === 'input') data.status = val('n_inp_status');
+      } else if(node?.type === 'output' || (!isEdit && val('n_out_name'))){
+        type = 'output';
+        data.label = val('n_out_name');
+        data.capacity = parseInt(val('n_out_cap'),10);
+        data.address = val('n_out_addr');
+        data.lat = parseFloat(val('n_out_lat'))||0;
+        data.lng = parseFloat(val('n_out_lng'))||0;
+        if(node?.type === 'output') data.status = val('n_out_status');
+      }
+
+      if(isEdit){
+        Object.assign(node, data);
+        pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `memperbarui titik ${node.type} ${node.label}`);
+        toast(`${node.type === 'olt' ? 'Port OLT' : node.type === 'input' ? 'Input Splitter' : 'Output Splitter'} berhasil diperbarui`);
+      } else {
+        const newNode = {
+          id: nextId('INF'),
+          type: type,
+          label: data.label,
+          capacity: data.capacity || 0,
+          connected: 0,
+          status: data.status || 'Aktif',
+          ...data
+        };
+
+        if(newNode.type === 'output'){
+          const oltId = val('n_out_olt');
+          const inputId = val('n_out_parent');
+          if(!oltId){ toast('Pilih Port OLT induk terlebih dahulu'); return; }
+          if(!inputId){ toast('Pilih Input Splitter induk terlebih dahulu'); return; }
+          const inputNode = findInputSplitter(oltId, inputId);
+          if(!inputNode){ toast('Input Splitter induk tidak ditemukan'); return; }
+          inputNode.children = inputNode.children || [];
+          inputNode.children.push(newNode);
+          expanded.add(inputNode.id);
+        } else if(newNode.type === 'input'){
           const oltId = val('n_inp_olt');
+          if(!oltId){ toast('Pilih Port OLT induk terlebih dahulu'); return; }
           const oltNode = findOltNode(oltId);
           if(!oltNode){ toast('Port OLT induk tidak ditemukan'); return; }
-          const cap = parseInt(val('n_inp_type'),10);
-          const newInput = {id:nextId('SPL'), type:'input', label:name, olt:oltNode.label, capacity:cap, connected:0, address:val('n_inp_addr'), lat:parseFloat(val('n_inp_lat'))||0, lng:parseFloat(val('n_inp_lng'))||0, children:[]};
           oltNode.children = oltNode.children || [];
-          oltNode.children.push(newInput);
-          expanded.add(oltId);
-          pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `menambahkan Input Splitter baru ${name} ke ${oltNode.label}`);
-          toast('Input Splitter baru berhasil ditambahkan');
-          Modal.close(); selectedId = newInput.id; kpis(); paintTree(); paintPanel();
-        });
+          oltNode.children.push(newNode);
+          expanded.add(oltNode.id);
+        } else if(newNode.type === 'olt'){
+          DB.infrastructure.push(newNode);
+          expanded.add(newNode.id);
+        }
+
+        pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `menambahkan titik ${newNode.type} ${newNode.label}`);
+        toast('Titik baru berhasil ditambahkan');
       }
+
+      window.location.hash='infra.topologi';
     });
+
+    if(isEdit && (isSuperUser() || node.type !== 'olt')){
+      content.querySelector('#fDelete')?.addEventListener('click', ()=>{
+        const confirmDelete = window.confirm(`Yakin ingin menghapus ${node.type === 'olt' ? 'Port OLT' : node.type === 'input' ? 'Input Splitter' : 'Output Splitter'} "${node.label}"?`);
+        if(!confirmDelete) return;
+        
+        if(node.type === 'output'){
+          DB.infrastructure.forEach(olt => {
+            (olt.children || []).forEach(input => {
+              input.children = (input.children || []).filter(output => output.id !== node.id);
+            });
+          });
+        } else if(node.type === 'input'){
+          DB.infrastructure.forEach(olt => {
+            olt.children = (olt.children || []).filter(input => input.id !== node.id);
+          });
+        } else if(node.type === 'olt'){
+          DB.infrastructure = DB.infrastructure.filter(olt => olt.id !== node.id);
+        }
+
+        pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `menghapus titik ${node.type} ${node.label}`);
+        toast(`${node.type === 'olt' ? 'Port OLT' : node.type === 'input' ? 'Input Splitter' : 'Output Splitter'} berhasil dihapus`);
+        window.location.hash='infra.topologi';
+      });
+    }
   }
 
-  function openAddOutputSplitterForm(){
-    if(DB.infrastructure.length === 0){ toast('Belum ada data OLT. Tambahkan OLT terlebih dahulu.'); return; }
+  Views['infra.topologi'] = function(root){
+    const hashParts = window.location.hash.split('?');
+    const params = new URLSearchParams(hashParts[1] || '');
+    const infraId = params.get('id');
+
+    if(infraId){
+      if(infraId === 'add'){
+        renderEditNodePage(root, null);
+        return;
+      } else {
+        const node = findNode(infraId);
+        if(node){
+          renderEditNodePage(root, node);
+          return;
+        }
+      }
+    }
+
+    root.innerHTML = pageIntro('Visualisasi topologi jaringan mulai dari Port OLT, Input Splitter, hingga Output Splitter yang melayani pelanggan.');
+    root.insertAdjacentHTML('beforeend', `<div id="kpiSlot"></div>`);
+
+    function kpis(){
+      const c = countInfra();
+      root.querySelector('#kpiSlot').outerHTML = `<div id="kpiSlot">${renderKPIs([
+        {label:'Total Port OLT', value:c.olt, icon:'server', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
+        {label:'Total Splitter', value:c.splitter, icon:'splitter', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'},
+        {label:'Total Titik Perangkat', value:c.titik, icon:'network', bg:'var(--badge-cyan-bg)', fg:'var(--badge-cyan-fg)'},
+        {label:'Total Pelanggan Terhubung', value:c.pelanggan, icon:'users', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
+      ])}</div>`;
+    }
+    kpis();
+
+    const layout = document.createElement('div');
+    layout.style.cssText = 'display:grid;grid-template-columns:1.1fr 1fr;gap:12px;align-items:start;';
+    root.appendChild(layout);
+
+    const treeCard = document.createElement('div'); treeCard.className='card';
+    const panelCard = document.createElement('div'); panelCard.className='card card-pad';
+    layout.appendChild(treeCard); layout.appendChild(panelCard);
+
+    let selectedId = null;
+    const expanded = new Set(DB.infrastructure.map(o=>o.id));
+
+    function nodeIcon(type){
+      if(type==='olt') return {ico:'server', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'};
+      if(type==='input') return {ico:'splitter', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'};
+      return {ico:'mapPin', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'};
+    }
+
+    function renderNode(node, depth){
+      const hasChildren = node.children && node.children.length;
+      const isOpen = expanded.has(node.id);
+      const {ico, bg, fg} = nodeIcon(node.type);
+      const meta = node.type==='output' ? `${node.connected}/${node.capacity}` : (node.type==='input' ? `${node.connected||0}/${node.capacity||'?'} · ${(node.children||[]).length} output` : `${(node.children||[]).length} input`);
+      
+      const actions = (isSuperUser() || node.type !== 'olt') ? `
+        <button class="tree-btn-action" title="Edit" data-node="${node.id}" data-action="edit">${ic('edit')}</button>
+        <button class="tree-btn-action tree-btn-danger" title="Hapus" data-node="${node.id}" data-action="delete">${ic('trash')}</button>
+      ` : '';
+
+      return `
+        <div class="tree-node">
+          <div class="tree-row ${selectedId===node.id?'selected':''}" data-node="${node.id}">
+            <span class="tree-toggle ${hasChildren && isOpen ? 'rot':''}" data-toggle="${node.id}">${hasChildren?ic('chevronRight'):''}</span>
+            <span class="tree-ico" style="background:${bg};color:${fg};">${ic(ico)}</span>
+            <span class="tree-label">${node.label}</span>
+            <span class="tree-meta">${meta}</span>
+            <div class="tree-actions">${actions}</div>
+          </div>
+          ${hasChildren && isOpen ? `<div class="tree-children">${node.children.map(ch=>renderNode(ch, depth+1)).join('')}</div>` : ''}
+        </div>`;
+    }
+
+    function findNode(id, list){
+      list = list || DB.infrastructure;
+      for(const n of list){
+        if(n.id === id) return n;
+        if(n.children){ const r = findNode(id, n.children); if(r) return r; }
+      }
+      return null;
+    }
+
     function inputOpts(oltId){
       const inputs = allInputSplitters(oltId);
       return inputs.length ? inputs.map(i=>({value:i.id,label:i.label})) : [{value:'',label:'-- Belum ada Input Splitter --'}];
     }
-    Modal.open({
-      title:'Tambah Output Splitter', subtitle:'Tambahkan Output Splitter baru pada Input Splitter terpilih',
-      bodyHTML:`
-        ${fieldsHTML([{label:'Nama Output Splitter', id:'n_out_name', placeholder:'Output Splitter 1:8 — RT 05'}])}
-        ${fieldsHTML([{label:'Port OLT Induk', id:'n_out_olt', type:'select', options:DB.infrastructure.map(o=>({value:o.id,label:`${o.label} (${o.olt_type})`}))}])}
-        ${fieldsHTML([{label:'Input Splitter Induk', id:'n_out_parent', type:'select', options:inputOpts(DB.infrastructure[0]?.id||'')}])}
-        ${fieldsHTML([{label:'Kapasitas', id:'n_out_cap', type:'select', options:[{value:'2',label:'Splitter 1:2'},{value:'8',label:'Output 1:8'},{value:'16',label:'Output 1:16'}]}])}
-        ${fieldsHTML([{label:'Alamat / Keterangan', id:'n_out_addr', type:'textarea', placeholder:'Alamat lokasi splitter ujung'}])}
-        ${rowWrap(fieldsHTML([
-          {label:'Latitude', id:'n_out_lat', type:'number', value:'-6.2'},
-          {label:'Longitude', id:'n_out_lng', type:'number', value:'106.8'},
-        ]))}
-      `,
-      footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}Tambah Output Splitter</button>`,
-      onOpen(b,f){
-        const selOlt = b.querySelector('#n_out_olt');
-        const selParent = b.querySelector('#n_out_parent');
-        function refreshParentOpts(){
-          const opts = inputOpts(selOlt.value);
-          const prev = selParent.value;
-          selParent.innerHTML = opts.map(o=>`<option value="${o.value}" ${o.value===prev?'selected':''}>${o.label}</option>`).join('');
+
+    function paintTree(){
+      const addBtns = isSuperUser()
+        ? `<button class="btn btn-primary btn-sm" id="btnAddOlt">${ic('plus')}Tambah OLT</button>
+           <button class="btn btn-secondary btn-sm" id="btnAddInput">${ic('plus')}Tambah Input Splitter</button>
+           <button class="btn btn-secondary btn-sm" id="btnAddOutput">${ic('plus')}Tambah Output Splitter</button>`
+        : `<button class="btn btn-secondary btn-sm" id="btnAddInput">${ic('plus')}Tambah Input Splitter</button>
+           <button class="btn btn-secondary btn-sm" id="btnAddOutput">${ic('plus')}Tambah Output Splitter</button>`;
+      treeCard.innerHTML = `
+        <div class="section-head"><h3>Topologi Infrastruktur</h3>
+          <div class="btn-group">${addBtns}</div>
+        </div>
+        <div class="tree" id="treeMount">${DB.infrastructure.map(o=>renderNode(o,0)).join('')}</div>
+      `;
+      treeCard.querySelectorAll('[data-toggle]').forEach(el=>{
+        el.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          const id = el.dataset.toggle;
+          if(expanded.has(id)) expanded.delete(id); else expanded.add(id);
+          paintTree();
+        });
+      });
+      treeCard.querySelectorAll('[data-node]').forEach(el=>{
+        el.addEventListener('click', (e)=>{
+          if(e.target.closest('.tree-btn-action')) return;
+          selectedId = el.dataset.node; 
+          paintTree(); paintPanel();
+        });
+      });
+
+      treeCard.querySelectorAll('[data-action="edit"]').forEach(btn=>{
+        btn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          const nodeId = btn.dataset.node;
+          window.location.hash = `infra.topologi?id=${nodeId}`;
+        });
+      });
+
+      treeCard.querySelectorAll('[data-action="delete"]').forEach(btn=>{
+        btn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          const nodeId = btn.dataset.node;
+          const node = findNode(nodeId);
+          if(isSuperUser() || node.type !== 'olt'){ // Role check
+            const confirmDelete = window.confirm(`Yakin ingin menghapus ${node.type === 'olt' ? 'Port OLT' : node.type === 'input' ? 'Input Splitter' : 'Output Splitter'} "${node.label}"?`);
+            if(!confirmDelete) return;
+            
+            if(node.type === 'output'){
+              DB.infrastructure.forEach(olt => {
+                (olt.children || []).forEach(input => {
+                  input.children = (input.children || []).filter(output => output.id !== node.id);
+                });
+              });
+            } else if(node.type === 'input'){
+              DB.infrastructure.forEach(olt => {
+                olt.children = (olt.children || []).filter(input => input.id !== node.id);
+              });
+            } else if(node.type === 'olt'){
+              DB.infrastructure = DB.infrastructure.filter(olt => olt.id !== node.id);
+            }
+
+            pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `menghapus titik ${node.type} ${node.label}`);
+            toast(`${node.type === 'olt' ? 'Port OLT' : node.type === 'input' ? 'Input Splitter' : 'Output Splitter'} berhasil dihapus`);
+            paintTree(); kpis();
+          }
+        });
+      });
+
+      treeCard.querySelector('#btnAddOlt')?.addEventListener('click', ()=>{ window.location.hash='infra.topologi?id=add&type=olt'; });
+      treeCard.querySelector('#btnAddInput')?.addEventListener('click', ()=>{ window.location.hash='infra.topologi?id=add&type=input'; });
+      treeCard.querySelector('#btnAddOutput')?.addEventListener('click', ()=>{ window.location.hash='infra.topologi?id=add&type=output'; });
+    }
+
+    function paintPanel(){
+      const node = selectedId ? findNode(selectedId) : null;
+      if(!node){
+        panelCard.innerHTML = `<div class="empty-state">${ic('network')}<div class="es-title">Pilih titik perangkat</div><div class="es-sub">Klik salah satu node pada topologi untuk melihat detail konfigurasinya.</div></div>`;
+        return;
+      }
+      if(node.type === 'output'){
+        panelCard.innerHTML = `
+          <h3 style="margin:0 0 4px 0;font-size:14.5px;">${node.label}</h3>
+          <p style="margin:0 0 14px 0;font-size:12.5px;color:var(--color-text-secondary);">Splitter ujung · melayani pelanggan langsung</p>
+          <div class="detail-grid" style="margin-bottom:14px;">
+            <div class="detail-item"><span class="dl">Jenis Splitter</span><span class="dv">Output 1:${node.capacity}</span></div>
+            <div class="detail-item"><span class="dl">Status</span><span class="dv">${statusBadge(node.status)}</span></div>
+            <div class="detail-item"><span class="dl">Kapasitas Terpakai</span><span class="dv">${node.connected}/${node.capacity}</span></div>
+            <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${node.address||'-'}</span></div>
+          </div>
+          <div class="cap-bar" style="width:100%;height:8px;margin-bottom:16px;"><span style="width:${node.connected/node.capacity*100}%;background:${node.connected>=node.capacity?'var(--badge-red-fg)':'var(--color-accent)'}"></span></div>
+          <div class="field-row">
+            <div class="field"><label>Latitude</label><input class="input" id="pLat" type="number" step="0.0001" value="${node.lat||0}"></div>
+            <div class="field"><label>Longitude</label><input class="input" id="pLng" type="number" step="0.0001" value="${node.lng||0}"></div>
+          </div>
+          <div class="map-placeholder" style="margin-bottom:14px;">${ic('mapPin','pin')}<span>Lokasi splitter di peta</span><span style="font-family:var(--font-family-mono);font-size:11px;">${node.lat||0}, ${node.lng||0}</span></div>
+          <button class="btn btn-primary" id="pSaveLoc" style="width:100%;">${ic('check')}Simpan Lokasi</button>
+        `;
+        panelCard.querySelector('#pSaveLoc').addEventListener('click', ()=>{
+          node.lat = parseFloat(document.getElementById('pLat').value)||node.lat;
+          node.lng = parseFloat(document.getElementById('pLng').value)||node.lng;
+          pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `memperbarui koordinat lokasi ${node.label}`);
+          toast('Koordinat lokasi splitter diperbarui'); paintPanel();
+        });
+      } else if(node.type === 'input'){
+        const inputConnected = (node.children||[]).reduce((s,c)=>s+(c.connected||0),0);
+        const inputCapacity = (node.children||[]).reduce((s,c)=>s+(c.capacity||0),0);
+        panelCard.innerHTML = `
+          <h3 style="margin:0 0 4px 0;font-size:14.5px;">${node.label}</h3>
+          <p style="margin:0 0 14px 0;font-size:12.5px;color:var(--color-text-secondary);">Terhubung ke ${node.olt} · ${(node.children||[]).length} output splitter</p>
+          <div class="detail-grid" style="margin-bottom:14px;">
+            <div class="detail-item"><span class="dl">Jenis Splitter</span><span class="dv">Input 1:${node.capacity||'?'}</span></div>
+            <div class="detail-item"><span class="dl">Total Output</span><span class="dv">${(node.children||[]).length} unit</span></div>
+            <div class="detail-item"><span class="dl">Kapasitas Total</span><span class="dv">${inputCapacity} port</span></div>
+            <div class="detail-item"><span class="dl">Port Terpakai</span><span class="dv">${inputConnected}/${inputCapacity}</span></div>
+            <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${node.address||'-'}</span></div>
+          </div>
+          ${inputCapacity > 0 ? `<div class="cap-bar" style="width:100%;height:8px;margin-bottom:16px;"><span style="width:${inputConnected/inputCapacity*100}%;background:${inputConnected>=inputCapacity?'var(--badge-red-fg)':'var(--color-accent)'}"></span></div>` : ''}
+          <div class="field-row">
+            <div class="field"><label>Latitude</label><input class="input" id="pLat" type="number" step="0.0001" value="${node.lat||0}"></div>
+            <div class="field"><label>Longitude</label><input class="input" id="pLng" type="number" step="0.0001" value="${node.lng||0}"></div>
+          </div>
+          <div class="map-placeholder" style="margin-bottom:14px;">${ic('mapPin','pin')}<span>Lokasi input splitter di peta</span><span style="font-family:var(--font-family-mono);font-size:11px;">${node.lat||0}, ${node.lng||0}</span></div>
+          <button class="btn btn-primary" id="pSaveLoc" style="width:100%;">${ic('check')}Simpan Lokasi</button>
+        `;
+        panelCard.querySelector('#pSaveLoc').addEventListener('click', ()=>{
+          node.lat = parseFloat(document.getElementById('pLat').value)||node.lat;
+          node.lng = parseFloat(document.getElementById('pLng').value)||node.lng;
+          pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `memperbarui koordinat lokasi ${node.label}`);
+          toast('Koordinat lokasi input splitter diperbarui'); paintPanel();
+        });
+      } else {
+        panelCard.innerHTML = `
+          <h3 style="margin:0 0 4px 0;font-size:14.5px;">${node.label}</h3>
+          <p style="margin:0 0 14px 0;font-size:12.5px;color:var(--color-text-secondary);">${partnerName(node.partner_id)} · ${(node.children||[]).length} input splitter</p>
+          <div class="detail-grid" style="margin-bottom:14px;">
+            <div class="detail-item"><span class="dl">Vendor / Tipe</span><span class="dv">${node.olt_type||'-'}</span></div>
+            <div class="detail-item"><span class="dl">Total Input Splitter</span><span class="dv">${(node.children||[]).length} unit</span></div>
+            <div class="detail-item"><span class="dl">Alamat</span><span class="dv">${node.address||'-'}</span></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Latitude</label><input class="input" id="pLat" type="number" step="0.0001" value="${node.lat||0}"></div>
+            <div class="field"><label>Longitude</label><input class="input" id="pLng" type="number" step="0.0001" value="${node.lng||0}"></div>
+          </div>
+          <div class="map-placeholder" style="margin-bottom:14px;">${ic('mapPin','pin')}<span>Lokasi OLT di peta</span><span style="font-family:var(--font-family-mono);font-size:11px;">${node.lat||0}, ${node.lng||0}</span></div>
+          <button class="btn btn-primary" id="pSaveLoc" style="width:100%;">${ic('check')}Simpan Lokasi</button>
+        `;
+        panelCard.querySelector('#pSaveLoc').addEventListener('click', ()=>{
+          node.lat = parseFloat(document.getElementById('pLat').value)||node.lat;
+          node.lng = parseFloat(document.getElementById('pLng').value)||node.lng;
+          pushActivity('Super Admin', `memperbarui koordinat lokasi ${node.label}`);
+          toast('Koordinat lokasi OLT diperbarui'); paintPanel();
+        });
+      }
+    }
+
+    function openAddOltForm(){
+      Modal.open({
+        title:'Tambah Port OLT', subtitle:'Daftarkan perangkat OLT baru ke topologi jaringan',
+        bodyHTML:`
+          ${fieldsHTML([{label:'Nama Port OLT', id:'n_olt_name', placeholder:'OLT Huawei MA5800 — Kantor Pusat'}])}
+          ${rowWrap(fieldsHTML([
+            {label:'Vendor / Tipe OLT', id:'n_olt_type', type:'select', options:[{value:'Huawei MA5800',label:'Huawei MA5800'},{value:'ZTE C320',label:'ZTE C320'},{value:'Fiberhome AN5516',label:'Fiberhome AN5516'}]},
+            {label:'Mitra', id:'n_olt_partner', type:'select', options:DB.partners.map(p=>({value:p.id,label:p.partner_name}))},
+          ]))}
+          ${fieldsHTML([{label:'Alamat / Keterangan', id:'n_olt_addr', type:'textarea', placeholder:'Lokasi pemasangan OLT'}])}
+          ${rowWrap(fieldsHTML([
+            {label:'Latitude', id:'n_olt_lat', type:'number', value:'-6.2'},
+            {label:'Longitude', id:'n_olt_lng', type:'number', value:'106.8'},
+          ]))}
+        `,
+        footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}Tambah OLT</button>`,
+        onOpen(b,f){
+          f.querySelector('#mCancel').addEventListener('click', Modal.close);
+          f.querySelector('#mSave').addEventListener('click', ()=>{
+            const val = id=>document.getElementById(id).value.trim();
+            const name = val('n_olt_name');
+            if(!name){ toast('Nama Port OLT wajib diisi'); return; }
+            const newOlt = {id:nextId('OLT'), type:'olt', label:name, olt_type:val('n_olt_type')||'Huawei MA5800', partner_id:val('n_olt_partner'), address:val('n_olt_addr'), lat:parseFloat(val('n_olt_lat'))||0, lng:parseFloat(val('n_olt_lng'))||0, children:[]};
+            DB.infrastructure.push(newOlt);
+            expanded.add(newOlt.id);
+            pushActivity('Super Admin', `menambahkan Port OLT baru ${name}`);
+            toast('Port OLT baru berhasil ditambahkan');
+            Modal.close(); selectedId = newOlt.id; kpis(); paintTree(); paintPanel();
+          });
         }
-        selOlt.addEventListener('change', refreshParentOpts);
-        f.querySelector('#mCancel').addEventListener('click', Modal.close);
-        f.querySelector('#mSave').addEventListener('click', ()=>{
-          const val = id=>document.getElementById(id).value;
-          const name = val('n_out_name').trim();
-          if(!name){ toast('Nama Output Splitter wajib diisi'); return; }
-          const parentId = val('n_out_parent');
-          if(!parentId){ toast('Pilih Input Splitter induk terlebih dahulu'); return; }
-          const parentNode = findNode(parentId);
-          if(!parentNode){ toast('Input Splitter induk tidak ditemukan'); return; }
-          const cap = parseInt(val('n_out_cap'),10);
-          const newNode = {id:nextId('SPL'), type:'output', label:name, lat:parseFloat(val('n_out_lat'))||0, lng:parseFloat(val('n_out_lng'))||0, address:val('n_out_addr'), capacity:cap, connected:0, status:'Aktif'};
-          parentNode.children = parentNode.children || [];
-          parentNode.children.push(newNode);
-          expanded.add(parentId);
-          pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `menambahkan Output Splitter baru ${name}`);
-          toast('Output Splitter baru berhasil ditambahkan');
-          Modal.close(); selectedId = newNode.id; kpis(); paintTree(); paintPanel();
+      });
+    }
+
+    function openAddInputSplitterForm(){
+      if(DB.infrastructure.length === 0){ toast('Belum ada data OLT. Tambahkan OLT terlebih dahulu.'); return; }
+      Modal.open({
+        title:'Tambah Input Splitter', subtitle:'Tambahkan Input Splitter baru pada Port OLT terpilih',
+        bodyHTML:`
+          ${fieldsHTML([{label:'Nama Input Splitter', id:'n_inp_name', placeholder:'Input Splitter 1:8 — Blok A'}])}
+          ${rowWrap(fieldsHTML([
+            {label:'Port OLT Induk', id:'n_inp_olt', type:'select', options:DB.infrastructure.map(o=>({value:o.id,label:`${o.label} (${o.olt_type})`}))},
+            {label:'Jenis Splitter', id:'n_inp_type', type:'select', options:[{value:'2',label:'Splitter 1:2'},{value:'8',label:'Splitter 1:8'},{value:'16',label:'Splitter 1:16'}]},
+          ]))}
+          ${fieldsHTML([{label:'Keterangan / Alamat', id:'n_inp_addr', type:'textarea', placeholder:'Alamat lokasi input splitter'}])}
+          ${rowWrap(fieldsHTML([
+            {label:'Latitude', id:'n_inp_lat', type:'number', value:'-6.2'},
+            {label:'Longitude', id:'n_inp_lng', type:'number', value:'106.8'},
+          ]))}
+        `,
+        footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}Tambah Input Splitter</button>`,
+        onOpen(b,f){
+          f.querySelector('#mCancel').addEventListener('click', Modal.close);
+          f.querySelector('#mSave').addEventListener('click', ()=>{
+            const val = id=>document.getElementById(id).value.trim();
+            const name = val('n_inp_name');
+            if(!name){ toast('Nama Input Splitter wajib diisi'); return; }
+            const oltId = val('n_inp_olt');
+            const oltNode = findOltNode(oltId);
+            if(!oltNode){ toast('Port OLT induk tidak ditemukan'); return; }
+            const cap = parseInt(val('n_inp_type'),10);
+            const newInput = {id:nextId('SPL'), type:'input', label:name, olt:oltNode.label, capacity:cap, connected:0, address:val('n_inp_addr'), lat:parseFloat(val('n_inp_lat'))||0, lng:parseFloat(val('n_inp_lng'))||0, children:[]};
+            oltNode.children = oltNode.children || [];
+            oltNode.children.push(newInput);
+            expanded.add(oltId);
+            pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `menambahkan Input Splitter baru ${name} ke ${oltNode.label}`);
+            toast('Input Splitter baru berhasil ditambahkan');
+            Modal.close(); selectedId = newInput.id; kpis(); paintTree(); paintPanel();
+          });
+        }
+      });
+    }
+
+    function openAddOutputSplitterForm(){
+      if(DB.infrastructure.length === 0){ toast('Belum ada data OLT. Tambahkan OLT terlebih dahulu.'); return; }
+      function inputOpts(oltId){
+        const inputs = allInputSplitters(oltId);
+        return inputs.length ? inputs.map(i=>({value:i.id,label:i.label})) : [{value:'',label:'-- Belum ada Input Splitter --'}];
+      }
+      Modal.open({
+        title:'Tambah Output Splitter', subtitle:'Tambahkan Output Splitter baru pada Input Splitter terpilih',
+        bodyHTML:`
+          ${fieldsHTML([{label:'Nama Output Splitter', id:'n_out_name', placeholder:'Output Splitter 1:8 — RT 05'}])}
+          ${fieldsHTML([{label:'Port OLT Induk', id:'n_out_olt', type:'select', options:DB.infrastructure.map(o=>({value:o.id,label:`${o.label} (${o.olt_type})`}))}]}])}
+          ${fieldsHTML([{label:'Input Splitter Induk', id:'n_out_parent', type:'select', options:inputOpts(DB.infrastructure[0]?.id||'')}])}
+          ${fieldsHTML([{label:'Kapasitas', id:'n_out_cap', type:'select', options:[{value:'2',label:'Splitter 1:2'},{value:'8',label:'Output 1:8'},{value:'16',label:'Output 1:16'}]}])}
+          ${fieldsHTML([{label:'Alamat / Keterangan', id:'n_out_addr', type:'textarea', placeholder:'Alamat lokasi splitter ujung'}])}
+          ${rowWrap(fieldsHTML([
+            {label:'Latitude', id:'n_out_lat', type:'number', value:'-6.2'},
+            {label:'Longitude', id:'n_out_lng', type:'number', value:'106.8'},
+          ]))}
+        `,
+        footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}Tambah Output Splitter</button>`,
+        onOpen(b,f){
+          const selOlt = b.querySelector('#n_out_olt');
+          const selParent = b.querySelector('#n_out_parent');
+          function refreshParentOpts(){
+            const opts = inputOpts(selOlt.value);
+            const prev = selParent.value;
+            selParent.innerHTML = opts.map(o=>`<option value="${o.value}" ${o.value===prev?'selected':''}>${o.label}</option>`).join('');
+          }
+          selOlt.addEventListener('change', refreshParentOpts);
+          f.querySelector('#mCancel').addEventListener('click', Modal.close);
+          f.querySelector('#mSave').addEventListener('click', ()=>{
+            const val = id=>document.getElementById(id).value;
+            const name = val('n_out_name').trim();
+            if(!name){ toast('Nama Output Splitter wajib diisi'); return; }
+            const parentId = val('n_out_parent');
+            if(!parentId){ toast('Pilih Input Splitter induk terlebih dahulu'); return; }
+            const parentNode = findNode(parentId);
+            if(!parentNode){ toast('Input Splitter induk tidak ditemukan'); return; }
+            const cap = parseInt(val('n_out_cap'),10);
+            const newNode = {id:nextId('SPL'), type:'output', label:name, lat:parseFloat(val('n_out_lat'))||0, lng:parseFloat(val('n_out_lng'))||0, address:val('n_out_addr'), capacity:cap, connected:0, status:'Aktif'};
+            parentNode.children = parentNode.children || [];
+            parentNode.children.push(newNode);
+            expanded.add(parentId);
+            pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `menambahkan Output Splitter baru ${name}`);
+            toast('Output Splitter baru berhasil ditambahkan');
+            Modal.close(); selectedId = newNode.id; kpis(); paintTree(); paintPanel();
+          });
+        }
+      });
+    }
+
+    paintTree();
+    paintPanel();
+  };
+
+  Views['infra.perangkat'] = function(root){
+    root.innerHTML = pageIntro('Seluruh perangkat jaringan yang telah terdaftar pada topologi infrastruktur mitra.');
+
+    const tableMount = document.createElement('div');
+    root.appendChild(tableMount);
+
+    const table = DataTable({
+      rows:()=>flattenInfra(),
+      rowKey:'id',
+      searchPlaceholder:'Cari nama titik, Port OLT, atau jenis splitter…',
+      searchFields:['name','olt'],
+      filters:[
+        {key:'jenis', label:'Semua Jenis Perangkat', options:[{value:'Port OLT',label:'Port OLT'},{value:'Input Splitter',label:'Input Splitter'},{value:'Output Splitter',label:'Output Splitter'}], match:(r,v)=>r.jenis===v},
+        {key:'status', label:'Semua Status', options:[{value:'Aktif',label:'Aktif'},{value:'Penuh',label:'Penuh'}], match:(r,v)=>r.status===v},
+      ],
+      columns:[
+        {key:'name', header:'Nama Titik', sortable:true, render:r=>`<span class="cell-strong">${r.name}</span>`},
+        {key:'jenis', header:'Jenis Perangkat', sortable:true, render:r=>badge(r.jenis, r.jenis==='Port OLT'?'blue':r.jenis==='Input Splitter'?'purple':'green')},
+        {key:'olt', header:'Port OLT', sortable:true, render:r=>`<span class="cell-mono">${r.olt}</span>`},
+        {key:'parent', header:'Parent Perangkat', render:r=>`<span class="cell-mono">${r.parent}</span>`},
+        {key:'lat', header:'Latitude', render:r=>r.lat},
+        {key:'lng', header:'Longitude', render:r=>r.lng},
+        {key:'status', header:'Status', sortable:true, render:r=>statusBadge(r.status)},
+        {key:'actions', header:'', align:'right', render:()=>`
+          <div class="row-actions">
+            <button class="btn btn-secondary btn-sm act-edit">${ic('edit')}Edit</button>
+            <button class="btn btn-ghost btn-sm act-detail">${ic('eye')}</button>
+          </div>`},
+      ],
+      afterRender(wrap, rows){
+        wrap.querySelectorAll('tbody tr[data-id]').forEach(tr=>{
+          const r = rows.find(x=>x.id===tr.dataset.id);
+          tr.querySelector('.act-detail')?.addEventListener('click', ()=>openDetail(r));
+          tr.querySelector('.act-edit')?.addEventListener('click', ()=>openEdit(r));
         });
       }
     });
-  }
+    const cardEl = document.createElement('div'); cardEl.className='card'; cardEl.appendChild(table);
+    tableMount.appendChild(cardEl);
 
-  paintTree();
-  paintPanel();
-};
+    function openDetail(r){
+      Modal.open({
+        title:r.name, subtitle:`${r.jenis} · ${r.olt}`,
+        bodyHTML:`<div class="detail-grid">
+          <div class="detail-item"><span class="dl">Jenis Perangkat</span><span class="dv">${badge(r.jenis,'blue')}</span></div>
+          <div class="detail-item"><span class="dl">Parent</span><span class="dv" style="font-family:var(--font-family-mono);">` + r.parent + `</span></div>
+          <div class="detail-item"><span class="dl">Latitude</span><span class="dv">` + r.lat + `</span></div>
+          <div class="detail-item"><span class="dl">Longitude</span><span class="dv">` + r.lng + `</span></div>
+          <div class="detail-item"><span class="dl">Status</span><span class="dv">${statusBadge(r.status)}</span></div>
+        </div>`,
+        footHTML:`<button class="btn btn-primary" id="mClose9">Tutup</button>`,
+        onOpen(b,f){ f.querySelector('#mClose9').addEventListener('click', Modal.close); }
+      });
+    }
+    function openEdit(r){
+      if(r.jenis !== 'Output Splitter'){ toast('Hanya Output Splitter yang dapat diedit langsung dari tabel ini'); return; }
+      Modal.open({
+        title:'Edit Perangkat', subtitle:r.name,
+        bodyHTML:`
+          ${rowWrap(fieldsHTML([
+            {label:'Latitude', id:'e_lat', type:'number', value:r.lat},
+            {label:'Longitude', id:'e_lng', type:'number', value:r.lng},
+          ]))}
+          ${fieldsHTML([{label:'Status', id:'e_status', type:'select', value:r.status, options:[{value:'Aktif',label:'Aktif'},{value:'Penuh',label:'Penuh'}]}])}
+        `,
+        footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}Simpan</button>`,
+        onOpen(b,f){
+          f.querySelector('#mCancel').addEventListener('click', Modal.close);
+          f.querySelector('#mSave').addEventListener('click', ()=>{
+            r.ref.lat = parseFloat(document.getElementById('e_lat').value)||r.ref.lat;
+            r.ref.lng = parseFloat(document.getElementById('e_lng').value)||r.ref.lng;
+            r.ref.status = document.getElementById('e_status').value;
+            toast('Data perangkat diperbarui');
+            Modal.close(); table.refresh();
+          });
+        }
+      });
+    }
+  };
 
 Views['infra.perangkat'] = function(root){
   root.innerHTML = pageIntro('Seluruh perangkat jaringan yang telah terdaftar pada topologi infrastruktur mitra.');
