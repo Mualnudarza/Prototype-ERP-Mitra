@@ -51,7 +51,7 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-28 — Initial prototype, 4 settlement records
 
 #### Data Pelanggan (`customer.pelanggan`)
-- **Fungsi**: Mengelola data pelanggan akhir (end-user) termasuk kredensial PPPoE, informasi perangkat (modem, OLT port, ONU), koordinat lokasi, dan status langganan.
+- **Fungsi**: Mengelola data pelanggan akhir (end-user) termasuk kredensial PPPoE, informasi perangkat (modem, OLT port, ONU), koordinat lokasi, dan status langganan. Pelanggan Unregistered memiliki tombol "Registrasi" yang mengarah ke `#customer.registrasi?id={customer_id}` (halaman registrasi penuh).
 - **Lokasi file**: `app-modules.js:448-619`, data di `app-data.js` (`DB.customers`)
 - **Data yang dibutuhkan**:
   - Input: partner_id, pppoe_secret, radius_username, customer_name, phone_number, customer_type (Reguler/Fasum), subscribe_date, expired_date, installation_address, package_id, modem_serial_number, latitude, longitude, olt_port, onu_number, access_name, access_port
@@ -62,15 +62,17 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-28 — Initial prototype, 10 pelanggan dummy (2 Unregistered)
 
 #### Registrasi Pelanggan (`customer.registrasi`)
-- **Fungsi**: Antrean registrasi ONU untuk pelanggan berstatus Unregistered. Menampilkan daftar pelanggan yang menunggu registrasi ke perangkat OLT, beserta modal untuk input serial number modem dan generate script CLI per vendor (Huawei, ZTE, Fiberhome).
-- **Lokasi file**: `app-modules.js:744-810`, data dari `DB.customers` (filter `Unregistered`)
+- **Fungsi**: Dua mode: (1) Antrean registrasi ONU untuk pelanggan berstatus Unregistered — menampilkan daftar pelanggan dengan KPI, filter, dan tombol Registrasi. (2) Halaman registrasi penuh (bukan modal) — dipanggil via hash `#customer.registrasi?id={customer_id}` — menampilkan info pelanggan, konfigurasi perangkat (OLT → Input Splitter → Output Splitter cascading), Slot/PON, generate script CLI per vendor dengan tombol copy.
+- **Lokasi file**: `app-modules.js:786-866` (queue), `app-modules.js:625-784` (`renderRegistrationPage`), data dari `DB.customers` (filter `Unregistered`)
 - **Data yang dibutuhkan**:
-  - Input: customer_id, modem_serial_number, olt_id, olt_slot, olt_pon
-  - Tampil: KPI (ukuran antrean, mitra terlibat, menunggu >3 hari), daftar pelanggan Unregistered dengan tombol "Registrasi". Modal registrasi menampilkan info pelanggan, input SN, selector OLT/Slot/PON, dan script CLI yang di-generate per vendor (Huawei MA5800, ZTE C320, Fiberhome AN5516) dengan tombol copy.
-- **Ketergantungan**: `DB.customers`, `DB.infrastructure` (OLT nodes), `genOnuScripts()` (generates CLI scripts), `openRegistrationModal()`, `pushActivity()`
+  - Input: customer_id, modem_serial_number, olt_id, olt_input_id, olt_output_id, olt_slot, olt_pon
+  - Tampil (Queue): KPI (ukuran antrean, mitra terlibat, menunggu >3 hari), DataTable dengan tombol Registrasi → navigasi ke `#customer.registrasi?id=...`
+  - Tampil (Page): Info pelanggan card, konfigurasi perangkat card (SN Modem, OLT cascading → Input → Output, Slot/PON), script CLI (Huawei MA5800, ZTE C320, Fiberhome AN5516) dengan copy button
+- **Ketergantungan**: `DB.customers`, `DB.infrastructure`, `allInputSplitters()`, `allOutputSplitters()`, `findOltNode()`, `genOnuScripts()`, `pushActivity()`
 - **Status**: Selesai
 - **Catatan Perubahan**:
   - 2026-07-28 — Initial prototype, flow registrasi ONU dengan generate script CLI
+  - 2026-07-28 — Konversi dari modal (`openRegistrationModal`) ke halaman penuh (`renderRegistrationPage`). Hash-based navigation: `#customer.registrasi?id=CUS-XXXX`. Cascading dropdown OLT → Input Splitter → Output Splitter.
 
 #### Paket Layanan (`customer.paket`)
 - **Fungsi**: Mengelola paket layanan internet yang ditawarkan per mitra, termasuk nama paket, bandwidth, harga, dan status.
@@ -128,16 +130,18 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-28 — Initial prototype, status sync antara radius dan customers
 
 #### Topologi Infrastruktur (`infra.topologi`)
-- **Fungsi**: Menampilkan pohon topologi infrastruktur jaringan: OLT → Input Splitter → Output Splitter. Mendukung expand/collapse, seleksi node, panel detail, dan penambah Output Splitter baru.
-- **Lokasi file**: `app-modules.js:1208-1383`, data di `app-data.js` (`DB.infrastructure`)
+- **Fungsi**: Menampilkan pohon topologi infrastruktur jaringan: OLT → Input Splitter → Output Splitter. Mendukung expand/collapse, seleksi node, panel detail (lat/lng, kapasitas, progress bar). Tiga tombol terpisah: "Tambah OLT" (hanya Super User), "Tambah Input Splitter", "Tambah Output Splitter" (kedua role). Modal Output Splitter menggunakan cascading OLT → Input Splitter.
+- **Lokasi file**: `app-modules.js:1208-1557`, data di `app-data.js` (`DB.infrastructure`)
 - **Data yang dibutuhkan**:
-  - Input (OLT): id, label, partner_id, olt_type (Huawei MA5800/ZTE C320/Fiberhome AN5516)
-  - Input (Output Splitter): lat, lng, address, capacity (8/16), connected, status (Aktif/Penuh)
-  - Tampil: KPI (total OLT, total splitter, titik tersedia, total pelanggan), pohon interaktif (klik expand/collapse), panel detail node (info, progress bar kapasitas, editor lat/lng dengan placeholder peta), tombol "Tambah Titik" untuk Output Splitter baru
-- **Ketergantungan**: `DB.infrastructure`, `DB.customers` (untuk count pelanggan per node), `renderKPIs`, `openModal`
+  - Input (OLT): id, label, partner_id, olt_type (Huawei MA5800/ZTE C320/Fiberhome AN5516), lat, lng, address
+  - Input (Input Splitter): lat, lng, address, capacity, connected
+  - Input (Output Splitter): lat, lng, address, capacity (2/8/16), connected, status (Aktif/Penuh)
+  - Tampil: KPI (total OLT, total splitter, titik tersedia, total pelanggan), pohon interaktif, panel detail node dengan lat/lng editor, progress bar kapasitas
+- **Ketergantungan**: `DB.infrastructure`, `DB.customers`, `allInputSplitters()`, `allOutputSplitters()`, `findOltNode()`, `renderKPIs`, `Modal`
 - **Status**: Selesai
 - **Catatan Perubahan**:
   - 2026-07-28 — Initial prototype, 3 OLT nodes dengan tree interaktif
+  - 2026-07-28 — Pecah tombol "Tambah Titik" menjadi 3 tombol terpisah. Tambah OLT hanya untuk Super User. Input Splitter menambahkan field lat/lng/address. Output Splitter modal menambahkan selector OLT induk → cascading Input Splitter.
 
 #### Data Perangkat (`infra.perangkat`)
 - **Fungsi**: Menampilkan daftar flat (rata) dari seluruh perangkat dalam topologi infrastruktur — OLT, Input Splitter, dan Output Splitter — dalam satu tabel.
@@ -205,14 +209,15 @@ infra.topologi ──→ infra.perangkat (flatten dari tree)
 | `ICONS` | 31 ikon SVG inline | `app-ui.js` |
 | `fieldsHTML(fields)` | Generator form fields dari config array | `app-modules.js` |
 | `activityTimeline(entries)` | Timeline vertikal aktivitas | `app-modules.js` |
-| `openRegistrationModal()` | Modal registrasi OLU dengan generate CLI script | `app-modules.js` |
+| `openRegistrationModal()` | Modal registrasi ONU dengan generate CLI script (DEPRECATED — diganti `renderRegistrationPage`) | `app-modules.js` |
+| `renderRegistrationPage(root, customer, onDone)` | Halaman penuh registrasi ONU dengan cascading OLT → Input → Output splitter | `app-modules.js` |
 
 ---
 
 ## Catatan Teknis & Batasan Prototype
 
 - **Tidak ada persistensi**: Semua data in-memory di objek `DB` global. Reload browser = reset data. Tombol "Reset data" hanya `location.reload()`.
-- **Tidak ada autentikasi**: User "Super Admin" hardcoded di sidebar footer. Role ada di data tapi tidak ditegakkan (tidak ada role-based access).
+- **Tidak ada autentikasi**: User Super Admin dan Admin Mitra dipilih via dropdown switcher di sidebar. Role ditegakkan via `isSuperUser()` — Admin Mitra tidak bisa mengakses modul Kemitraan dan tidak bisa menambah OLT.
 - **Tidak ada API/backend**: Semua operasi murni client-side.
 - **Tidak ada test**: Tidak ada framework atau file test.
 - **Single-user view**: Tidak ada multi-tenancy atau scoped view per mitra — Super Admin melihat semua data.
@@ -230,3 +235,6 @@ infra.topologi ──→ infra.perangkat (flatten dari tree)
 | Tanggal | Perubahan | Modul Terdampak |
 | :---- | :---- | :---- |
 | 2026-07-28 | Initial prototype — 11 modul, 4 grup navigasi, data dummy lengkap | Semua modul |
+| 2026-07-28 | User switcher dropdown, role-based navigation (Super Admin / Admin Mitra) | `app-ui.js`, `app-main.js`, `app-data.js` |
+| 2026-07-28 | Registrasi ONU dikonversi dari modal ke halaman penuh (hash-based nav) | `customer.registrasi`, `customer.pelanggan` |
+| 2026-07-28 | Topologi: 3 tombol terpisah (OLT/Input/Output), cascading selector pada modal Output Splitter | `infra.topologi` |
