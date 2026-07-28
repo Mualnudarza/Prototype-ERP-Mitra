@@ -38,18 +38,25 @@ const NAV_CONFIG = [
 ];
 
 const ALL_ITEMS = NAV_CONFIG.flatMap(g=>g.items);
+const PARTNERSHIP_KEYS = NAV_CONFIG[0].items.map(i=>i.key);
 const DEFAULT_ROUTE = 'partnership.mitra';
+const DEFAULT_ROUTE_MITRA = 'customer.pelanggan';
+
+function isSuperUser(){ return CURRENT_USER.id === 'super'; }
 
 function currentRoute(){
   const hash = window.location.hash.replace('#','');
-  return ALL_ITEMS.some(i=>i.key===hash) ? hash : DEFAULT_ROUTE;
+  const allowed = isSuperUser() ? ALL_ITEMS : ALL_ITEMS.filter(i=>!PARTNERSHIP_KEYS.includes(i.key));
+  return allowed.some(i=>i.key===hash) ? hash : (isSuperUser() ? DEFAULT_ROUTE : DEFAULT_ROUTE_MITRA);
 }
 
 function navWithBadges(){
-  return NAV_CONFIG.map(group => ({
-    group: group.group,
-    items: group.items.map(item => ({...item, badge: item.badgeFn ? item.badgeFn() : undefined}))
-  }));
+  return NAV_CONFIG
+    .filter(group => isSuperUser() || group.group !== 'Kemitraan')
+    .map(group => ({
+      group: group.group,
+      items: group.items.map(item => ({...item, badge: item.badgeFn ? item.badgeFn() : undefined}))
+    }));
 }
 
 function syncNavBadge(){
@@ -59,6 +66,7 @@ function syncNavBadge(){
 function renderRoute(){
   const key = currentRoute();
   const meta = ALL_ITEMS.find(i=>i.key===key);
+  if(!meta) return;
   document.getElementById('topbarEyebrow').textContent = meta.eyebrow;
   document.getElementById('topbarTitle').textContent = meta.title;
   document.title = `${meta.title} · ERP Mitra — Dasaria`;
@@ -78,7 +86,8 @@ function renderRoute(){
 window.addEventListener('hashchange', renderRoute);
 
 document.addEventListener('DOMContentLoaded', ()=>{
-  if(!window.location.hash) window.location.hash = DEFAULT_ROUTE;
+  const initRoute = isSuperUser() ? DEFAULT_ROUTE : DEFAULT_ROUTE_MITRA;
+  if(!window.location.hash) window.location.hash = initRoute;
   renderRoute();
 
   document.getElementById('menuToggle').addEventListener('click', ()=>{
@@ -89,5 +98,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if(confirm('Reset seluruh data prototipe ke kondisi awal? Perubahan yang belum disimpan akan hilang.')){
       window.location.reload();
     }
+  });
+
+  document.addEventListener('click', (e)=>{
+    const sw = document.getElementById('userSwitcher');
+    if(sw && !sw.contains(e.target)) sw.classList.remove('open');
   });
 });

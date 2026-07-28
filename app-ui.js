@@ -301,11 +301,25 @@ function renderSidebar(navConfig, activeKey){
         </div>`).join('')}
     </div>
     <div class="sidebar-footer">
-      <div class="sidebar-user">
-        <div class="avatar">SA</div>
-        <div class="sidebar-user-text">
-          <strong>Super Admin</strong>
-          <span>admin@dasaria.id</span>
+      <div class="sidebar-user-wrap" id="userSwitcher">
+        <div class="sidebar-user" id="userSwitcherTrigger">
+          <div class="avatar">${CURRENT_USER.initials}</div>
+          <div class="sidebar-user-text">
+            <strong>${CURRENT_USER.name}</strong>
+            <span>${CURRENT_USER.email}</span>
+          </div>
+          <svg class="sidebar-user-caret" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+        </div>
+        <div class="user-dropdown" id="userDropdown">
+          ${USERS.map(u => `
+            <div class="user-dropdown-item ${u.id===CURRENT_USER.id?'active':''}" data-user-id="${u.id}">
+              <div class="avatar">${u.initials}</div>
+              <div class="user-dropdown-info">
+                <strong>${u.name}</strong>
+                <span>${u.email}</span>
+              </div>
+              <span class="user-dropdown-role">${u.role}</span>
+            </div>`).join('')}
         </div>
       </div>
     </div>
@@ -314,6 +328,33 @@ function renderSidebar(navConfig, activeKey){
     el.addEventListener('click', ()=>{
       window.location.hash = el.dataset.nav;
       if(window.innerWidth <= 960) document.getElementById('sidebar').classList.remove('open');
+    });
+  });
+
+  const switcher = document.getElementById('userSwitcher');
+  const trigger = document.getElementById('userSwitcherTrigger');
+  if(trigger){
+    trigger.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      switcher.classList.toggle('open');
+    });
+  }
+  sidebar.querySelectorAll('[data-user-id]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const uid = el.dataset.userId;
+      const user = USERS.find(u=>u.id===uid);
+      if(user && user.id !== CURRENT_USER.id){
+        CURRENT_USER = user;
+        const hash = window.location.hash.replace('#','');
+        const isPartnership = PARTNERSHIP_KEYS.includes(hash);
+        if(user.id==='mitra' && isPartnership){
+          window.location.hash = DEFAULT_ROUTE_MITRA;
+        } else {
+          renderRoute();
+        }
+        toast('Beralih ke: ' + user.name);
+      }
+      switcher.classList.remove('open');
     });
   });
 }

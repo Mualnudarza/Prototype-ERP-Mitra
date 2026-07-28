@@ -39,6 +39,12 @@ const Fmt = {
 let __uid = 1000;
 function nextId(prefix){ __uid += 1; return prefix + '-' + __uid; }
 
+const USERS = [
+  { id:'super', name:'Super Admin', email:'admin@dasaria.id', initials:'SA', role:'Super User', partner_id:null },
+  { id:'mitra', name:'Admin Mitra', email:'mitra@dasaria.id', initials:'AM', role:'Admin User', partner_id:'P-1001' },
+];
+let CURRENT_USER = USERS[0];
+
 const AVATAR_PALETTE = ['#3b5bdb','#0f8f6f','#b25b12','#c22a79','#6d3fc4','#127489','#c62c2c','#52525b'];
 function colorFor(seed){
   let h = 0;
