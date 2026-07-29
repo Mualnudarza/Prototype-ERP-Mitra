@@ -972,17 +972,12 @@ Views['deposit.dashboard'] = function(root){
     const history = DB.depositHistory.filter(d => d.partner_id === partner.id);
     const masuk = history.filter(d => d.type === 'Deposit Masuk' && d.status === 'Berhasil').reduce((s,d)=>s+d.amount, 0);
     const keluar = history.filter(d => d.type === 'Deposit Keluar' && d.status === 'Berhasil').reduce((s,d)=>s+Math.abs(d.amount), 0);
-    const isLow = partner.deposit_balance < partner.cashier_deposit_min;
-    const statusText = isLow ? 'Perlu Top Up' : 'Aman';
-    const statusBg = isLow ? 'var(--badge-red-bg)' : 'var(--badge-green-bg)';
-    const statusFg = isLow ? 'var(--badge-red-fg)' : 'var(--badge-green-fg)';
 
     root.querySelector('#kpiSlot').outerHTML = `<div id="kpiSlot">${renderKPIs([
       {label:'Saldo Deposit Saat Ini', value:Fmt.rupiah(partner.deposit_balance), icon:'wallet', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
       {label:'Total Deposit Masuk', value:Fmt.rupiah(masuk), icon:'plus', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
       {label:'Total Deposit Keluar', value:Fmt.rupiah(keluar), icon:'minus', bg:'var(--badge-orange-bg)', fg:'var(--badge-orange-fg)'},
-      {label:'Total Pembayaran Customer', value:Fmt.rupiah(keluar), icon:'users', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'},
-      {label:'Status Deposit', value:statusText, icon:'bolt', bg:statusBg, fg:statusFg, sub:`Min: ${Fmt.rupiah(partner.cashier_deposit_min)}`}
+      {label:'Total Pembayaran Customer', value:Fmt.rupiah(keluar), icon:'users', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'}
     ])}</div>`;
   }
   kpis();

@@ -98,11 +98,11 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-28 — Initial prototype, 6 paket dummy
 
 #### Dashboard Deposit (`deposit.dashboard`)
-- **Fungsi**: Mengelola saldo deposit kasir mitra, histori transaksi deposit, dan penerimaan pembayaran tunai dari customer. Menampilkan KPI saldo, total deposit masuk/keluar, total pembayaran customer, status deposit (Aman/Perlu Top Up berdasarkan minimal deposit). Terdapat dua submenu tab: Riwayat Deposit dan Pembayaran Customer.
+- **Fungsi**: Mengelola saldo deposit kasir mitra, histori transaksi deposit, dan penerimaan pembayaran tunai dari customer. Menampilkan KPI saldo, total deposit masuk/keluar, total pembayaran customer. Terdapat dua submenu tab: Riwayat Deposit dan Pembayaran Customer.
 - **Lokasi file**: `app-modules.js` (view `deposit.dashboard`), data di `app-data.js` (`DB.partners`, `DB.depositHistory`, `DB.invoices`, `DB.customers`, `DB.packages`, `DB.payments`)
 - **Data yang dibutuhkan**:
   - Input: partner_id (FK), ref, type (Deposit Masuk/Deposit Keluar), date, amount, balance_before, balance_after, note, status
-  - Tampil (KPI): Saldo Deposit, Total Deposit Masuk, Total Deposit Keluar, Total Pembayaran Customer, Status Deposit
+  - Tampil (KPI): Saldo Deposit, Total Deposit Masuk, Total Deposit Keluar, Total Pembayaran Customer
   - Tampil (Riwayat Deposit): DataTable dengan kolom nomor transaksi, jenis transaksi, tanggal, nominal, saldo sebelum/sesudah, keterangan, status
   - Tampil (Pembayaran Customer): Form pilih customer → tampil detail invoice + biaya tambahan (berdasarkan konfigurasi mitra) → konfirmasi bayar tunai → update invoice status Lunas, potong deposit mitra, catat ke depositHistory & payments
 - **Ketergantungan**: `DataTable`, `renderKPIs`, `badge`, `statusBadge`, `Modal`, `toast`, `pushActivity`, `nextId`
