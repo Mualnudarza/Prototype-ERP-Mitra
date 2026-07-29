@@ -117,7 +117,7 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - Input: partner_id, ref, period, tx_count, gross_revenue, total_deduction, net_revenue, bank_account, status, date
   - Tampil (KPI): Gross Revenue, Total Potongan, Net Revenue, Saldo Siap Settlement
   - Tampil (Riwayat Settlement): DataTable dengan kolom nomor settlement, periode, jumlah transaksi, pendapatan kotor, total potongan, pendapatan bersih, rekening tujuan, status, tanggal
-  - Aksi: Ajukan Pencairan Settlement → membuat record DB.settlements, menandai invoice settled=true, catat activity log
+  - Aksi: Ajukan Pencairan Settlement → membuka modal input nominal pencairan (default = saldo maksimal, minimal Rp 1.000). Validasi nominal tidak melebihi saldo tersedia. Konfirmasi: membuat record DB.settlements, jika nominal penuh tandai invoice settled=true.
 - **Ketergantungan**: `DataTable`, `renderKPIs`, `badge`, `statusBadge`, `Modal`, `toast`, `pushActivity`, `nextId`
 - **Status**: Selesai
 - **Catatan Perubahan**:

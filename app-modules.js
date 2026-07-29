@@ -1265,38 +1265,64 @@ Views['settlement.dashboard'] = function(root){
     tableMount.appendChild(card);
   }
 
+  function openSettlementModal(maxAmount, invoices){
+    Modal.open({
+      title:'Ajukan Pencairan Settlement', subtitle:`Saldo tersedia: ${Fmt.rupiah(maxAmount)}`,
+      bodyHTML:`<div class="detail-grid">
+        <div class="detail-item"><span class="dl">Jumlah Transaksi Tersedia</span><span class="dv">${invoices.length} transaksi</span></div>
+        <div class="detail-item"><span class="dl">Saldo Maksimal</span><span class="dv">${Fmt.rupiah(maxAmount)}</span></div>
+        <div class="detail-item" style="grid-column:1/-1;">
+          <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Nominal Pencairan (Rp)</label>
+          <input type="number" id="settleAmount" class="input" style="width:100%;font-size:14px;" value="${maxAmount}" min="1000" max="${maxAmount}" step="1000">
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px;">Minimal Rp 1.000. Maksimal ${Fmt.rupiah(maxAmount)}</div>
+        </div>
+        <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--color-text-secondary);">
+          Rekening tujuan: ${partner.bank_name} - ${partner.bank_account_no} a.n. ${partner.bank_account_name}
+        </div>
+      </div>`,
+      footHTML:`<button class="btn btn-secondary" id="mCloseSettle">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmSettle">${ic('check')} Ajukan Pencairan</button>`,
+      onOpen(b, f){
+        f.querySelector('#mCloseSettle').addEventListener('click', Modal.close);
+        f.querySelector('#mConfirmSettle').addEventListener('click', () => {
+          const amount = parseFloat(f.querySelector('#settleAmount').value) || 0;
+          if(amount <= 0 || amount > maxAmount) {
+            toast('Nominal tidak valid. Minimal Rp 1.000, maksimal ' + Fmt.rupiah(maxAmount));
+            return;
+          }
+          const setRef = 'SET/2026/07/' + String(DB.settlements.length+1).padStart(4,'0');
+          DB.settlements.push({
+            id: nextId('SET'),
+            partner_id: partner.id,
+            ref: setRef,
+            period: 'Juli 2026',
+            tx_count: invoices.length,
+            gross_revenue: gross,
+            total_deduction: total_potongan,
+            net_revenue: amount,
+            bank_account: `${partner.bank_name} - ${partner.bank_account_no}`,
+            status: 'Selesai',
+            date: new Date().toISOString().slice(0,10)
+          });
+          // If full amount, mark all invoices as settled
+          if(amount === maxAmount) {
+            invoices.forEach(inv => { inv.settled = true; });
+          }
+          pushActivity(CURRENT_USER.name, `mengajukan pencairan settlement ${setRef} sebesar ${Fmt.rupiah(amount)}`);
+          toast('Pencairan settlement berhasil diajukan!');
+          renderDashboard();
+          Modal.close();
+        });
+      }
+    });
+  }
+
   root.querySelector('#btnRequestSettlement').addEventListener('click', () => {
     calculateStats();
     if(unsettledInvoices.length === 0) {
       toast('Tidak ada transaksi lunas yang siap dicairkan.');
       return;
     }
-    if(!confirm(`Konfirmasi pencairan settlement untuk ${unsettledInvoices.length} transaksi? Nominal bersih ${Fmt.rupiah(net)} akan ditransfer.`)) {
-      return;
-    }
-
-    const setRef = 'SET/2026/07/' + String(DB.settlements.length+1).padStart(4,'0');
-    DB.settlements.push({
-      id: nextId('SET'),
-      partner_id: partner.id,
-      ref: setRef,
-      period: 'Juli 2026',
-      tx_count: unsettledInvoices.length,
-      gross_revenue: gross,
-      total_deduction: total_potongan,
-      net_revenue: net,
-      bank_account: `${partner.bank_name} - ${partner.bank_account_no}`,
-      status: 'Selesai',
-      date: new Date().toISOString().slice(0,10)
-    });
-
-    unsettledInvoices.forEach(inv => {
-      inv.settled = true;
-    });
-
-    pushActivity(CURRENT_USER.name, `mengajukan pencairan settlement ${setRef} sebesar ${Fmt.rupiah(net)}`);
-    toast('Pencairan settlement berhasil diajukan!');
-    renderDashboard();
+    openSettlementModal(net, unsettledInvoices);
   });
 
   renderDashboard();
