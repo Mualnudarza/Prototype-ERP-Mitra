@@ -1023,128 +1023,67 @@ Views['deposit.dashboard'] = function(root){
   function showPaymentTab(){
     btnTabHistory.classList.remove('active');
     btnTabPayment.classList.add('active');
+
+    const customersWithInvoices = DB.customers
+      .filter(c => c.partner_id === partner.id)
+      .map(c => {
+        const invoice = DB.invoices.find(i => i.customer_id === c.id);
+        const pkg = DB.packages.find(p => p.id === c.package_id);
+        if(!invoice) return null;
+        let extraCharge = 0;
+        if(partner.other_deductions && partner.other_deductions.length > 0){
+          partner.other_deductions.forEach(d => {
+            extraCharge += d.type === 'percentage' ? Math.round(invoice.billing_amount * (d.value / 100)) : d.value;
+          });
+        } else if(invoice.billing_status !== 'Lunas') {
+          extraCharge = 5000;
+        }
+        const totalPayable = invoice.billing_amount + extraCharge;
+        return { customer: c, invoice, pkg, extraCharge, totalPayable, status: invoice.billing_status === 'Lunas' ? 'Lunas' : 'Belum Dibayar' };
+      })
+      .filter(x => x !== null);
+
     tabContent.innerHTML = `
-      <div class="card card-pad" style="max-width:600px;margin:0 auto;">
+      <div class="card card-pad">
         <h3 style="margin-top:0;margin-bottom:16px;">Terima Pembayaran Tunai Customer</h3>
-        <div class="field">
-          <label>Pilih Customer</label>
-          <select class="input" id="payCustomerSelect" style="width:100%;">
-            <option value="">-- Pilih Customer --</option>
-            ${DB.customers.filter(c => c.partner_id === partner.id && DB.invoices.some(i => i.customer_id === c.id && i.billing_status !== 'Lunas')).map(c => `<option value="${c.id}">${c.customer_name} (${c.pppoe_secret})</option>`).join('')}
-          </select>
-        </div>
-        <div id="paymentDetailsSlot" style="margin-top:16px;"></div>
+        <div id="paymentTableSlot"></div>
       </div>
     `;
 
-    const select = tabContent.querySelector('#payCustomerSelect');
-    const detailsSlot = tabContent.querySelector('#paymentDetailsSlot');
+    const tableSlot = tabContent.querySelector('#paymentTableSlot');
 
-    select.addEventListener('change', () => {
-      const custId = select.value;
-      if(!custId) {
-        detailsSlot.innerHTML = '';
-        return;
-      }
-      const customer = DB.customers.find(c => c.id === custId);
-      const invoice = DB.invoices.find(i => i.customer_id === custId && i.billing_status !== 'Lunas');
-      if(!invoice) {
-        detailsSlot.innerHTML = '<div class="empty-state">Tidak ada tagihan aktif untuk customer ini.</div>';
-        return;
-      }
-
-      let extraCharge = 0;
-      let breakdownHTML = '';
-      if(partner.other_deductions && partner.other_deductions.length > 0){
-        partner.other_deductions.forEach(d => {
-          let val = d.type === 'percentage' ? Math.round(invoice.billing_amount * (d.value / 100)) : d.value;
-          extraCharge += val;
-          breakdownHTML += `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;color:var(--color-text-secondary);">
-            <span>${d.name || 'Biaya Tambahan'}</span>
-            <span>+ ${Fmt.rupiah(val)}</span>
-          </div>`;
+    const table = DataTable({
+      rows: () => customersWithInvoices,
+      rowKey: 'invoice.id',
+      searchPlaceholder: 'Cari nama customer, PPPoE, atau paket…',
+      searchFields: ['customer.customer_name', 'customer.pppoe_secret', 'pkg.package_name'],
+      columns: [
+        {key:'customer.customer_name', header:'Nama Customer', sortable:true, render:r=>`<span class="cell-strong">${r.customer.customer_name}</span>`},
+        {key:'customer.pppoe_secret', header:'PPPoE Secret', sortable:true, render:r=>`<span class="cell-mono">${r.customer.pppoe_secret}</span>`},
+        {key:'pkg.package_name', header:'Paket', sortable:true, render:r=>r.pkg ? `${r.pkg.package_name} (${r.pkg.bandwidth})` : '-'},
+        {key:'invoice.billing_period', header:'Periode', sortable:true},
+        {key:'invoice.billing_amount', header:'Nominal Paket', sortable:true, align:'right', render:r=>Fmt.rupiah(r.invoice.billing_amount)},
+        {key:'extraCharge', header:'Biaya Tambahan', align:'right', render:r=>Fmt.rupiah(r.extraCharge)},
+        {key:'totalPayable', header:'Total Bayar', sortable:true, align:'right', render:r=>`<span class="cell-num" style="color:var(--color-accent);font-weight:700;">${Fmt.rupiah(r.totalPayable)}</span>`},
+        {key:'status', header:'Status', sortable:true, render:r=>statusBadge(r.status)},
+        {key:'actions', header:'', align:'right', render:r=> r.status === 'Lunas' 
+          ? `<span class="cell-secondary">Sudah bayar</span>` 
+          : `<button class="btn btn-primary btn-sm act-pay" data-invoice="${r.invoice.id}" data-customer="${r.customer.id}">${ic('check')} Bayar</button>`}
+      ],
+      afterRender(wrap, rows){
+        wrap.querySelectorAll('.act-pay').forEach(btn=>{
+          btn.addEventListener('click', ()=>{
+            const invoiceId = btn.dataset.invoice;
+            const custId = btn.dataset.customer;
+            const row = rows.find(r=>r.invoice.id===invoiceId);
+            if(!row) return;
+            openPaymentModal(row.customer, row.invoice, row.pkg, row.extraCharge, row.totalPayable);
+          });
         });
-      } else {
-        extraCharge = 5000;
-        breakdownHTML += `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;color:var(--color-text-secondary);">
-          <span>Biaya Layanan</span>
-          <span>+ ${Fmt.rupiah(5000)}</span>
-        </div>`;
       }
-
-      const totalPayable = invoice.billing_amount + extraCharge;
-
-      detailsSlot.innerHTML = `
-        <div style="border-top:1px dashed var(--color-border);padding-top:16px;margin-top:16px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;">
-            <span class="muted">Nomor Tagihan</span>
-            <span class="cell-mono font-bold">${invoice.invoice_number}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;">
-            <span class="muted">Paket Layanan</span>
-            <span>${pkgName(customer.package_id)} (${(DB.packages.find(p=>p.id===customer.package_id)||{}).bandwidth||'-'})</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;">
-            <span class="muted">Periode Billing</span>
-            <span>${invoice.billing_period}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;">
-            <span class="muted">Nominal Paket</span>
-            <span>${Fmt.rupiah(invoice.billing_amount)}</span>
-          </div>
-          ${breakdownHTML}
-          <div style="display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--color-border);font-weight:700;font-size:15px;color:var(--color-text-primary);">
-            <span>Total yang Harus Dibayar</span>
-            <span style="color:var(--color-accent);">${Fmt.rupiah(totalPayable)}</span>
-          </div>
-          <div style="margin-top:20px;display:flex;justify-content:flex-end;">
-            <button class="btn btn-primary" id="btnConfirmPayment" style="width:100%;justify-content:center;">${ic('check')} Konfirmasi & Bayar Tunai</button>
-          </div>
-        </div>
-      `;
-
-      detailsSlot.querySelector('#btnConfirmPayment').addEventListener('click', () => {
-        if(partner.deposit_balance < totalPayable) {
-          toast('Saldo deposit tidak mencukupi untuk melakukan pembayaran ini.');
-          return;
-        }
-        if(!confirm(`Konfirmasi pembayaran tunai sebesar ${Fmt.rupiah(totalPayable)}? Saldo deposit mitra akan berkurang.`)) {
-          return;
-        }
-        const oldBalance = partner.deposit_balance;
-        partner.deposit_balance -= totalPayable;
-        invoice.billing_status = 'Lunas';
-        invoice.extra_charge = extraCharge;
-        invoice.total_paid = totalPayable;
-        invoice.settled = false;
-        const depId = nextId('DEP');
-        DB.depositHistory.push({
-          id: depId,
-          partner_id: partner.id,
-          ref: 'DEP/2026/07/' + String(DB.depositHistory.length+1).padStart(4,'0'),
-          type: 'Deposit Keluar',
-          date: new Date().toISOString().slice(0,10),
-          amount: -totalPayable,
-          balance_before: oldBalance,
-          balance_after: partner.deposit_balance,
-          note: `Pembayaran tunai ${customer.customer_name} (${invoice.invoice_number})`,
-          status: 'Berhasil'
-        });
-        DB.payments.push({
-          id: nextId('PAY'),
-          invoice_id: invoice.id,
-          payment_reference: 'CSH-' + Date.now(),
-          virtual_account: 'TUNAI/KASIR',
-          billing_amount: totalPayable,
-          payment_date: new Date().toISOString(),
-          payment_status: 'Berhasil'
-        });
-        pushActivity(CURRENT_USER.name, `menerima pembayaran tunai ${customer.customer_name} sebesar ${Fmt.rupiah(totalPayable)}`);
-        toast('Pembayaran berhasil dikonfirmasi & saldo deposit diperbarui!');
-        kpis();
-        showHistoryTab();
-      });
     });
+    const card = document.createElement('div'); card.className='card'; card.appendChild(table);
+    tableSlot.appendChild(card);
   }
 
   btnTabHistory.addEventListener('click', showHistoryTab);
