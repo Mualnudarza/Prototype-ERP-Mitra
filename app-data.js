@@ -103,17 +103,17 @@ DB.packages = [
 ];
 
 DB.customers = [
-  {id:'CUS-2001', partner_id:'PTR-0001', pppoe_secret:'nn-jkt-00231', radius_username:'nn00231', customer_name:'Andi Wijaya', phone_number:'0813-7788-2201', customer_type:'Reguler', subscribe_date:'2025-01-14', expired_date:'2026-08-14', installation_address:'Jl. Kemang Raya No. 12A, Jakarta Selatan', package_id:'PKG-02', customer_status:'Active', modem_serial_number:'ZTE-887231AA', latitude:-6.2608, longitude:106.8133, olt_port:'OLT-01/PON-03', onu_number:'ONU-0231', access_name:'Access-Kemang-02', access_port:'12', olt_id:'OLT-01', olt_input_id:'SPL-01-IN', olt_output_id:'SPL-01-OUT-B', olt_slot:'3', olt_pon:'1', olt_rx_register:-21.2},
-  {id:'CUS-2002', partner_id:'PTR-0001', pppoe_secret:'nn-jkt-00187', radius_username:'nn00187', customer_name:'Maria Angelina', phone_number:'0857-1122-9034', customer_type:'Reguler', subscribe_date:'2024-11-02', expired_date:'2026-07-30', installation_address:'Jl. Cipete Utara No. 7, Jakarta Selatan', package_id:'PKG-01', customer_status:'Isolir', modem_serial_number:'ZTE-887214BC', latitude:-6.2717, longitude:106.7999, olt_port:'OLT-01/PON-02', onu_number:'ONU-0187', access_name:'Access-Cipete-01', access_port:'05', olt_id:'OLT-01', olt_input_id:'SPL-01-IN', olt_output_id:'SPL-01-OUT-A', olt_slot:'2', olt_pon:'1', olt_rx_register:-22.5},
-  {id:'CUS-2003', partner_id:'PTR-0001', pppoe_secret:'nn-jkt-00305', radius_username:'nn00305', customer_name:'Balai RW 04 Kemang', phone_number:'0812-0000-1111', customer_type:'Fasum', subscribe_date:'2024-06-01', expired_date:'2027-06-01', installation_address:'Balai Warga RW 04, Kemang, Jakarta Selatan', package_id:'PKG-01', customer_status:'Active', modem_serial_number:'ZTE-887299FF', latitude:-6.2630, longitude:106.8150, olt_port:'OLT-01/PON-03', onu_number:'ONU-0305', access_name:'Access-Kemang-02', access_port:'16', olt_id:'OLT-01', olt_input_id:'SPL-01-IN', olt_output_id:'SPL-01-OUT-B', olt_slot:'3', olt_pon:'1', olt_rx_register:-19.8},
-  {id:'CUS-2004', partner_id:'PTR-0001', pppoe_secret:'nn-jkt-00412', radius_username:'nn00412', customer_name:'Robert Simanjuntak', phone_number:'0821-4455-8890', customer_type:'Reguler', subscribe_date:'2025-09-10', expired_date:'2026-06-10', installation_address:'Jl. Fatmawati No. 90, Jakarta Selatan', package_id:'PKG-03', customer_status:'Terminate', modem_serial_number:'ZTE-887302GH', latitude:-6.2921, longitude:106.7970, olt_port:'OLT-02/PON-01', onu_number:'ONU-0412', access_name:'Access-Fatmawati-01', access_port:'02', olt_id:'OLT-02', olt_input_id:'SPL-02-IN', olt_output_id:'SPL-02-OUT-A', olt_slot:'1', olt_pon:'1', olt_rx_register:-20.1},
-  {id:'CUS-2005', partner_id:'PTR-0002', pppoe_secret:'pf-bdg-00088', radius_username:'pf00088', customer_name:'Dewi Lestari', phone_number:'0813-9900-2231', customer_type:'Reguler', subscribe_date:'2025-03-21', expired_date:'2026-08-21', installation_address:'Jl. Dago No. 55, Bandung', package_id:'PKG-05', customer_status:'Active', modem_serial_number:'HW-9982JK', latitude:-6.8951, longitude:107.6134, olt_port:'OLT-05/PON-01', onu_number:'ONU-0088', access_name:'Access-Dago-01', access_port:'09', olt_id:'OLT-05', olt_input_id:'SPL-05-IN', olt_output_id:'SPL-05-OUT-A', olt_slot:'1', olt_pon:'1', olt_rx_register:-18.5},
-  {id:'CUS-2006', partner_id:'PTR-0002', pppoe_secret:'pf-bdg-00120', radius_username:'pf00120', customer_name:'Fajar Ramadhan', phone_number:'0857-6677-1290', customer_type:'Reguler', subscribe_date:'2025-05-30', expired_date:'2026-07-28', installation_address:'Jl. Setiabudi No. 33, Bandung', package_id:'PKG-04', customer_status:'Isolir', modem_serial_number:'HW-9991LM', latitude:-6.8551, longitude:107.5980, olt_port:'OLT-05/PON-02', onu_number:'ONU-0120', access_name:'Access-Setiabudi-01', access_port:'14', olt_id:'OLT-05', olt_input_id:'SPL-05-IN', olt_output_id:'SPL-05-OUT-B', olt_slot:'2', olt_pon:'1', olt_rx_register:-23.1},
-  {id:'CUS-2007', partner_id:'PTR-0004', pppoe_secret:'sb-sby-00551', radius_username:'sb00551', customer_name:'Nadia Kusuma', phone_number:'0812-3300-7788', customer_type:'Reguler', subscribe_date:'2024-12-19', expired_date:'2026-08-05', installation_address:'Jl. Darmo Permai No. 18, Surabaya', package_id:'PKG-06', customer_status:'Active', modem_serial_number:'ZTE-770021QW', latitude:-7.2777, longitude:112.7183, olt_port:'OLT-09/PON-01', onu_number:'ONU-0551', access_name:'Access-Darmo-01', access_port:'03', olt_id:'OLT-09', olt_input_id:'SPL-09-IN', olt_output_id:'SPL-09-OUT-A', olt_slot:'1', olt_pon:'1', olt_rx_register:-19.3},
-  {id:'CUS-2008', partner_id:'PTR-0004', pppoe_secret:'sb-sby-00602', radius_username:'sb00602', customer_name:'Panti Asuhan Kasih Bunda', phone_number:'0812-0000-2222', customer_type:'Fasum', subscribe_date:'2024-02-14', expired_date:'2027-02-14', installation_address:'Jl. Kertajaya No. 200, Surabaya', package_id:'PKG-06', customer_status:'Active', modem_serial_number:'ZTE-770099RT', latitude:-7.2704, longitude:112.7772, olt_port:'OLT-09/PON-02', onu_number:'ONU-0602', access_name:'Access-Kertajaya-01', access_port:'11', olt_id:'OLT-09', olt_input_id:'SPL-09-IN', olt_output_id:'SPL-09-OUT-B', olt_slot:'2', olt_pon:'1', olt_rx_register:-21.7},
+  {id:'CUS-2001', partner_id:'PTR-0001', pppoe_secret:'nn-jkt-00231', radius_username:'nn00231', customer_name:'Andi Wijaya', phone_number:'0813-7788-2201', customer_type:'Reguler', subscribe_date:'2025-01-14', expired_date:'2026-08-14', installation_address:'Jl. Kemang Raya No. 12A, Jakarta Selatan', package_id:'PKG-02', customer_status:'Active', modem_serial_number:'ZTE-887231AA', latitude:-6.2608, longitude:106.8133, olt_port:'OLT-01/ODP-1', onu_number:'ONU-0231', access_name:'ODP 1:8 — Kemang Raya A', access_port:'12', olt_id:'OLT-01', olt_odp_id:'SPL-01-OUT-A', olt_slot:'1', olt_pon:'1', olt_rx_register:-21.2},
+  {id:'CUS-2002', partner_id:'PTR-0001', pppoe_secret:'nn-jkt-00187', radius_username:'nn00187', customer_name:'Maria Angelina', phone_number:'0857-1122-9034', customer_type:'Reguler', subscribe_date:'2024-11-02', expired_date:'2026-07-30', installation_address:'Jl. Cipete Utara No. 7, Jakarta Selatan', package_id:'PKG-01', customer_status:'Isolir', modem_serial_number:'ZTE-887214BC', latitude:-6.2717, longitude:106.7999, olt_port:'OLT-01/ODP-2', onu_number:'ONU-0187', access_name:'ODP 1:16 — Cipete Utara B', access_port:'05', olt_id:'OLT-01', olt_odp_id:'SPL-01-OUT-B', olt_slot:'2', olt_pon:'1', olt_rx_register:-22.5},
+  {id:'CUS-2003', partner_id:'PTR-0001', pppoe_secret:'nn-jkt-00305', radius_username:'nn00305', customer_name:'Balai RW 04 Kemang', phone_number:'0812-0000-1111', customer_type:'Fasum', subscribe_date:'2024-06-01', expired_date:'2027-06-01', installation_address:'Balai Warga RW 04, Kemang, Jakarta Selatan', package_id:'PKG-01', customer_status:'Active', modem_serial_number:'ZTE-887299FF', latitude:-6.2630, longitude:106.8150, olt_port:'OLT-01/ODP-3', onu_number:'ONU-0305', access_name:'ODP 1:8 — Kemang Raya A', access_port:'16', olt_id:'OLT-01', olt_odp_id:'SPL-01-OUT-A', olt_slot:'3', olt_pon:'1', olt_rx_register:-19.8},
+  {id:'CUS-2004', partner_id:'PTR-0001', pppoe_secret:'nn-jkt-00412', radius_username:'nn00412', customer_name:'Robert Simanjuntak', phone_number:'0821-4455-8890', customer_type:'Reguler', subscribe_date:'2025-09-10', expired_date:'2026-06-10', installation_address:'Jl. Fatmawati No. 90, Jakarta Selatan', package_id:'PKG-03', customer_status:'Terminate', modem_serial_number:'ZTE-887302GH', latitude:-6.2921, longitude:106.7970, olt_port:'OLT-02/ODP-1', onu_number:'ONU-0412', access_name:'ODP 1:8 — Fatmawati C', access_port:'02', olt_id:'OLT-02', olt_odp_id:'SPL-02-OUT-A', olt_slot:'1', olt_pon:'1', olt_rx_register:-20.1},
+  {id:'CUS-2005', partner_id:'PTR-0002', pppoe_secret:'pf-bdg-00088', radius_username:'pf00088', customer_name:'Dewi Lestari', phone_number:'0813-9900-2231', customer_type:'Reguler', subscribe_date:'2025-03-21', expired_date:'2026-08-21', installation_address:'Jl. Dago No. 55, Bandung', package_id:'PKG-05', customer_status:'Active', modem_serial_number:'HW-9982JK', latitude:-6.8951, longitude:107.6134, olt_port:'OLT-05/ODP-1', onu_number:'ONU-0088', access_name:'ODP 1:16 — Dago Atas', access_port:'09', olt_id:'OLT-05', olt_odp_id:'SPL-05-OUT-A', olt_slot:'1', olt_pon:'1', olt_rx_register:-18.5},
+  {id:'CUS-2006', partner_id:'PTR-0002', pppoe_secret:'pf-bdg-00120', radius_username:'pf00120', customer_name:'Fajar Ramadhan', phone_number:'0857-6677-1290', customer_type:'Reguler', subscribe_date:'2025-05-30', expired_date:'2026-07-28', installation_address:'Jl. Setiabudi No. 33, Bandung', package_id:'PKG-04', customer_status:'Isolir', modem_serial_number:'HW-9991LM', latitude:-6.8551, longitude:107.5980, olt_port:'OLT-05/ODP-2', onu_number:'ONU-0120', access_name:'ODP 1:8 — Setiabudi', access_port:'14', olt_id:'OLT-05', olt_odp_id:'SPL-05-OUT-B', olt_slot:'2', olt_pon:'1', olt_rx_register:-23.1},
+  {id:'CUS-2007', partner_id:'PTR-0004', pppoe_secret:'sb-sby-00551', radius_username:'sb00551', customer_name:'Nadia Kusuma', phone_number:'0812-3300-7788', customer_type:'Reguler', subscribe_date:'2024-12-19', expired_date:'2026-08-05', installation_address:'Jl. Darmo Permai No. 18, Surabaya', package_id:'PKG-06', customer_status:'Active', modem_serial_number:'ZTE-770021QW', latitude:-7.2777, longitude:112.7183, olt_port:'OLT-09/ODP-1', onu_number:'ONU-0551', access_name:'ODP 1:8 — Darmo Permai', access_port:'03', olt_id:'OLT-09', olt_odp_id:'SPL-09-OUT-A', olt_slot:'1', olt_pon:'1', olt_rx_register:-19.3},
+  {id:'CUS-2008', partner_id:'PTR-0004', pppoe_secret:'sb-sby-00602', radius_username:'sb00602', customer_name:'Panti Asuhan Kasih Bunda', phone_number:'0812-0000-2222', customer_type:'Fasum', subscribe_date:'2024-02-14', expired_date:'2027-02-14', installation_address:'Jl. Kertajaya No. 200, Surabaya', package_id:'PKG-06', customer_status:'Active', modem_serial_number:'ZTE-770099RT', latitude:-7.2704, longitude:112.7772, olt_port:'OLT-09/ODP-2', onu_number:'ONU-0602', access_name:'ODP 1:16 — Kertajaya', access_port:'11', olt_id:'OLT-09', olt_odp_id:'SPL-09-OUT-B', olt_slot:'2', olt_pon:'1', olt_rx_register:-21.7},
   /* Pelanggan baru — belum diregistrasi ke OLT, menunggu di antrian Registrasi Pelanggan */
-  {id:'CUS-2009', partner_id:'PTR-0001', pppoe_secret:'nn-jkt-00489', radius_username:'nn00489', customer_name:'Yoga Ramadhan', phone_number:'0812-5566-7788', customer_type:'Reguler', subscribe_date:'2026-07-24', expired_date:'2026-08-24', installation_address:'Jl. Kemang Selatan No. 30, Jakarta Selatan', package_id:'PKG-02', customer_status:'Unregistered', modem_serial_number:'', latitude:-6.2650, longitude:106.8110, olt_port:'', onu_number:'', access_name:'', access_port:'', olt_id:null, olt_input_id:null, olt_output_id:null, olt_slot:null, olt_pon:null, olt_rx_register:null},
-  {id:'CUS-2010', partner_id:'PTR-0002', pppoe_secret:'pf-bdg-00201', radius_username:'pf00201', customer_name:'Nurul Fadhila', phone_number:'0857-3344-5566', customer_type:'Reguler', subscribe_date:'2026-07-25', expired_date:'2026-08-25', installation_address:'Jl. Ir. H. Juanda No. 60, Bandung', package_id:'PKG-04', customer_status:'Unregistered', modem_serial_number:'', latitude:-6.8930, longitude:107.6090, olt_port:'', onu_number:'', access_name:'', access_port:'', olt_id:null, olt_input_id:null, olt_output_id:null, olt_slot:null, olt_pon:null, olt_rx_register:null},
+  {id:'CUS-2009', partner_id:'PTR-0001', pppoe_secret:'nn-jkt-00489', radius_username:'nn00489', customer_name:'Yoga Ramadhan', phone_number:'0812-5566-7788', customer_type:'Reguler', subscribe_date:'2026-07-24', expired_date:'2026-08-24', installation_address:'Jl. Kemang Selatan No. 30, Jakarta Selatan', package_id:'PKG-02', customer_status:'Unregistered', modem_serial_number:'', latitude:-6.2650, longitude:106.8110, olt_port:'', onu_number:'', access_name:'', access_port:'', olt_id:null, olt_odp_id:null, olt_slot:null, olt_pon:null, olt_rx_register:null},
+  {id:'CUS-2010', partner_id:'PTR-0002', pppoe_secret:'pf-bdg-00201', radius_username:'pf00201', customer_name:'Nurul Fadhila', phone_number:'0857-3344-5566', customer_type:'Reguler', subscribe_date:'2026-07-25', expired_date:'2026-08-25', installation_address:'Jl. Ir. H. Juanda No. 60, Bandung', package_id:'PKG-04', customer_status:'Unregistered', modem_serial_number:'', latitude:-6.8930, longitude:107.6090, olt_port:'', onu_number:'', access_name:'', access_port:'', olt_id:null, olt_odp_id:null, olt_slot:null, olt_pon:null, olt_rx_register:null},
 ];
 
 /* ---------------------------------------------------------------------- */
@@ -176,16 +176,16 @@ DB.infrastructure = [
     id:'OLT-01', type:'olt', label:'OLT-01 · Kemang Sudirman', partner_id:'PTR-0001', olt_type:'Huawei MA5800', address:'Gedung Sentral Komunikasi, Jl. Sudirman Kav. 52, Jakarta Selatan', lat:-6.2297, lng:106.8196,
     children:[
       {
-        id:'SPL-01-IN', type:'input', label:'Input Splitter 1:2 — SPL-01-IN', olt:'OLT-01', capacity:2, connected:2, address:'Jl. Kemang Raya No. 1, Jakarta Selatan', lat:-6.2608, lng:106.8133,
+        id:'SPL-01-IN', type:'input', label:'Input Splitter 1:2 — SPL-01-IN', olt:'OLT-01', capacity:2, connected:2, isOdp:false, address:'Jl. Kemang Raya No. 1, Jakarta Selatan', lat:-6.2608, lng:106.8133,
         children:[
-          {id:'SPL-01-OUT-A', type:'output', label:'Output Splitter 1:8 — Kemang Raya A', lat:-6.2608, lng:106.8133, address:'Jl. Kemang Raya No. 12, Jakarta Selatan', capacity:8, connected:6, status:'Aktif'},
-          {id:'SPL-01-OUT-B', type:'output', label:'Output Splitter 1:16 — Cipete Utara B', lat:-6.2717, lng:106.7999, address:'Jl. Cipete Utara No. 5, Jakarta Selatan', capacity:16, connected:11, status:'Aktif'},
+          {id:'SPL-01-OUT-A', type:'output', label:'ODP 1:8 — Kemang Raya A', isOdp:true, lat:-6.2608, lng:106.8133, address:'Jl. Kemang Raya No. 12, Jakarta Selatan', capacity:8, connected:6, status:'Aktif'},
+          {id:'SPL-01-OUT-B', type:'output', label:'ODP 1:16 — Cipete Utara B', isOdp:true, lat:-6.2717, lng:106.7999, address:'Jl. Cipete Utara No. 5, Jakarta Selatan', capacity:16, connected:11, status:'Aktif'},
         ]
       },
       {
-        id:'SPL-02-IN', type:'input', label:'Input Splitter 1:8 — SPL-02-IN', olt:'OLT-01', capacity:8, connected:3, address:'Jl. Fatmawati No. 50, Jakarta Selatan', lat:-6.2921, lng:106.7970,
+        id:'SPL-02-IN', type:'input', label:'Input Splitter 1:8 — SPL-02-IN', olt:'OLT-01', capacity:8, connected:3, isOdp:false, address:'Jl. Fatmawati No. 50, Jakarta Selatan', lat:-6.2921, lng:106.7970,
         children:[
-          {id:'SPL-02-OUT-A', type:'output', label:'Output Splitter 1:8 — Fatmawati C', lat:-6.2921, lng:106.7970, address:'Jl. Fatmawati No. 88, Jakarta Selatan', capacity:8, connected:3, status:'Aktif'},
+          {id:'SPL-02-OUT-A', type:'output', label:'ODP 1:8 — Fatmawati C', isOdp:true, lat:-6.2921, lng:106.7970, address:'Jl. Fatmawati No. 88, Jakarta Selatan', capacity:8, connected:3, status:'Aktif'},
         ]
       }
     ]
@@ -194,10 +194,10 @@ DB.infrastructure = [
     id:'OLT-05', type:'olt', label:'OLT-05 · Dago Bandung', partner_id:'PTR-0002', olt_type:'ZTE C320', address:'Gedung Telkom Regional II, Jl. Dago No. 100, Bandung', lat:-6.8851, lng:107.6134,
     children:[
       {
-        id:'SPL-05-IN', type:'input', label:'Input Splitter 1:2 — SPL-05-IN', olt:'OLT-05', capacity:2, connected:2, address:'Jl. Dago Atas No. 10, Bandung', lat:-6.8551, lng:107.6134,
+        id:'SPL-05-IN', type:'input', label:'Input Splitter 1:2 — SPL-05-IN', olt:'OLT-05', capacity:2, connected:2, isOdp:false, address:'Jl. Dago Atas No. 10, Bandung', lat:-6.8551, lng:107.6134,
         children:[
-          {id:'SPL-05-OUT-A', type:'output', label:'Output Splitter 1:16 — Dago Atas', lat:-6.8551, lng:107.6134, address:'Jl. Dago Atas No. 20, Bandung', capacity:16, connected:14, status:'Aktif'},
-          {id:'SPL-05-OUT-B', type:'output', label:'Output Splitter 1:8 — Setiabudi', lat:-6.8551, lng:107.5980, address:'Jl. Setiabudi No. 40, Bandung', capacity:8, connected:8, status:'Penuh'},
+          {id:'SPL-05-OUT-A', type:'output', label:'ODP 1:16 — Dago Atas', isOdp:true, lat:-6.8551, lng:107.6134, address:'Jl. Dago Atas No. 20, Bandung', capacity:16, connected:14, status:'Aktif'},
+          {id:'SPL-05-OUT-B', type:'output', label:'ODP 1:8 — Setiabudi', isOdp:true, lat:-6.8551, lng:107.5980, address:'Jl. Setiabudi No. 40, Bandung', capacity:8, connected:8, status:'Penuh'},
         ]
       }
     ]
@@ -206,10 +206,10 @@ DB.infrastructure = [
     id:'OLT-09', type:'olt', label:'OLT-09 · Darmo Surabaya', partner_id:'PTR-0004', olt_type:'Fiberhome AN5516', address:'Gedung Telkom Jatim, Jl. Darmo No. 80, Surabaya', lat:-7.2777, lng:112.7183,
     children:[
       {
-        id:'SPL-09-IN', type:'input', label:'Input Splitter 1:2 — SPL-09-IN', olt:'OLT-09', capacity:2, connected:2, address:'Jl. Darmo Permai No. 10, Surabaya', lat:-7.2777, lng:112.7183,
+        id:'SPL-09-IN', type:'input', label:'Input Splitter 1:2 — SPL-09-IN', olt:'OLT-09', capacity:2, connected:2, isOdp:false, address:'Jl. Darmo Permai No. 10, Surabaya', lat:-7.2777, lng:112.7183,
         children:[
-          {id:'SPL-09-OUT-A', type:'output', label:'Output Splitter 1:8 — Darmo Permai', lat:-7.2777, lng:112.7183, address:'Jl. Darmo Permai No. 18, Surabaya', capacity:8, connected:5, status:'Aktif'},
-          {id:'SPL-09-OUT-B', type:'output', label:'Output Splitter 1:16 — Kertajaya', lat:-7.2704, lng:112.7772, address:'Jl. Kertajaya No. 200, Surabaya', capacity:16, connected:9, status:'Aktif'},
+          {id:'SPL-09-OUT-A', type:'output', label:'ODP 1:8 — Darmo Permai', isOdp:true, lat:-7.2777, lng:112.7183, address:'Jl. Darmo Permai No. 18, Surabaya', capacity:8, connected:5, status:'Aktif'},
+          {id:'SPL-09-OUT-B', type:'output', label:'ODP 1:16 — Kertajaya', isOdp:true, lat:-7.2704, lng:112.7772, address:'Jl. Kertajaya No. 200, Surabaya', capacity:16, connected:9, status:'Aktif'},
         ]
       }
     ]
@@ -272,7 +272,7 @@ function findOltNode(id){
 function allInputSplitters(oltId){
   const olt = findOltNode(oltId);
   if(!olt) return [];
-  return (olt.children||[]).map(c=>({id:c.id, label:c.label, olt_id:oltId}));
+  return (olt.children||[]).map(c=>({id:c.id, label:c.label, olt_id:oltId, isOdp:c.isOdp}));
 }
 function allOutputSplitters(oltId, inputId){
   const olt = findOltNode(oltId);
@@ -290,4 +290,27 @@ function findOutputSplitter(oltId, inputId, outputId){
   const inp = findInputSplitter(oltId, inputId);
   if(!inp) return null;
   return (inp.children||[]).find(c=>c.id===outputId) || null;
+}
+function allOdps(){
+  const results = [];
+  DB.infrastructure.forEach(olt => {
+    (olt.children||[]).forEach(inp => {
+      (inp.children||[]).forEach(out => {
+        if(out.isOdp) results.push({...out, oltId: olt.id, oltLabel: olt.label, parentLabel: inp.label});
+      });
+      if(inp.isOdp) results.push({...inp, oltId: olt.id, oltLabel: olt.label});
+    });
+  });
+  return results;
+}
+function findOdpNode(id){
+  for(const olt of DB.infrastructure){
+    for(const inp of (olt.children||[])){
+      for(const out of (inp.children||[])){
+        if(out.id === id) return {node:out, oltId:olt.id, parentId:inp.id, type:'output'};
+      }
+      if(inp.id === id && inp.isOdp) return {node:inp, oltId:olt.id, parentId:null, type:'input'};
+    }
+  }
+  return null;
 }
