@@ -1020,6 +1020,71 @@ Views['deposit.dashboard'] = function(root){
     tabContent.appendChild(card);
   }
 
+  function openPaymentModal(customer, invoice, pkg, extraCharge, totalPayable){
+    const breakdownHTML = extraCharge > 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;color:var(--color-text-secondary);">
+          <span>Biaya Tambahan</span>
+          <span>+ ${Fmt.rupiah(extraCharge)}</span>
+        </div>` : '';
+    Modal.open({
+      title:'Konfirmasi Pembayaran Tunai', subtitle:customer.customer_name,
+      bodyHTML:`<div class="detail-grid">
+        <div class="detail-item"><span class="dl">Nomor Tagihan</span><span class="dv cell-mono font-bold">${invoice.invoice_number}</span></div>
+        <div class="detail-item"><span class="dl">Paket Layanan</span><span class="dv">${pkg ? pkg.package_name + ' (' + pkg.bandwidth + ')' : '-'}</span></div>
+        <div class="detail-item"><span class="dl">Periode Billing</span><span class="dv">${invoice.billing_period}</span></div>
+        <div class="detail-item"><span class="dl">Nominal Paket</span><span class="dv">${Fmt.rupiah(invoice.billing_amount)}</span></div>
+        ${breakdownHTML}
+        <div class="detail-item" style="display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--color-border);font-weight:700;font-size:15px;color:var(--color-text-primary);">
+          <span>Total yang Harus Dibayar</span>
+          <span style="color:var(--color-accent);">${Fmt.rupiah(totalPayable)}</span>
+        </div>
+        <div class="detail-item" style="font-size:12px;color:var(--color-text-secondary);margin-top:8px;">Saldo deposit mitra saat ini: ${Fmt.rupiah(partner.deposit_balance)}</div>
+      </div>`,
+      footHTML:`<button class="btn btn-secondary" id="mClosePay">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmPay">${ic('check')} Konfirmasi Bayar</button>`,
+      onOpen(b, f){
+        f.querySelector('#mClosePay').addEventListener('click', Modal.close);
+        f.querySelector('#mConfirmPay').addEventListener('click', () => {
+          if(partner.deposit_balance < totalPayable) {
+            toast('Saldo deposit tidak mencukupi untuk melakukan pembayaran ini.');
+            return;
+          }
+          const oldBalance = partner.deposit_balance;
+          partner.deposit_balance -= totalPayable;
+          invoice.billing_status = 'Lunas';
+          invoice.extra_charge = extraCharge;
+          invoice.total_paid = totalPayable;
+          invoice.settled = false;
+          const depId = nextId('DEP');
+          DB.depositHistory.push({
+            id: depId,
+            partner_id: partner.id,
+            ref: 'DEP/2026/07/' + String(DB.depositHistory.length+1).padStart(4,'0'),
+            type: 'Deposit Keluar',
+            date: new Date().toISOString().slice(0,10),
+            amount: -totalPayable,
+            balance_before: oldBalance,
+            balance_after: partner.deposit_balance,
+            note: `Pembayaran tunai ${customer.customer_name} (${invoice.invoice_number})`,
+            status: 'Berhasil'
+          });
+          DB.payments.push({
+            id: nextId('PAY'),
+            invoice_id: invoice.id,
+            payment_reference: 'CSH-' + Date.now(),
+            virtual_account: 'TUNAI/KASIR',
+            billing_amount: totalPayable,
+            payment_date: new Date().toISOString(),
+            payment_status: 'Berhasil'
+          });
+          pushActivity(CURRENT_USER.name, `menerima pembayaran tunai ${customer.customer_name} sebesar ${Fmt.rupiah(totalPayable)}`);
+          toast('Pembayaran berhasil dikonfirmasi & saldo deposit diperbarui!');
+          kpis();
+          showHistoryTab();
+          Modal.close();
+        });
+      }
+    });
+  }
+
   function showPaymentTab(){
     btnTabHistory.classList.remove('active');
     btnTabPayment.classList.add('active');
