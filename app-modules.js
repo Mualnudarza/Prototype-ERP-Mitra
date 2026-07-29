@@ -1216,6 +1216,7 @@ Views['settlement.dashboard'] = function(root){
     ]);
 
     tableMount.innerHTML = '';
+  }
 
   root.querySelector('#btnRequestSettlement').addEventListener('click', () => {
     calculateStats();
