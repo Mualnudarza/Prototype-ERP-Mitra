@@ -11,22 +11,24 @@
 
 ## Ringkasan
 
-Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cakupan yang ada: pengelolaan kemitraan (mitra, pengguna, pendapatan), manajemen pelanggan (data, registrasi ONU, paket layanan), billing & settlement, monitoring payment gateway, monitoring radius & control gateway, dan infrastruktur jaringan (topologi OLT/splitter). Semua data dummy/in-memory — reload browser menghapus semua perubahan. Tidak ada backend, autentikasi, atau integrasi API.
+Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cakupan yang ada: pengelolaan kemitraan (mitra — tambah/edit oleh Super User, pengguna, pendapatan), manajemen pelanggan (data, registrasi ONU, paket layanan), billing & settlement, monitoring payment gateway, monitoring radius & control gateway, dan infrastruktur jaringan (topologi OLT/splitter). Semua data dummy/in-memory — reload browser menghapus semua perubahan. Tidak ada backend, autentikasi, atau integrasi API.
 
 ---
 
 ## Daftar Modul
 
 #### Data Mitra (`partnership.mitra`)
-- **Fungsi**: Menampilkan daftar mitra dengan KPI dan filter. Hanya diakses oleh Super User (read-only — tidak ada tombol Tambah/Edit).
-- **Lokasi file**: `app-modules.js` (list view), data di `app-data.js` (`DB.partners`)
+- **Fungsi**: Mengelola data mitra — menampilkan daftar mitra dengan KPI dan filter, serta form tambah/edit mitra (halaman penuh via hash `#partnership.mitra?id=add` atau `#partnership.mitra?id={partner_id}`). Hanya diakses oleh Super User.
+- **Lokasi file**: `app-modules.js:54-237` (form `renderMitraForm`), `app-modules.js:239-305` (list view), data di `app-data.js` (`DB.partners`)
 - **Data yang dibutuhkan**:
-  - Input: partner_code, partner_name, company_name, pic_name, phone_number, email, status, cooperation_name, cooperation_doc_no, cooperation_start, cooperation_end, cooperation_doc_file, npwp_nib, bank_name, bank_account_no, bank_account_name, payment_due_type, payment_due_value
-  - Tampil: KPI grid, DataTable dengan kolom kode, nama mitra, nama perusahaan, wilayah, jumlah pengguna, status.
-- **Ketergantungan**: `DataTable`, `renderKPIs`
+  - Input: partner_code, partner_name, company_name, pic_name, phone_number, email, status, cooperation_name, cooperation_doc_no, cooperation_start, cooperation_end, cooperation_doc_file, npwp_nib, bank_name, bank_account_no, bank_account_name, payment_due_type, payment_due_value, cashier_deposit_min, cashier_deposit_initial, kso_value, kso_type (percentage/nominal), other_deductions (array of {name, value, type})
+  - Tampil (list): KPI grid, DataTable dengan kolom kode, nama mitra, perusahaan, wilayah, jumlah pengguna, status, tombol Edit (Super User).
+  - Tampil (form): Informasi Mitra, Kerja Sama B2B, Konfigurasi Keuangan (Jatuh Tempo, Settlement/Rekening, Deposit Kasir, Potongan KSO & Lainnya)
+- **Ketergantungan**: `DataTable`, `renderKPIs`, `fieldsHTML`, `renderMitraForm`
 - **Status**: Selesai
 - **Catatan Perubahan**:
   - 2026-07-28 — Initial prototype, 6 mitra dummy data
+  - 2026-07-29 — Tambah tombol "Tambah Mitra" (toolbar) dan "Edit" per baris, khusus Super User. Form mitra diperluas: gabung Rekening Settlement + Jatuh Tempo jadi "Konfigurasi Keuangan". Tambah sub-bagian Deposit Kasir (minimal + nominal awal) dan Potongan (KSO + daftar potongan lainnya, masing-masing bisa persentase/nominal).
 
 #### Manajemen Pengguna (`partnership.pengguna`)
 - **Fungsi**: Menampilkan daftar akun pengguna per mitra. Hanya diakses oleh Super User (read-only — tidak ada tombol Tambah/Edit/Reset).
@@ -185,7 +187,7 @@ infra.topologi ──→ customer.registrasi (OLT nodes untuk registrasi)
 
 | Entitas | Field Kunci | Dipakai di Modul |
 | :---- | :---- | :---- |
-| Partner | id, partner_code, partner_name, company_name, operational_area, status | Data Mitra, Manajemen Pengguna, Dashboard Pendapatan, Data Pelanggan, Paket Layanan, Radius Monitoring |
+| Partner | id, partner_code, partner_name, company_name, operational_area, status, bank_name, bank_account_no, bank_account_name, payment_due_type, payment_due_value, cashier_deposit_min, cashier_deposit_initial, kso_value, kso_type, other_deductions[] | Data Mitra, Manajemen Pengguna, Dashboard Pendapatan, Data Pelanggan, Paket Layanan, Radius Monitoring |
 | User | id, partner_id, user_name, username, role_name, user_status | Manajemen Pengguna |
 | Customer | id, partner_id, pppoe_secret, radius_username, customer_name, package_id, customer_status, olt_odp_id, olt_port, onu_number | Data Pelanggan, Registrasi, Billing, Payment Gateway, Radius Monitoring |
 | Package | id, partner_id, package_name, bandwidth, price, status | Paket Layanan, Data Pelanggan (lookup), Radius Monitoring (lookup) |
@@ -220,7 +222,7 @@ infra.topologi ──→ customer.registrasi (OLT nodes untuk registrasi)
 ## Catatan Teknis & Batasan Prototype
 
 - **Tidak ada persistensi**: Semua data in-memory di objek `DB` global. Reload browser = reset data. Tombol "Reset data" hanya `location.reload()`.
-- **Tidak ada autentikasi**: User Super Admin dan Admin Mitra dipilih via dropdown switcher di sidebar. Role ditegakkan via `isSuperUser()` — Super User hanya melihat modul Kemitraan (read-only). Admin Mitra melihat semua modul non-Kemitraan termasuk kelola infrastruktur (tambah/edit/hapus semua tipe node).
+- **Tidak ada autentikasi**: User Super Admin dan Admin Mitra dipilih via dropdown switcher di sidebar. Role ditegakkan via `isSuperUser()` — Super User hanya melihat modul Kemitraan (tambah/edit mitra, lihat pengguna & pendapatan). Admin Mitra melihat semua modul non-Kemitraan termasuk kelola infrastruktur (tambah/edit/hapus semua tipe node).
 - **Tidak ada API/backend**: Semua operasi murni client-side.
 - **Tidak ada test**: Tidak ada framework atau file test.
 - **Single-user view**: Tidak ada multi-tenancy atau scoped view per mitra — Super Admin melihat semua data.
@@ -244,3 +246,4 @@ infra.topologi ──→ customer.registrasi (OLT nodes untuk registrasi)
 | 2026-07-29 | Role swap navigasi — Super User hanya melihat Kemitraan (read-only), Admin User melihat non-Kemitraan + kelola infrastruktur penuh. Form mitra dikonversi dari modal ke full page. | `app-main.js`, `app-modules.js` |
 | 2026-07-29 | Konsep ODP: toggle ODP pada add/edit splitter, badge ODP di tree & panel, Input ODP tidak bisa ditambah Output. Registrasi pelanggan sederhana: Port ODP + ONU Pelanggan (hapus cascading OLT/Input/Output). | `app-data.js`, `app-modules.js`, `erp-mitra-prototype.html` |
 | 2026-07-29 | Radius & Control Gateway: overhaul tabel ke 10 kolom ERP Griya (Nama, PPPoE, No ONU, Status Berlangganan, Start Subscribe, ODP, Port Access, OLT RX Regist, OLT RX Now, Status OLT). Tambah olt_rx_now, olt_status di DB.radius. Rename modul dari "Radius & Status". Hapus Data Perangkat (`infra.perangkat`, `flattenInfra`, NAV_CONFIG entry). Perbaiki field registrasi: pisahkan No. ONU (text) dan Port Pelanggan (dropdown). | `app-data.js`, `app-modules.js`, `app-main.js`, `PRD.md` |
+| 2026-07-29 | Data Mitra: tambah tombol "Tambah Mitra" (toolbar) dan "Edit" per baris, khusus Super User. Form mitra diperluas: gabung Rekening Settlement + Jatuh Tempo jadi "Konfigurasi Keuangan" dengan 4 sub-bagian (Jatuh Tempo, Settlement, Deposit Kasir, Potongan KSO + Lainnya). | `app-data.js`, `app-modules.js`, `PRD.md` |

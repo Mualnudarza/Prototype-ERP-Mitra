@@ -101,14 +101,9 @@ function renderMitraForm(root, existing){
       ]))}
       ${fieldsHTML([{label:'Dokumen Kerja Sama', id:'f_coop_file', value:existing?.cooperation_doc_file, placeholder:'Nama file (contoh: PKS_NetIndo.pdf)'}])}
 
-      <div class="section-head" style="padding:20px 0 14px 0;"><h3>Rekening Settlement</h3></div>
-      ${rowWrap(fieldsHTML([
-        {label:'Nama Bank', id:'f_bank', value:existing?.bank_name, placeholder:'Bank Mandiri'},
-        {label:'Nomor Rekening', id:'f_acc_no', value:existing?.bank_account_no, placeholder:'1230007890123'},
-      ]))}
-      ${fieldsHTML([{label:'Nama Pemilik Rekening', id:'f_acc_name', value:existing?.bank_account_name, placeholder:'Sesuai nama rekening'}])}
+      <div class="section-head" style="padding:20px 0 14px 0;"><h3>Konfigurasi Keuangan</h3></div>
 
-      <div class="section-head" style="padding:20px 0 14px 0;"><h3>Konfigurasi Jatuh Tempo</h3></div>
+      <div style="padding:0 0 10px 0;font-size:12.5px;font-weight:600;color:var(--color-text-secondary);">Konfigurasi Jatuh Tempo</div>
       ${rowWrap(fieldsHTML([
         {label:'Tipe Jatuh Tempo', id:'f_due_type', type:'select', value:existing?.payment_due_type||'Tanggal Tetap', options:[
           {value:'Tanggal Tetap',label:'Tanggal Tetap'},
@@ -117,6 +112,41 @@ function renderMitraForm(root, existing){
         ]},
         {label:'Nilai', id:'f_due_value', value:existing?.payment_due_value, placeholder:'Tanggal (1-28) atau jumlah hari'},
       ]))}
+
+      <div style="padding:14px 0 10px 0;font-size:12.5px;font-weight:600;color:var(--color-text-secondary);">Konfigurasi Settlement</div>
+      ${rowWrap(fieldsHTML([
+        {label:'Nama Bank', id:'f_bank', value:existing?.bank_name, placeholder:'Bank Mandiri'},
+        {label:'Nomor Rekening', id:'f_acc_no', value:existing?.bank_account_no, placeholder:'1230007890123'},
+      ]))}
+      ${fieldsHTML([{label:'Nama Pemilik Rekening', id:'f_acc_name', value:existing?.bank_account_name, placeholder:'Sesuai nama rekening'}])}
+
+      <div style="padding:14px 0 10px 0;font-size:12.5px;font-weight:600;color:var(--color-text-secondary);">Konfigurasi Deposit Kasir</div>
+      ${rowWrap(fieldsHTML([
+        {label:'Minimal Deposit', id:'f_deposit_min', type:'number', value:existing?.cashier_deposit_min, placeholder:'0'},
+        {label:'Deposit Awal', id:'f_deposit_init', type:'number', value:existing?.cashier_deposit_initial, placeholder:'0'},
+      ]))}
+
+      <div style="padding:14px 0 10px 0;font-size:12.5px;font-weight:600;color:var(--color-text-secondary);">Konfigurasi Potongan</div>
+      <div style="background:var(--color-background-muted);border-radius:8px;padding:12px;margin-bottom:8px;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px;">KSO (Kerja Sama Operasi)</div>
+        ${rowWrap(fieldsHTML([
+          {label:'Nilai KSO', id:'f_kso_value', type:'number', value:existing?.kso_value, placeholder:'0'},
+          {label:'Tipe', id:'f_kso_type', type:'select', value:existing?.kso_type||'percentage', options:[{value:'percentage',label:'Persentase'},{value:'nominal',label:'Nominal'}]},
+        ]))}
+      </div>
+      <div style="background:var(--color-background-muted);border-radius:8px;padding:12px;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Potongan Lainnya</div>
+        <div id="otherDeductionsList">
+          ${(existing?.other_deductions||[{name:'',value:'',type:'percentage'}]).map((d,i)=>`
+            <div class="ded-row" style="display:flex;gap:6px;align-items:end;margin-bottom:6px;">
+              <div class="field" style="flex:2;margin:0;"><label style="font-size:10px;">Nama</label><input class="input ded-name" value="${d.name}" placeholder="Biaya Admin" style="font-size:12px;"></div>
+              <div class="field" style="flex:1;margin:0;"><label style="font-size:10px;">Nilai</label><input class="input ded-value" type="number" value="${d.value}" placeholder="0" style="font-size:12px;"></div>
+              <div class="field" style="flex:1;margin:0;"><label style="font-size:10px;">Tipe</label><select class="input ded-type" style="font-size:12px;"><option value="percentage" ${d.type==='percentage'?'selected':''}>%</option><option value="nominal" ${d.type==='nominal'?'selected':''}>Rp</option></select></div>
+              <button type="button" class="btn btn-ghost btn-sm ded-remove" style="margin-bottom:2px;flex-shrink:0;">${ic('x')}</button>
+            </div>`).join('')}
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" id="addDedRow" style="margin-top:4px;">${ic('plus')}Tambah Potongan</button>
+      </div>
 
       <div style="margin-top:24px;display:flex;gap:8px;justify-content:flex-end;">
         <button class="btn btn-secondary" id="fCancel">${ic('x')}Batal</button>
@@ -136,6 +166,38 @@ function renderMitraForm(root, existing){
   selDueType.addEventListener('change', updateDuePlaceholder);
   updateDuePlaceholder();
 
+  function collectDeductions(){
+    const rows = content.querySelectorAll('#otherDeductionsList .ded-row');
+    const list = [];
+    rows.forEach(row=>{
+      const name = row.querySelector('.ded-name').value.trim();
+      const value = row.querySelector('.ded-value').value;
+      const type = row.querySelector('.ded-type').value;
+      if(name) list.push({name, value, type});
+    });
+    return list;
+  }
+
+  function wireDedRow(cont){
+    cont.querySelector('#addDedRow')?.addEventListener('click', ()=>{
+      const list = cont.querySelector('#otherDeductionsList');
+      const div = document.createElement('div');
+      div.className = 'ded-row';
+      div.style.cssText = 'display:flex;gap:6px;align-items:end;margin-bottom:6px;';
+      div.innerHTML = `
+        <div class="field" style="flex:2;margin:0;"><label style="font-size:10px;">Nama</label><input class="input ded-name" placeholder="Biaya Admin" style="font-size:12px;"></div>
+        <div class="field" style="flex:1;margin:0;"><label style="font-size:10px;">Nilai</label><input class="input ded-value" type="number" placeholder="0" style="font-size:12px;"></div>
+        <div class="field" style="flex:1;margin:0;"><label style="font-size:10px;">Tipe</label><select class="input ded-type" style="font-size:12px;"><option value="percentage">%</option><option value="nominal">Rp</option></select></div>
+        <button type="button" class="btn btn-ghost btn-sm ded-remove" style="margin-bottom:2px;flex-shrink:0;">${ic('x')}</button>`;
+      list.appendChild(div);
+      div.querySelector('.ded-remove')?.addEventListener('click', ()=>{ div.remove(); });
+    });
+    cont.querySelectorAll('.ded-remove').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ btn.closest('.ded-row').remove(); });
+    });
+  }
+  wireDedRow(content);
+
   content.querySelector('#fCancel')?.addEventListener('click', ()=>{ window.location.hash='partnership.mitra'; });
   content.querySelector('#fSave')?.addEventListener('click', ()=>{
     const val = id => document.getElementById(id).value.trim();
@@ -152,6 +214,11 @@ function renderMitraForm(root, existing){
       cooperation_end:val('f_coop_end'), cooperation_doc_file:val('f_coop_file'), npwp_nib:val('f_npwp'),
       bank_name:val('f_bank'), bank_account_no:val('f_acc_no'), bank_account_name:val('f_acc_name'),
       payment_due_type:selDueType.value, payment_due_value:valDue.value,
+      cashier_deposit_min: parseFloat(val('f_deposit_min'))||0,
+      cashier_deposit_initial: parseFloat(val('f_deposit_init'))||0,
+      kso_value: parseFloat(val('f_kso_value'))||0,
+      kso_type: document.getElementById('f_kso_type').value,
+      other_deductions: collectDeductions(),
     };
 
     if(isEdit){
@@ -226,9 +293,13 @@ Views['partnership.mitra'] = function(root){
       {key:'operational_area', header:'Wilayah Operasional', sortable:true},
       {key:'users_count', header:'Jumlah Pengguna', sortable:true, align:'right', render:r=>`<span class="cell-num">${r.users_count}</span>`},
       {key:'status', header:'Status', sortable:true, render:r=>statusBadge(r.status)},
+      ...(isSuperUser() ? [{key:'actions', header:'', align:'right', render:r=>`<button class="btn btn-secondary btn-sm act-edit-mitra" data-id="${r.id}">${ic('edit')}Edit</button>`}] : []),
     ],
     afterRender(wrap){
       wrap.querySelector('#btnAddMitra')?.addEventListener('click', ()=>{ window.location.hash='partnership.mitra?id=add'; });
+      wrap.querySelectorAll('.act-edit-mitra').forEach(btn=>{
+        btn.addEventListener('click', ()=>{ window.location.hash='partnership.mitra?id='+btn.dataset.id; });
+      });
     }
   });
   const cardEl = document.createElement('div');
