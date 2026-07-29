@@ -111,11 +111,12 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-29 — Modul baru menggantikan Billing Customer: Dashboard Deposit dengan submenu Riwayat Deposit & Pembayaran Customer. Kalkulasi biaya tambahan otomatis dari other_deductions mitra. Integrasi deposit→invoice→payment→settlement flow.
 
 #### Dashboard Settlement (`settlement.dashboard`)
-- **Fungsi**: Menampilkan rekap hasil transaksi customer dalam satu periode settlement: Pendapatan Kotor (Gross), Total Potongan (KSO, Payment Gateway Fee, Biaya Admin/Lainnya), Pendapatan Bersih (Net), Saldo Siap Settlement, dan Jadwal Settlement Berikutnya. Terdapat tombol Ajukan Pencairan Settlement.
+- **Fungsi**: Menampilkan rekap hasil transaksi customer dalam satu periode settlement: Pendapatan Kotor (Gross), Total Potongan (KSO, Payment Gateway Fee, Biaya Admin/Lainnya), Pendapatan Bersih (Net), dan Saldo Siap Settlement. Terdapat tombol Ajukan Pencairan Settlement dan submenu Riwayat Settlement.
 - **Lokasi file**: `app-modules.js` (view `settlement.dashboard`), data di `app-data.js` (`DB.settlements`, `DB.invoices`, `DB.payments`, `DB.partners`)
 - **Data yang dibutuhkan**:
   - Input: partner_id, ref, period, tx_count, gross_revenue, total_deduction, net_revenue, bank_account, status, date
-  - Tampil (KPI): Gross Revenue, Total Potongan, Net Revenue, Saldo Siap Settlement, Jadwal Berikutnya
+  - Tampil (KPI): Gross Revenue, Total Potongan, Net Revenue, Saldo Siap Settlement
+  - Tampil (Riwayat Settlement): DataTable dengan kolom nomor settlement, periode, jumlah transaksi, pendapatan kotor, total potongan, pendapatan bersih, rekening tujuan, status, tanggal
   - Aksi: Ajukan Pencairan Settlement → membuat record DB.settlements, menandai invoice settled=true, catat activity log
 - **Ketergantungan**: `DataTable`, `renderKPIs`, `badge`, `statusBadge`, `Modal`, `toast`, `pushActivity`, `nextId`
 - **Status**: Selesai

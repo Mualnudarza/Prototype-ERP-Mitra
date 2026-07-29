@@ -1206,16 +1206,59 @@ Views['settlement.dashboard'] = function(root){
 
   function renderDashboard(){
     calculateStats();
-    const nextSched = partner.payment_due_type === 'Tanggal Tetap' ? `Setiap Tanggal ${partner.payment_due_value}` : partner.payment_due_type;
     kpiSlot.innerHTML = renderKPIs([
       {label:'Pendapatan Kotor (Gross)', value:Fmt.rupiah(gross), icon:'wallet', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
       {label:'Total Potongan', value:Fmt.rupiah(total_potongan), icon:'minus', bg:'var(--badge-orange-bg)', fg:'var(--badge-orange-fg)', sub:`KSO + PG + Admin`},
       {label:'Pendapatan Bersih (Net)', value:Fmt.rupiah(net), icon:'checkCircle', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
-      {label:'Saldo Siap Settlement', value:Fmt.rupiah(net), icon:'wallet', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)', sub:`${unsettledInvoices.length} transaksi`},
-      {label:'Jadwal Settlement Berikutnya', value:nextSched, icon:'history', bg:'var(--badge-gray-bg)', fg:'var(--badge-gray-fg)'}
+      {label:'Saldo Siap Settlement', value:Fmt.rupiah(net), icon:'wallet', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)', sub:`${unsettledInvoices.length} transaksi`}
     ]);
 
     tableMount.innerHTML = '';
+    const table = DataTable({
+      rows: () => DB.settlements.filter(s => s.partner_id === partner.id),
+      rowKey: 'id',
+      searchPlaceholder: 'Cari nomor settlement…',
+      searchFields: ['ref'],
+      columns: [
+        {key:'ref', header:'Nomor Settlement', sortable:true, render:r=>`<span class="cell-mono">${r.ref}</span>`},
+        {key:'period', header:'Periode', sortable:true},
+        {key:'tx_count', header:'Jumlah Transaksi', sortable:true, align:'right'},
+        {key:'gross_revenue', header:'Pendapatan Kotor', sortable:true, align:'right', render:r=>Fmt.rupiah(r.gross_revenue)},
+        {key:'total_deduction', header:'Total Potongan', sortable:true, align:'right', render:r=>`<span style="color:var(--badge-red-fg);">${Fmt.rupiah(r.total_deduction)}</span>`},
+        {key:'net_revenue', header:'Pendapatan Bersih', sortable:true, align:'right', render:r=>`<span class="cell-strong" style="color:var(--badge-green-fg);">${Fmt.rupiah(r.net_revenue)}</span>`},
+        {key:'bank_account', header:'Rekening Tujuan', render:r=>`<span class="cell-secondary">${r.bank_account}</span>`},
+        {key:'status', header:'Status', render:r=>statusBadge(r.status)},
+        {key:'date', header:'Tanggal', sortable:true, render:r=>Fmt.date(r.date)},
+        {key:'actions', header:'', align:'right', render:()=>`<button class="btn btn-ghost btn-sm act-detail">${ic('eye')}</button>`}
+      ],
+      afterRender(wrap, rows){
+        wrap.querySelectorAll('tbody tr[data-id]').forEach(tr=>{
+          const s = rows.find(r=>r.id===tr.dataset.id);
+          tr.querySelector('.act-detail')?.addEventListener('click', ()=>{
+            Modal.open({
+              title:'Detail Settlement', subtitle:s.ref,
+              bodyHTML:`<div class="detail-grid">
+                <div class="detail-item"><span class="dl">Periode</span><span class="dv">${s.period}</span></div>
+                <div class="detail-item"><span class="dl">Jumlah Transaksi</span><span class="dv">${s.tx_count}</span></div>
+                <div class="detail-item"><span class="dl">Pendapatan Kotor</span><span class="dv">${Fmt.rupiah(s.gross_revenue)}</span></div>
+                <div class="detail-item"><span class="dl">Total Potongan</span><span class="dv">${Fmt.rupiah(s.total_deduction)}</span></div>
+                <div class="detail-item"><span class="dl">Pendapatan Bersih</span><span class="dv" style="font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(s.net_revenue)}</span></div>
+                <div class="detail-item"><span class="dl">Rekening Tujuan</span><span class="dv">${s.bank_account}</span></div>
+                <div class="detail-item"><span class="dl">Status</span><span class="dv">${statusBadge(s.status)}</span></div>
+                <div class="detail-item"><span class="dl">Tanggal Settlement</span><span class="dv">${Fmt.date(s.date)}</span></div>
+              </div>`,
+              footHTML:`<button class="btn btn-primary" id="mCloseSettlement">Tutup</button>`,
+              onOpen(b,f){ f.querySelector('#mCloseSettlement').addEventListener('click', Modal.close); }
+            });
+          });
+        });
+      }
+    });
+
+    const card = document.createElement('div'); card.className = 'card';
+    card.innerHTML = `<div class="section-head"><h3>Riwayat Settlement Mitra</h3></div>`;
+    card.appendChild(table);
+    tableMount.appendChild(card);
   }
 
   root.querySelector('#btnRequestSettlement').addEventListener('click', () => {
