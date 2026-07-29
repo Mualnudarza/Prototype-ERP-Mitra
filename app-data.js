@@ -155,15 +155,21 @@ DB.payments = [
 DB.radius = DB.customers.map(c => {
   const statusMap = {Active:'Active', Isolir:'Isolir', Terminate:'Terminate'};
   const radiusMap = {Active:'Online', Isolir:'Isolir', Terminate:'Offline'};
+  const rxRegist = c.olt_rx_register;
   return {
     id:'RAD-'+c.id,
     customer_id:c.id,
+    customer_name: c.customer_name,
+    pppoe_secret: c.pppoe_secret,
+    onu_number: c.onu_number,
     bandwidth:(DB.packages.find(p=>p.id===c.package_id)||{}).bandwidth || '-',
     customer_status:statusMap[c.customer_status] || c.customer_status,
     radius_status:radiusMap[c.customer_status] || 'Offline',
     isolation_date: c.customer_status==='Isolir' ? '2026-07-11' : null,
     activation_date: c.customer_status==='Active' ? '2026-07-01' : null,
     last_update:'2026-07-26T0'+((Math.floor(Math.random()*8)+1))+':1'+(Math.floor(Math.random()*5))+':00',
+    olt_rx_now: rxRegist != null ? Math.round((rxRegist + (Math.random()*1.6-0.8)) * 10) / 10 : null,
+    olt_status: radiusMap[c.customer_status] === 'Online' ? 'Online' : (radiusMap[c.customer_status] === 'Isolir' ? 'Isolir' : 'Offline'),
   };
 });
 

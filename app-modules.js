@@ -561,7 +561,7 @@ Views['customer.pelanggan'] = function(root){
               olt_id:null, olt_odp_id:null, olt_slot:null, olt_pon:null, olt_rx_register:null,
             };
             DB.customers.push(newC);
-            DB.radius.push({id:'RAD-'+newC.id, customer_id:newC.id, bandwidth:(DB.packages.find(p=>p.id===newC.package_id)||{}).bandwidth||'-', customer_status:'Unregistered', radius_status:'Offline', isolation_date:null, activation_date:null, last_update:new Date().toISOString()});
+            DB.radius.push({id:'RAD-'+newC.id, customer_id:newC.id, customer_name:name, pppoe_secret:newC.pppoe_secret, onu_number:newC.onu_number, bandwidth:(DB.packages.find(p=>p.id===newC.package_id)||{}).bandwidth||'-', customer_status:'Unregistered', radius_status:'Offline', isolation_date:null, activation_date:null, last_update:new Date().toISOString(), olt_rx_now:null, olt_status:'Offline'});
             toast('Pelanggan baru tersimpan · menunggu Registrasi ONU');
             pushActivity('Administrator Mitra', `menambahkan pelanggan baru ${name} (menunggu registrasi ONU)`);
           }
@@ -627,8 +627,11 @@ function renderRegistrationPage(root, customer, onDone){
         </div>
         <div class="section-head" style="padding:0 0 14px 0;"><h3>Konfigurasi Perangkat</h3></div>
         ${fieldsHTML([{label:'SN Modem', id:'r_sn', value:customer.modem_serial_number, placeholder:'ZTE-XXXXXXX (scan / input manual)'}])}
-        ${fieldsHTML([{label:'Port ODP (Spliter ke pelanggan)', id:'r_odp', type:'select', value:customer.olt_odp_id||'', options:odpOptions()}])}
-        ${fieldsHTML([{label:'ONU Pelanggan', id:'r_onu', type:'select', value:customer.olt_pon||'1', options:Array.from({length:16},(_,i)=>({value:String(i+1), label:'ONU '+(i+1)}))}])}
+        ${fieldsHTML([{label:'Port ODP', id:'r_odp', type:'select', value:customer.olt_odp_id||'', options:odpOptions()}])}
+        ${rowWrap(fieldsHTML([
+          {label:'No. ONU', id:'r_onu', value:customer.onu_number||'', placeholder:'ONU-XXXX'},
+          {label:'Port Pelanggan', id:'r_port', type:'select', value:customer.access_port||'1', options:Array.from({length:16},(_,i)=>({value:String(i+1), label:'Port '+(i+1)}))},
+        ]))}
         <div class="hint">Script registrasi di sebelah kanan diperbarui otomatis mengikuti konfigurasi yang dipilih.</div>
         <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
           <button class="btn btn-secondary" id="rCancel">${ic('x')}Batal</button>
@@ -643,7 +646,7 @@ function renderRegistrationPage(root, customer, onDone){
   `;
 
   const selOdp = content.querySelector('#r_odp');
-  const selOnu = content.querySelector('#r_onu');
+  const selPort = content.querySelector('#r_port');
   const snInput = content.querySelector('#r_sn');
   const scriptContainer = content.querySelector('#regScriptsContainer');
 
@@ -654,7 +657,7 @@ function renderRegistrationPage(root, customer, onDone){
 
   function refreshScripts(){
     const oltId = getOltIdFromOdp(selOdp.value);
-    scriptContainer.innerHTML = scriptsHTML(oltId, '1', selOnu.value, snInput.value.trim());
+    scriptContainer.innerHTML = scriptsHTML(oltId, '1', selPort.value, snInput.value.trim());
     wireCopyButtons();
   }
 
@@ -675,16 +678,18 @@ function renderRegistrationPage(root, customer, onDone){
   wireCopyButtons();
 
   selOdp.addEventListener('change', refreshScripts);
-  selOnu.addEventListener('change', refreshScripts);
+  selPort.addEventListener('change', refreshScripts);
   snInput.addEventListener('input', refreshScripts);
 
   content.querySelector('#rCancel')?.addEventListener('click', ()=>{ window.location.hash='customer.registrasi'; });
   content.querySelector('#rSave')?.addEventListener('click', ()=>{
     const odpId = selOdp.value;
-    const onuPort = selOnu.value;
+    const onuPort = selPort.value;
     const sn = snInput.value.trim();
+    const onuNumber = content.querySelector('#r_onu').value.trim();
     if(!odpId){ toast('Pilih Port ODP terlebih dahulu'); return; }
     if(!sn){ toast('SN Modem wajib diisi'); return; }
+    if(!onuNumber){ toast('No. ONU wajib diisi'); return; }
     const odpInfo = findOdpNode(odpId);
     if(!odpInfo){ toast('ODP tidak ditemukan'); return; }
     const odpNode = odpInfo.node;
@@ -695,7 +700,6 @@ function renderRegistrationPage(root, customer, onDone){
     const ok = window.confirm(`Selesaikan registrasi ONU untuk ${customer.customer_name} pada ${odpNode.label}, Port ${onuPort}?`);
     if(!ok) return;
 
-    const onuNumber = 'ONU-' + String(Math.floor(Math.random()*9000+1000));
     const rx = (Math.random() * (-18 - (-24)) + (-24)).toFixed(1);
 
     customer.modem_serial_number = sn;
@@ -717,6 +721,7 @@ function renderRegistrationPage(root, customer, onDone){
     if(rad){
       rad.radius_status = 'Online';
       rad.customer_status = 'Active';
+      rad.onu_number = onuNumber;
       rad.activation_date = new Date().toISOString().slice(0,10);
       rad.last_update = new Date().toISOString();
     }
@@ -1093,18 +1098,18 @@ Views['payment.gateway'] = function(root){
    ======================================================================== */
 
 Views['radius.monitoring'] = function(root){
-  root.innerHTML = pageIntro('Status autentikasi dan kondisi layanan pelanggan pada server FreeRADIUS — isolir dan aktivasi berjalan otomatis mengikuti status billing.');
+  root.innerHTML = pageIntro('Monitoring layanan pelanggan — status ONU, redaman OLT, dan kendali layanan (isolir/aktivasi).');
   root.insertAdjacentHTML('beforeend', `<div id="kpiSlot"></div>`);
 
   function kpis(){
-    const online = DB.radius.filter(r=>r.radius_status==='Online').length;
-    const isolir = DB.radius.filter(r=>r.radius_status==='Isolir').length;
+    const online = DB.radius.filter(r=>r.olt_status==='Online').length;
+    const isolir = DB.radius.filter(r=>r.customer_status==='Isolir').length;
     const active = DB.radius.filter(r=>r.customer_status==='Active').length;
     root.querySelector('#kpiSlot').outerHTML = `<div id="kpiSlot">${renderKPIs([
-      {label:'Total Pelanggan Online', value:online, icon:'wifi', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
-      {label:'Total Pelanggan Isolir', value:isolir, icon:'bolt', bg:'var(--badge-orange-bg)', fg:'var(--badge-orange-fg)'},
+      {label:'Total ONU Online', value:online, icon:'wifi', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
+      {label:'Total Isolir', value:isolir, icon:'bolt', bg:'var(--badge-orange-bg)', fg:'var(--badge-orange-fg)'},
       {label:'Total Pelanggan Aktif', value:active, icon:'checkCircle', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
-      {label:'Total Sinkronisasi Berhasil', value:DB.radius.length, icon:'server', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'},
+      {label:'Total Pelanggan', value:DB.customers.length, icon:'users', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'},
     ])}</div>`;
   }
   kpis();
@@ -1112,23 +1117,32 @@ Views['radius.monitoring'] = function(root){
   const tableMount = document.createElement('div');
   root.appendChild(tableMount);
 
+  function odpName(cust){
+    if(!cust || !cust.olt_odp_id) return '-';
+    const found = findOdpNode(cust.olt_odp_id);
+    return found ? found.node.label : '-';
+  }
+
   const table = DataTable({
     rows:()=>DB.radius,
     rowKey:'id',
-    searchPlaceholder:'Cari PPPoE Secret, username, atau nama…',
-    searchFields:[],
+    searchPlaceholder:'Cari nama, PPPoE, atau No ONU…',
+    searchFields:['customer_name','pppoe_secret','onu_number'],
     filters:[
-      {key:'status', label:'Semua Status Layanan', options:[{value:'Active',label:'Active'},{value:'Isolir',label:'Isolir'},{value:'Terminate',label:'Terminate'}], match:(r,v)=>r.customer_status===v},
-      {key:'radius', label:'Semua Status Radius', options:[{value:'Online',label:'Online'},{value:'Offline',label:'Offline'},{value:'Isolir',label:'Isolir'}], match:(r,v)=>r.radius_status===v},
+      {key:'status', label:'Semua Status Berlangganan', options:[{value:'Active',label:'Aktif'},{value:'Isolir',label:'Isolir'},{value:'Terminate',label:'Terminate'},{value:'Unregistered',label:'Unregistered'}], match:(r,v)=>{ const c=DB.customers.find(x=>x.id===r.customer_id); return c?c.customer_status===v:false; }},
+      {key:'olt', label:'Semua Status OLT', options:[{value:'Online',label:'Online'},{value:'Offline',label:'Offline'},{value:'Isolir',label:'Isolir'}], match:(r,v)=>r.olt_status===v},
     ],
     columns:[
-      {key:'pppoe', header:'PPPoE Secret', sortable:true, sortValue:r=>{const c=DB.customers.find(x=>x.id===r.customer_id); return c?c.pppoe_secret:'';}, render:r=>{ const c=DB.customers.find(x=>x.id===r.customer_id); return `<span class="cell-mono">${c?c.pppoe_secret:'-'}</span>`; }},
-      {key:'name', header:'Nama Pelanggan', sortValue:r=>custName(r.customer_id), sortable:true, render:r=>`<span class="cell-strong">${custName(r.customer_id)}</span>`},
-      {key:'radius_username', header:'Username Radius', render:r=>{ const c=DB.customers.find(x=>x.id===r.customer_id); return `<span class="cell-mono">${c?c.radius_username:'-'}</span>`; }},
-      {key:'bandwidth', header:'Bandwidth', render:r=>badge(r.bandwidth,'cyan')},
-      {key:'customer_status', header:'Status Pelanggan', sortable:true, render:r=>statusBadge(r.customer_status)},
-      {key:'radius_status', header:'Status Radius', sortable:true, render:r=>statusBadge(r.radius_status)},
-      {key:'last_update', header:'Last Update', sortable:true, sortValue:r=>r.last_update, render:r=>`<span class="cell-secondary">${Fmt.datetime(r.last_update)}</span>`},
+      {key:'name', header:'Nama', sortable:true, sortValue:r=>custName(r.customer_id), render:r=>`<span class="cell-strong">${custName(r.customer_id)}</span>`},
+      {key:'pppoe', header:'Customer ID (PPPoE)', sortable:true, sortValue:r=>{const c=DB.customers.find(x=>x.id===r.customer_id); return c?c.pppoe_secret:'';}, render:r=>{ const c=DB.customers.find(x=>x.id===r.customer_id); return `<span class="cell-mono">${c?c.pppoe_secret:'-'}</span>`; }},
+      {key:'onu', header:'No ONU', sortable:true, sortValue:r=>{const c=DB.customers.find(x=>x.id===r.customer_id); return c?c.onu_number:'';}, render:r=>{ const c=DB.customers.find(x=>x.id===r.customer_id); return `<span class="cell-mono">${c&&c.onu_number?c.onu_number:'-'}</span>`; }},
+      {key:'customer_status', header:'Status Berlangganan', sortable:true, render:r=>{ const c=DB.customers.find(x=>x.id===r.customer_id); return c?statusBadge(c.customer_status):statusBadge(r.customer_status); }},
+      {key:'subscribe', header:'Start Subscribe', sortable:true, sortValue:r=>{const c=DB.customers.find(x=>x.id===r.customer_id); return c?c.subscribe_date:'';}, render:r=>{ const c=DB.customers.find(x=>x.id===r.customer_id); return `<span class="cell-secondary">${c?Fmt.date(c.subscribe_date):'-'}</span>`; }},
+      {key:'odp', header:'ODP', render:r=>{ const c=DB.customers.find(x=>x.id===r.customer_id); return odpName(c); }},
+      {key:'port', header:'Port Access', render:r=>{ const c=DB.customers.find(x=>x.id===r.customer_id); return c&&c.access_port?`<span class="cell-mono">${c.access_port}</span>`:'-'; }},
+      {key:'olt_rx_regist', header:'OLT RX Regist', render:r=>{ const c=DB.customers.find(x=>x.id===r.customer_id); return c&&c.olt_rx_register!=null?`<span class="cell-mono">${c.olt_rx_register} dBm</span>`:'-'; }},
+      {key:'olt_rx_now', header:'OLT RX Now', render:r=>r.olt_rx_now!=null?`<span class="cell-mono">${r.olt_rx_now} dBm</span>`:'-'},
+      {key:'olt_status', header:'Status OLT', sortable:true, render:r=>statusBadge(r.olt_status)},
       {key:'actions', header:'', align:'right', render:()=>`<button class="btn btn-ghost btn-sm act-detail">${ic('eye')}Detail</button>`},
     ],
     afterRender(wrap, rows){
@@ -1143,16 +1157,22 @@ Views['radius.monitoring'] = function(root){
 
   function openDetail(r){
     const c = DB.customers.find(x=>x.id===r.customer_id);
-    const canIsolir = r.customer_status !== 'Terminate' && c.customer_type !== 'Fasum' && r.radius_status !== 'Isolir';
+    const canIsolir = c && c.customer_status !== 'Terminate' && c.customer_type !== 'Fasum' && r.radius_status !== 'Isolir';
     const canActivate = r.radius_status === 'Isolir';
     Modal.open({
       title:custName(r.customer_id), subtitle:`${c?.pppoe_secret||'-'} · ${partnerName(c?.partner_id)}`,
       bodyHTML:`<div class="detail-grid">
-        <div class="detail-item"><span class="dl">Username Radius</span><span class="dv" style="font-family:var(--font-family-mono);">${c?.radius_username}</span></div>
+        <div class="detail-item"><span class="dl">Nama / PPPoE</span><span class="dv">${custName(r.customer_id)} · <span class="cell-mono">${c?.pppoe_secret||'-'}</span></span></div>
+        <div class="detail-item"><span class="dl">No ONU</span><span class="dv" style="font-family:var(--font-family-mono);">${c?.onu_number||'-'}</span></div>
         <div class="detail-item"><span class="dl">Paket Layanan</span><span class="dv">${pkgName(c?.package_id)}</span></div>
         <div class="detail-item"><span class="dl">Bandwidth Aktif</span><span class="dv">${r.bandwidth}</span></div>
-        <div class="detail-item"><span class="dl">Status Pelanggan</span><span class="dv">${statusBadge(r.customer_status)}</span></div>
-        <div class="detail-item"><span class="dl">Status Radius</span><span class="dv">${statusBadge(r.radius_status)}</span></div>
+        <div class="detail-item"><span class="dl">ODP</span><span class="dv">${odpName(c)}</span></div>
+        <div class="detail-item"><span class="dl">Port Access</span><span class="dv">${c?.access_port||'-'}</span></div>
+        <div class="detail-item"><span class="dl">Status Berlangganan</span><span class="dv">${c?statusBadge(c.customer_status):statusBadge(r.customer_status)}</span></div>
+        <div class="detail-item"><span class="dl">Start Subscribe</span><span class="dv">${c?Fmt.date(c.subscribe_date):'-'}</span></div>
+        <div class="detail-item"><span class="dl">OLT RX Regist</span><span class="dv">${c&&c.olt_rx_register!=null?c.olt_rx_register+' dBm':'-'}</span></div>
+        <div class="detail-item"><span class="dl">OLT RX Now</span><span class="dv">${r.olt_rx_now!=null?r.olt_rx_now+' dBm':'-'}</span></div>
+        <div class="detail-item"><span class="dl">Status OLT</span><span class="dv">${statusBadge(r.olt_status)}</span></div>
         <div class="detail-item"><span class="dl">Tanggal Isolir Terakhir</span><span class="dv">${r.isolation_date?Fmt.date(r.isolation_date):'-'}</span></div>
         <div class="detail-item"><span class="dl">Tanggal Aktivasi Terakhir</span><span class="dv">${r.activation_date?Fmt.date(r.activation_date):'-'}</span></div>
         <div class="detail-item"><span class="dl">Tipe Pelanggan</span><span class="dv">${badge(c?.customer_type,'purple')}</span></div>
@@ -1166,14 +1186,14 @@ Views['radius.monitoring'] = function(root){
       onOpen(b,f){
         f.querySelector('#mClose8').addEventListener('click', Modal.close);
         f.querySelector('#mIsolir')?.addEventListener('click', ()=>{
-          r.radius_status='Isolir'; r.customer_status='Isolir'; r.isolation_date=new Date().toISOString().slice(0,10); r.last_update=new Date().toISOString();
-          c.customer_status='Isolir';
+          r.radius_status='Isolir'; r.customer_status='Isolir'; r.olt_status='Isolir'; r.isolation_date=new Date().toISOString().slice(0,10); r.last_update=new Date().toISOString();
+          if(c) c.customer_status='Isolir';
           pushActivity('Radius Control Gateway', `mengisolir layanan pelanggan ${custName(r.customer_id)}`);
           toast('Layanan pelanggan berhasil diisolir'); Modal.close(); kpis(); table.refresh();
         });
         f.querySelector('#mActivate')?.addEventListener('click', ()=>{
-          r.radius_status='Online'; r.customer_status='Active'; r.activation_date=new Date().toISOString().slice(0,10); r.last_update=new Date().toISOString();
-          c.customer_status='Active';
+          r.radius_status='Online'; r.customer_status='Active'; r.olt_status='Online'; r.activation_date=new Date().toISOString().slice(0,10); r.last_update=new Date().toISOString();
+          if(c) c.customer_status='Active';
           pushActivity('Radius Control Gateway', `mengaktifkan kembali layanan pelanggan ${custName(r.customer_id)}`);
           toast('Layanan pelanggan berhasil diaktifkan kembali'); Modal.close(); kpis(); table.refresh();
         });
@@ -1186,19 +1206,6 @@ Views['radius.monitoring'] = function(root){
    6. INFRASTRUCTURE / ODP
    ======================================================================== */
 
-function flattenInfra(){
-  const rows = [];
-  DB.infrastructure.forEach(olt=>{
-    rows.push({id:olt.id, name:olt.label, jenis:'Port OLT', olt:olt.id, parent:'-', lat:olt.lat||'-', lng:olt.lng||'-', status:'Aktif', ref:olt});
-    (olt.children||[]).forEach(inp=>{
-      rows.push({id:inp.id, name:inp.label, jenis:'Input Splitter', olt:olt.id, parent:olt.id, lat:inp.lat||'-', lng:inp.lng||'-', status:'Aktif', ref:inp});
-      (inp.children||[]).forEach(out=>{
-        rows.push({id:out.id, name:out.label, jenis:'Output Splitter', olt:olt.id, parent:inp.id, lat:out.lat, lng:out.lng, status:out.status, ref:out});
-      });
-    });
-  });
-  return rows;
-}
 function countInfra(){
   let olt=0, splitter=0, titik=0, pelanggan=0;
   DB.infrastructure.forEach(o=>{ olt++; (o.children||[]).forEach(i=>{ splitter++; titik++; (i.children||[]).forEach(x=>{ splitter++; titik++; pelanggan += x.connected||0; }); }); });
@@ -1631,82 +1638,4 @@ Views['infra.topologi'] = function(root){
   paintPanel();
 };
 
-Views['infra.perangkat'] = function(root){
-  root.innerHTML = pageIntro('Seluruh perangkat jaringan yang telah terdaftar pada topologi infrastruktur mitra.');
 
-  const tableMount = document.createElement('div');
-  root.appendChild(tableMount);
-
-  const table = DataTable({
-    rows:()=>flattenInfra(),
-    rowKey:'id',
-    searchPlaceholder:'Cari nama titik, Port OLT, atau jenis splitter…',
-    searchFields:['name','olt'],
-    filters:[
-      {key:'jenis', label:'Semua Jenis Perangkat', options:[{value:'Port OLT',label:'Port OLT'},{value:'Input Splitter',label:'Input Splitter'},{value:'Output Splitter',label:'Output Splitter'}], match:(r,v)=>r.jenis===v},
-      {key:'status', label:'Semua Status', options:[{value:'Aktif',label:'Aktif'},{value:'Penuh',label:'Penuh'}], match:(r,v)=>r.status===v},
-    ],
-    columns:[
-      {key:'name', header:'Nama Titik', sortable:true, render:r=>`<span class="cell-strong">${r.name}</span>`},
-      {key:'jenis', header:'Jenis Perangkat', sortable:true, render:r=>badge(r.jenis, r.jenis==='Port OLT'?'blue':r.jenis==='Input Splitter'?'purple':'green')},
-      {key:'olt', header:'Port OLT', sortable:true, render:r=>`<span class="cell-mono">${r.olt}</span>`},
-      {key:'parent', header:'Parent Perangkat', render:r=>`<span class="cell-mono">${r.parent}</span>`},
-      {key:'lat', header:'Latitude', render:r=>r.lat},
-      {key:'lng', header:'Longitude', render:r=>r.lng},
-      {key:'status', header:'Status', sortable:true, render:r=>statusBadge(r.status)},
-      {key:'actions', header:'', align:'right', render:()=>`
-        <div class="row-actions">
-          <button class="btn btn-secondary btn-sm act-edit">${ic('edit')}Edit</button>
-          <button class="btn btn-ghost btn-sm act-detail">${ic('eye')}</button>
-        </div>`},
-    ],
-    afterRender(wrap, rows){
-      wrap.querySelectorAll('tbody tr[data-id]').forEach(tr=>{
-        const r = rows.find(x=>x.id===tr.dataset.id);
-        tr.querySelector('.act-detail')?.addEventListener('click', ()=>openDetail(r));
-        tr.querySelector('.act-edit')?.addEventListener('click', ()=>openEdit(r));
-      });
-    }
-  });
-  const cardEl = document.createElement('div'); cardEl.className='card'; cardEl.appendChild(table);
-  tableMount.appendChild(cardEl);
-
-  function openDetail(r){
-    Modal.open({
-      title:r.name, subtitle:`${r.jenis} · ${r.olt}`,
-      bodyHTML:`<div class="detail-grid">
-        <div class="detail-item"><span class="dl">Jenis Perangkat</span><span class="dv">${badge(r.jenis,'blue')}</span></div>
-        <div class="detail-item"><span class="dl">Parent</span><span class="dv" style="font-family:var(--font-family-mono);">${r.parent}</span></div>
-        <div class="detail-item"><span class="dl">Latitude</span><span class="dv">${r.lat}</span></div>
-        <div class="detail-item"><span class="dl">Longitude</span><span class="dv">${r.lng}</span></div>
-        <div class="detail-item"><span class="dl">Status</span><span class="dv">${statusBadge(r.status)}</span></div>
-      </div>`,
-      footHTML:`<button class="btn btn-primary" id="mClose9">Tutup</button>`,
-      onOpen(b,f){ f.querySelector('#mClose9').addEventListener('click', Modal.close); }
-    });
-  }
-  function openEdit(r){
-    if(r.jenis !== 'Output Splitter'){ toast('Hanya Output Splitter yang dapat diedit langsung dari tabel ini'); return; }
-    Modal.open({
-      title:'Edit Perangkat', subtitle:r.name,
-      bodyHTML:`
-        ${rowWrap(fieldsHTML([
-          {label:'Latitude', id:'e_lat', type:'number', value:r.lat},
-          {label:'Longitude', id:'e_lng', type:'number', value:r.lng},
-        ]))}
-        ${fieldsHTML([{label:'Status', id:'e_status', type:'select', value:r.status, options:[{value:'Aktif',label:'Aktif'},{value:'Penuh',label:'Penuh'}]}])}
-      `,
-      footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}Simpan</button>`,
-      onOpen(b,f){
-        f.querySelector('#mCancel').addEventListener('click', Modal.close);
-        f.querySelector('#mSave').addEventListener('click', ()=>{
-          r.ref.lat = parseFloat(document.getElementById('e_lat').value)||r.ref.lat;
-          r.ref.lng = parseFloat(document.getElementById('e_lng').value)||r.ref.lng;
-          r.ref.status = document.getElementById('e_status').value;
-          toast('Data perangkat diperbarui');
-          Modal.close(); table.refresh();
-        });
-      }
-    });
-  }
-};

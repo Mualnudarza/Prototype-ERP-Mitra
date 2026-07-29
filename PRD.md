@@ -11,7 +11,7 @@
 
 ## Ringkasan
 
-Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cakupan yang ada: pengelolaan kemitraan (mitra, pengguna, pendapatan), manajemen pelanggan (data, registrasi ONU, paket layanan), billing & settlement, monitoring payment gateway, monitoring radius/status layanan, dan infrastruktur jaringan (topologi OLT/splitter, data perangkat). Semua data dummy/in-memory — reload browser menghapus semua perubahan. Tidak ada backend, autentikasi, atau integrasi API.
+Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cakupan yang ada: pengelolaan kemitraan (mitra, pengguna, pendapatan), manajemen pelanggan (data, registrasi ONU, paket layanan), billing & settlement, monitoring payment gateway, monitoring radius & control gateway, dan infrastruktur jaringan (topologi OLT/splitter). Semua data dummy/in-memory — reload browser menghapus semua perubahan. Tidak ada backend, autentikasi, atau integrasi API.
 
 ---
 
@@ -62,18 +62,19 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-28 — Initial prototype, 10 pelanggan dummy (2 Unregistered)
 
 #### Registrasi Pelanggan (`customer.registrasi`)
-- **Fungsi**: Dua mode: (1) Antrean registrasi ONU untuk pelanggan berstatus Unregistered — menampilkan daftar pelanggan dengan KPI, filter, dan tombol Registrasi. (2) Halaman registrasi penuh (bukan modal) — dipanggil via hash `#customer.registrasi?id={customer_id}` — menampilkan info pelanggan, konfigurasi perangkat (SN Modem, Port ODP, ONU Pelanggan), generate script CLI per vendor dengan tombol copy. Port ODP menampilkan daftar splitter yang ditandai sebagai ODP (Optical Distribution Point — splitter paling bawah yang langsung ke pelanggan) dari seluruh topologi infrastruktur.
+- **Fungsi**: Dua mode: (1) Antrean registrasi ONU untuk pelanggan berstatus Unregistered — menampilkan daftar pelanggan dengan KPI, filter, dan tombol Registrasi. (2) Halaman registrasi penuh (bukan modal) — dipanggil via hash `#customer.registrasi?id={customer_id}` — menampilkan info pelanggan, konfigurasi perangkat (SN Modem, Port ODP, No. ONU, Port Pelanggan), generate script CLI per vendor dengan tombol copy. Port ODP menampilkan daftar splitter yang ditandai sebagai ODP dari seluruh topologi infrastruktur.
 - **Lokasi file**: `app-modules.js:786-866` (queue), `app-modules.js:580-729` (`renderRegistrationPage`), data dari `DB.customers` (filter `Unregistered`)
 - **Data yang dibutuhkan**:
-  - Input: customer_id, modem_serial_number, olt_odp_id, olt_slot, olt_pon
+  - Input: customer_id, modem_serial_number, olt_odp_id, onu_number (text input), access_port (dropdown 1-16), olt_slot, olt_pon
   - Tampil (Queue): KPI (ukuran antrean, mitra terlibat, menunggu >3 hari), DataTable dengan tombol Registrasi → navigasi ke `#customer.registrasi?id=...`
-  - Tampil (Page): Info pelanggan card, konfigurasi perangkat card (SN Modem, Port ODP dropdown dari `allOdps()`, ONU Pelanggan), script CLI (Huawei MA5800, ZTE C320, Fiberhome AN5516) dengan copy button
+  - Tampil (Page): Info pelanggan card, konfigurasi perangkat card (SN Modem, Port ODP dropdown dari `allOdps()`, No. ONU text input, Port Pelanggan dropdown 1-16), script CLI (Huawei MA5800, ZTE C320, Fiberhome AN5516) dengan copy button
 - **Ketergantungan**: `DB.customers`, `DB.infrastructure`, `allOdps()`, `findOdpNode()`, `findOltNode()`, `genOnuScripts()`, `pushActivity()`
 - **Status**: Selesai
 - **Catatan Perubahan**:
   - 2026-07-28 — Initial prototype, flow registrasi ONU dengan generate script CLI
   - 2026-07-28 — Konversi dari modal (`openRegistrationModal`) ke halaman penuh (`renderRegistrationPage`). Hash-based navigation: `#customer.registrasi?id=CUS-XXXX`. Cascading dropdown OLT → Input Splitter → Output Splitter.
   - 2026-07-29 — Sederhanakan konfigurasi perangkat: hapus cascading OLT/Input/Output, ganti dengan Port ODP (pilih dari daftar ODP) dan ONU Pelanggan. Data pelanggan gunakan `olt_odp_id`.
+  - 2026-07-29 — Pisahkan field "ONU Pelanggan" (dropdown 1-16) menjadi dua field terpisah: "No. ONU" (text input) untuk nomor ONU aktual dan "Port Pelanggan" (dropdown 1-16) untuk port ODP. Nomor ONU tidak lagi digenerate otomatis.
 
 #### Paket Layanan (`customer.paket`)
 - **Fungsi**: Mengelola paket layanan internet yang ditawarkan per mitra, termasuk nama paket, bandwidth, harga, dan status.
@@ -119,16 +120,17 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
 - **Catatan Perubahan**:
   - 2026-07-28 — Initial prototype, 5 payment records
 
-#### Radius & Status (`radius.monitoring`)
-- **Fungsi**: Monitoring status koneksi radius pelanggan — online, isolir, atau terminate. Memungkinkan aksi manual isolir dan aktivasi ulang langsung dari detail modal.
-- **Lokasi file**: `app-modules.js:1095-1183`, data di `app-data.js` (`DB.radius`, derived dari `DB.customers`)
+#### Radius & Control Gateway (`radius.monitoring`)
+- **Fungsi**: Monitoring layanan pelanggan — status ONU, redaman OLT (RX power), dan kendali layanan (isolir/aktivasi ulang). Data ditampilkan per ONU dengan 10 kolom utama: Nama, Customer ID (PPPoE), No ONU, Status Berlangganan, Start Subscribe, ODP, Port Access, OLT RX Regist, OLT RX Now, Status OLT.
+- **Lokasi file**: `app-modules.js:1095-1198`, data di `app-data.js` (`DB.radius`, derived dari `DB.customers`)
 - **Data yang dibutuhkan**:
-  - Input: customer_id, bandwidth (dari package), customer_status, radius_status, isolation_date, activation_date, last_update
-  - Tampil: KPI (online, isolir, active, synced), DataTable dengan kolom PPPoE secret, nama pelanggan, radius username, bandwidth, customer status, radius status, update terakhir. Modal detail dengan tombol "Isolir Manual" / "Aktivasi Ulang" (kontekstual berdasarkan status). Pelanggan Fasum tidak bisa diisolir.
-- **Ketergantungan**: `DB.customers`, `DB.packages`, `DB.radius` (derived), `DataTable`, `renderKPIs`, `openModal`, `pushActivity()`
+  - Input: customer_id, bandwidth (dari package), customer_status, radius_status, isolation_date, activation_date, last_update, olt_rx_now (derived dengan variasi ±0.8 dB dari olt_rx_register), olt_status (Online/Offline/Isolir dari customer_status)
+  - Tampil: KPI (ONU Online, Isolir, Pelanggan Aktif, Total Pelanggan), DataTable dengan kolom Nama, Customer ID (PPPoE), No ONU, Status Berlangganan, Start Subscribe, ODP, Port Access, OLT RX Regist, OLT RX Now, Status OLT. Filter: Status Berlangganan (Aktif/Isolir/Terminate/Unregistered) dan Status OLT (Online/Offline/Isolir). Search mencakup nama, PPPoE, dan No ONU. Modal detail menampilkan semua field plus Paket Layanan, Bandwidth, Tanggal Isolir/Aktivasi, Tipe Pelanggan, dan tombol "Isolir Manual" / "Aktivasi Ulang" (kontekstual). Pelanggan Fasum tidak bisa diisolir.
+- **Ketergantungan**: `DB.customers`, `DB.packages`, `DB.radius` (derived), `DB.infrastructure` (lookup ODP label via `findOdpNode`), `DataTable`, `renderKPIs`, `openModal`, `pushActivity()`
 - **Status**: Selesai
 - **Catatan Perubahan**:
   - 2026-07-28 — Initial prototype, status sync antara radius dan customers
+  - 2026-07-29 — Overhaul tabel: ganti kolom dengan 10 kolom ERP Griya (Nama, PPPoE, No ONU, Status Berlangganan, Start Subscribe, ODP, Port Access, OLT RX Regist, OLT RX Now, Status OLT). Tambah field olt_rx_now dan olt_status di DB.radius. Rename modul dari "Radius & Status" menjadi "Radius & Control Gateway". KPI diubah ke ONU Online / Isolir / Pelanggan Aktif / Total Pelanggan.
 
 #### Topologi Infrastruktur (`infra.topologi`)
 - **Fungsi**: Menampilkan pohon topologi infrastruktur jaringan: OLT → Input Splitter → Output Splitter. Mendukung expand/collapse, seleksi node, panel detail (lat/lng, kapasitas, progress bar), serta badge ODP pada node yang bertipe ODP (Optical Distribution Point). Tiga tombol terpisah: "Tambah OLT", "Tambah Input Splitter", "Tambah Output Splitter" (hanya Admin User). Modal Tambah/Edit Input/Output Splitter memiliki toggle "Jadikan sebagai ODP". ODP adalah splitter paling bawah yang langsung menyambung ke modem pelanggan dan tidak bisa ditambahi Output Splitter turunan. Port ODP dipilih saat registrasi pelanggan. Modal Output Splitter menggunakan cascading OLT → Input Splitter (Input Splitter dengan status ODP tidak muncul sebagai opsi induk). Node dapat diedit dan dihapus melalui panel detail (hanya Admin User, semua tipe node).
@@ -146,16 +148,15 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-28 — Tambah fitur Edit & Hapus node pada topologi dengan role-based access control (RBAC). Super User untuk semua tipe, Admin User hanya untuk tipe Splitter.
   - 2026-07-29 — Konsep ODP: toggle ODP pada add/edit Input/Output Splitter. Badge ODP di pohon & panel. Input Splitter ODP tidak bisa ditambahi Output Splitter. Data registrasi pelanggan gunakan `olt_odp_id`.
 
-#### Data Perangkat (`infra.perangkat`)
-- **Fungsi**: Menampilkan daftar flat (rata) dari seluruh perangkat dalam topologi infrastruktur — OLT, Input Splitter, dan Output Splitter — dalam satu tabel.
-- **Lokasi file**: `app-modules.js:1385-1463`, data dari `DB.infrastructure` (diflatten via `allOltNodes()`)
-- **Data yang dibutuhkan**:
-  - Input: data dari tree `DB.infrastructure` (OLT, input splitter, output splitter)
-  - Tampil: DataTable dengan kolom nama, tipe (badge: Port OLT/Input Splitter/Output Splitter), OLT ID, parent, lat, lng, status. Edit hanya untuk Output Splitter.
-- **Ketergantungan**: `DB.infrastructure`, `allOltNodes()`, `findOltNode()`, `DataTable`, `badge`, `openModal`
-- **Status**: Selesai
+#### ~~Data Perangkat (`infra.perangkat`)~~
+- ~~**Fungsi**: Menampilkan daftar flat (rata) dari seluruh perangkat dalam topologi infrastruktur — OLT, Input Splitter, dan Output Splitter — dalam satu tabel.~~
+- ~~**Lokasi file**: `app-modules.js:1385-1463`, data dari `DB.infrastructure` (diflatten via `allOltNodes()`)~~
+- ~~**Data yang dibutuhkan**: Input dari tree DB.infrastructure~~
+- ~~**Ketergantungan**: `DB.infrastructure`, ~~`allOltNodes()`~~, ~~`findOltNode()`~~, `DataTable`, `badge`, `openModal`~~
+- **Status**: ~~Selesai~~ **Dihapus**
 - **Catatan Perubahan**:
   - 2026-07-28 — Initial prototype, flatten view dari tree infrastructure
+  - 2026-07-29 — Dihapus karena fungsinya sudah tercover oleh Topologi Infrastruktur. `flattenInfra()` dan `Views['infra.perangkat']` dihapus dari `app-modules.js`. Entry NAV_CONFIG dihapus dari `app-main.js`.
 
 ---
 
@@ -175,8 +176,7 @@ customer.pelanggan ──→ customer.registrasi (filter Unregistered)
 customer.paket ──→ customer.pelanggan (lookup package_id)
                ──→ radius.monitoring (lookup bandwidth)
 
-infra.topologi ──→ infra.perangkat (flatten dari tree)
-               ──→ customer.registrasi (OLT nodes untuk registrasi)
+infra.topologi ──→ customer.registrasi (OLT nodes untuk registrasi)
 ```
 
 ---
@@ -192,8 +192,8 @@ infra.topologi ──→ infra.perangkat (flatten dari tree)
 | Invoice | id, customer_id, invoice_number, billing_period, billing_amount, billing_status | Billing Customer, Payment Gateway (lookup) |
 | Payment | id, invoice_id, payment_reference, virtual_account, billing_amount, payment_status | Payment Gateway |
 | Settlement | id, partner_id, ref, type, amount, balance_before, balance_after | Dashboard Pendapatan, Riwayat Settlement |
-| Infrastructure | id, type, label, partner_id, isOdp, children (tree: OLT → Input Splitter → Output Splitter) | Topologi Infrastruktur, Data Perangkat, Registrasi (ODP nodes) |
-| Radius | id, customer_id, bandwidth, customer_status, radius_status | Radius & Status |
+| Infrastructure | id, type, label, partner_id, isOdp, children (tree: OLT → Input Splitter → Output Splitter) | Topologi Infrastruktur, Registrasi (ODP nodes) |
+| Radius | id, customer_id, customer_name, pppoe_secret, onu_number, bandwidth, customer_status, radius_status, isolation_date, activation_date, last_update, olt_rx_now, olt_status | Radius & Control Gateway |
 | ActivityLog | actor, action, time | Shared (semua modul via `pushActivity()`) |
 
 ---
@@ -243,3 +243,4 @@ infra.topologi ──→ infra.perangkat (flatten dari tree)
 | 2026-07-28 | Topologi: 3 tombol terpisah (OLT/Input/Output), cascading selector pada modal Output Splitter | `infra.topologi` |
 | 2026-07-29 | Role swap navigasi — Super User hanya melihat Kemitraan (read-only), Admin User melihat non-Kemitraan + kelola infrastruktur penuh. Form mitra dikonversi dari modal ke full page. | `app-main.js`, `app-modules.js` |
 | 2026-07-29 | Konsep ODP: toggle ODP pada add/edit splitter, badge ODP di tree & panel, Input ODP tidak bisa ditambah Output. Registrasi pelanggan sederhana: Port ODP + ONU Pelanggan (hapus cascading OLT/Input/Output). | `app-data.js`, `app-modules.js`, `erp-mitra-prototype.html` |
+| 2026-07-29 | Radius & Control Gateway: overhaul tabel ke 10 kolom ERP Griya (Nama, PPPoE, No ONU, Status Berlangganan, Start Subscribe, ODP, Port Access, OLT RX Regist, OLT RX Now, Status OLT). Tambah olt_rx_now, olt_status di DB.radius. Rename modul dari "Radius & Status". Hapus Data Perangkat (`infra.perangkat`, `flattenInfra`, NAV_CONFIG entry). Perbaiki field registrasi: pisahkan No. ONU (text) dan Port Pelanggan (dropdown). | `app-data.js`, `app-modules.js`, `app-main.js`, `PRD.md` |

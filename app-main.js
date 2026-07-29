@@ -30,9 +30,8 @@ const NAV_CONFIG = [
   {
     group:'Jaringan',
     items:[
-      {key:'radius.monitoring', label:'Radius & Status', icon:'bolt', eyebrow:'Radius & Control Gateway', title:'Radius & Status Layanan'},
+      {key:'radius.monitoring', label:'Radius & Control Gateway', icon:'bolt', eyebrow:'Radius & Control Gateway', title:'Radius & Control Gateway'},
       {key:'infra.topologi', label:'Topologi Infrastruktur', icon:'network', eyebrow:'Infrastruktur / ODP', title:'Topologi Infrastruktur'},
-      {key:'infra.perangkat', label:'Data Perangkat', icon:'odp', eyebrow:'Infrastruktur / ODP', title:'Data Perangkat'},
     ]
   },
 ];
