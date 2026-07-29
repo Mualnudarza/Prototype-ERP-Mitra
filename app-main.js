@@ -22,8 +22,8 @@ const NAV_CONFIG = [
   {
     group:'Keuangan',
     items:[
-      {key:'billing.tagihan', label:'Billing Customer', icon:'receipt', eyebrow:'Billing & Settlement', title:'Billing Customer'},
-      {key:'billing.settlement', label:'Riwayat Settlement', icon:'history', eyebrow:'Billing & Settlement', title:'Riwayat Settlement'},
+      {key:'deposit.dashboard', label:'Dashboard Deposit', icon:'wallet', eyebrow:'Keuangan Mitra', title:'Dashboard Deposit'},
+      {key:'settlement.dashboard', label:'Dashboard Settlement', icon:'history', eyebrow:'Keuangan Mitra', title:'Dashboard Settlement'},
       {key:'payment.gateway', label:'Payment Gateway', icon:'creditCard', eyebrow:'Payment Gateway (Paspe)', title:'Monitoring Pembayaran'},
     ]
   },

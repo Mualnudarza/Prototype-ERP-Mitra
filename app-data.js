@@ -61,7 +61,7 @@ const WILAYAH_LIST = ['Jabodetabek','Jawa Barat','Jawa Tengah','Jawa Timur','Bal
 const DB = {};
 
 DB.partners = [
-  {id:'PTR-0001', partner_code:'DSR-JKT-01', partner_name:'Mitra Nusantara Net', company_name:'PT Nusantara Net Indonesia', phone_number:'0812-3456-7810', email:'admin@nusantaranet.id', address:'Jl. Sudirman Kav. 21, Jakarta Selatan', operational_area:'Jabodetabek', business_configuration:'Revenue Share 70/30', status:'Aktif', users_count:3, created_at:'2024-02-11', pic_name:'Budi Santoso', cooperation_name:'Kerja Sama Distribusi Fiber', cooperation_doc_no:'PKS/2024/001', cooperation_start:'2024-02-11', cooperation_end:'2027-02-11', cooperation_doc_file:'PKS_NetIndo_2024.pdf', npwp_nib:'01.234.567.8-901.000', bank_name:'Bank Mandiri', bank_account_no:'1230007890123', bank_account_name:'PT Nusantara Net Indonesia', payment_due_type:'Tanggal Tetap', payment_due_value:'10', cashier_deposit_min:500000, cashier_deposit_initial:5000000, kso_value:30, kso_type:'percentage', other_deductions:[{name:'Biaya Administrasi',value:2,type:'percentage'}]},
+  {id:'PTR-0001', partner_code:'DSR-JKT-01', partner_name:'Mitra Nusantara Net', company_name:'PT Nusantara Net Indonesia', phone_number:'0812-3456-7810', email:'admin@nusantaranet.id', address:'Jl. Sudirman Kav. 21, Jakarta Selatan', operational_area:'Jabodetabek', business_configuration:'Revenue Share 70/30', status:'Aktif', users_count:3, created_at:'2024-02-11', pic_name:'Budi Santoso', cooperation_name:'Kerja Sama Distribusi Fiber', cooperation_doc_no:'PKS/2024/001', cooperation_start:'2024-02-11', cooperation_end:'2027-02-11', cooperation_doc_file:'PKS_NetIndo_2024.pdf', npwp_nib:'01.234.567.8-901.000', bank_name:'Bank Mandiri', bank_account_no:'1230007890123', bank_account_name:'PT Nusantara Net Indonesia', payment_due_type:'Tanggal Tetap', payment_due_value:'10', cashier_deposit_min:500000, cashier_deposit_initial:5000000, deposit_balance:4701000, kso_value:30, kso_type:'percentage', other_deductions:[{name:'Biaya Administrasi',value:2,type:'percentage'}]},
 ];
 
 DB.users = [
@@ -71,6 +71,15 @@ DB.users = [
 ];
 
 DB.roles = ['Administrator Mitra','Staf Billing','Staf Customer Service','Teknisi'];
+
+DB.depositHistory = [
+  {id:'DEP-0001', partner_id:'PTR-0001', ref:'DEP/2026/07/0001', type:'Deposit Masuk', date:'2026-07-28', amount:5000000, balance_before:0, balance_after:5000000, note:'Setoran awal kasir mitra', status:'Berhasil'},
+  {id:'DEP-0002', partner_id:'PTR-0001', ref:'DEP/2026/07/0002', type:'Deposit Keluar', date:'2026-07-29', amount:-299000, balance_before:5000000, balance_after:4701000, note:'Pembayaran tunai CUS-2001 (Andi Wijaya)', status:'Berhasil'}
+];
+
+DB.settlements = [
+  {id:'SET-0001', partner_id:'PTR-0001', ref:'SET/2026/07/0001', period:'Juli 2026', tx_count:1, gross_revenue:299000, total_deduction:95680, net_revenue:203320, bank_account:'Bank Mandiri - 1230007890123', status:'Selesai', date:'2026-07-29'},
+];
 
 DB.settlementHistory = [
   {id:'STL-500231', partner_id:'PTR-0001', ref:'STL/2026/07/0231', type:'Settlement', amount:14250000, balance_before:2100000, balance_after:16350000, date:'2026-07-20', note:'Settlement periode Juli 2026'},
@@ -109,7 +118,7 @@ function custName(id){ const c = DB.customers.find(x=>x.id===id); return c? c.cu
 function partnerName(id){ const p = DB.partners.find(x=>x.id===id); return p? p.partner_name : '-'; }
 
 DB.invoices = [
-  {id:'INV-880231', customer_id:'CUS-2001', invoice_number:'INV/2026/07/00231', billing_period:'Juli 2026', billing_amount:299000, generated_date:'2026-07-01', due_date:'2026-07-15', billing_status:'Lunas'},
+  {id:'INV-880231', customer_id:'CUS-2001', invoice_number:'INV/2026/07/00231', billing_period:'Juli 2026', billing_amount:299000, generated_date:'2026-07-01', due_date:'2026-07-15', billing_status:'Lunas', extra_charge:5980, total_paid:304980, settled:false},
   {id:'INV-880187', customer_id:'CUS-2002', invoice_number:'INV/2026/07/00187', billing_period:'Juli 2026', billing_amount:199000, generated_date:'2026-07-01', due_date:'2026-07-10', billing_status:'Jatuh Tempo'},
   {id:'INV-880305', customer_id:'CUS-2003', invoice_number:'INV/2026/07/00305', billing_period:'Juli 2026', billing_amount:199000, generated_date:'2026-07-01', due_date:'2026-07-15', billing_status:'Belum Dibayar'},
   {id:'INV-880412', customer_id:'CUS-2004', invoice_number:'INV/2026/06/00412', billing_period:'Juni 2026', billing_amount:429000, generated_date:'2026-06-01', due_date:'2026-06-15', billing_status:'Jatuh Tempo'},
