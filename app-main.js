@@ -39,7 +39,7 @@ const NAV_CONFIG = [
 
 const ALL_ITEMS = NAV_CONFIG.flatMap(g=>g.items);
 const PARTNERSHIP_KEYS = NAV_CONFIG[0].items.map(i=>i.key);
-const DEFAULT_ROUTE = 'partnership.mitra';
+const DEFAULT_ROUTE_SUPER = 'partnership.mitra';
 const DEFAULT_ROUTE_MITRA = 'customer.pelanggan';
 
 function isSuperUser(){ return CURRENT_USER.id === 'super'; }
@@ -47,16 +47,25 @@ function isSuperUser(){ return CURRENT_USER.id === 'super'; }
 function currentRoute(){
   const hash = window.location.hash.replace('#','');
   const routeKey = hash.split('?')[0];
-  const allowed = isSuperUser() ? ALL_ITEMS : ALL_ITEMS.filter(i=>!PARTNERSHIP_KEYS.includes(i.key));
-  return allowed.some(i=>i.key===routeKey) ? routeKey : (isSuperUser() ? DEFAULT_ROUTE : DEFAULT_ROUTE_MITRA);
+  if(isSuperUser()){
+    return PARTNERSHIP_KEYS.some(i=>i===routeKey) ? routeKey : DEFAULT_ROUTE_SUPER;
+  }
+  return !PARTNERSHIP_KEYS.includes(routeKey) ? routeKey : DEFAULT_ROUTE_MITRA;
 }
 
 function navWithBadges(){
-  return NAV_CONFIG
-    .filter(group => isSuperUser() || group.group !== 'Kemitraan')
-    .map(group => ({
+  if(isSuperUser()){
+    const group = NAV_CONFIG[0];
+    return [{
       group: group.group,
       items: group.items.map(item => ({...item, badge: item.badgeFn ? item.badgeFn() : undefined}))
+    }];
+  }
+  return NAV_CONFIG
+    .filter(g => g.group !== 'Kemitraan')
+    .map(g => ({
+      group: g.group,
+      items: g.items.map(item => ({...item, badge: item.badgeFn ? item.badgeFn() : undefined}))
     }));
 }
 
@@ -87,7 +96,7 @@ function renderRoute(){
 window.addEventListener('hashchange', renderRoute);
 
 document.addEventListener('DOMContentLoaded', ()=>{
-  const initRoute = isSuperUser() ? DEFAULT_ROUTE : DEFAULT_ROUTE_MITRA;
+  const initRoute = isSuperUser() ? DEFAULT_ROUTE_SUPER : DEFAULT_ROUTE_MITRA;
   if(!window.location.hash) window.location.hash = initRoute;
   renderRoute();
 

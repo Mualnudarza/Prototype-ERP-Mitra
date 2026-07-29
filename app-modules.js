@@ -214,7 +214,6 @@ Views['partnership.mitra'] = function(root){
       {key:'status', label:'Semua Status', options:[{value:'Aktif',label:'Aktif'},{value:'Nonaktif',label:'Nonaktif'}], match:(r,v)=>r.status===v},
       {key:'area', label:'Semua Wilayah', options:WILAYAH_LIST.map(w=>({value:w,label:w})), match:(r,v)=>r.operational_area===v},
     ],
-    toolbarRight:`<button class="btn btn-primary btn-sm" id="btnAddMitra">${ic('plus')}Tambah Mitra</button>`,
     columns:[
       {key:'partner_code', header:'Kode Mitra', sortable:true, render:r=>`<span class="cell-mono">${r.partner_code}</span>`},
       {key:'partner_name', header:'Nama Mitra', sortable:true, render:r=>`
@@ -225,19 +224,7 @@ Views['partnership.mitra'] = function(root){
       {key:'operational_area', header:'Wilayah Operasional', sortable:true},
       {key:'users_count', header:'Jumlah Pengguna', sortable:true, align:'right', render:r=>`<span class="cell-num">${r.users_count}</span>`},
       {key:'status', header:'Status', sortable:true, render:r=>statusBadge(r.status)},
-      {key:'actions', header:'', align:'right', render:r=>`
-        <div class="row-actions">
-          <button class="btn btn-secondary btn-sm act-edit">${ic('edit')}Edit</button>
-        </div>`},
     ],
-    afterRender(wrap){
-      wrap.querySelectorAll('tbody tr[data-id]').forEach(tr=>{
-        const p = DB.partners.find(x=>x.id===tr.dataset.id);
-        tr.querySelector('.act-edit')?.addEventListener('click', ()=>{ window.location.hash = `partnership.mitra?id=${p.id}`; });
-      });
-      const addBtn = wrap.querySelector('#btnAddMitra');
-      if(addBtn) addBtn.addEventListener('click', ()=>{ window.location.hash = 'partnership.mitra?id=add'; });
-    }
   });
   const cardEl = document.createElement('div');
   cardEl.className = 'card';
@@ -273,7 +260,6 @@ Views['partnership.pengguna'] = function(root){
       {key:'role', label:'Semua Role', options:DB.roles.map(r=>({value:r,label:r})), match:(r,v)=>r.role_name===v},
       {key:'status', label:'Semua Status', options:[{value:'Aktif',label:'Aktif'},{value:'Nonaktif',label:'Nonaktif'}], match:(r,v)=>r.user_status===v},
     ],
-    toolbarRight:`<button class="btn btn-primary btn-sm" id="btnAddUser">${ic('plus')}Tambah Pengguna</button>`,
     columns:[
       {key:'user_name', header:'Nama Pengguna', sortable:true, render:r=>`
         <div class="item-cell">
@@ -284,83 +270,10 @@ Views['partnership.pengguna'] = function(root){
       {key:'role_name', header:'Role', sortable:true, render:r=>badge(r.role_name,'blue')},
       {key:'user_status', header:'Status', sortable:true, render:r=>statusBadge(r.user_status)},
       {key:'last_login', header:'Last Login', sortable:true, sortValue:r=>r.last_login, render:r=>`<span class="cell-secondary">${Fmt.datetime(r.last_login)}</span>`},
-      {key:'actions', header:'', align:'right', render:()=>`
-        <div class="row-actions">
-          <button class="btn btn-secondary btn-sm act-edit">${ic('edit')}Edit</button>
-          <button class="btn btn-ghost btn-sm act-reset">${ic('key')}Reset</button>
-          <button class="btn btn-ghost btn-sm act-detail">${ic('eye')}</button>
-        </div>`},
     ],
-    afterRender(wrap){
-      wrap.querySelectorAll('tbody tr[data-id]').forEach(tr=>{
-        const u = DB.users.find(x=>x.id===tr.dataset.id);
-        tr.querySelector('.act-edit')?.addEventListener('click', ()=>openUserForm(u));
-        tr.querySelector('.act-detail')?.addEventListener('click', ()=>openUserDetail(u));
-        tr.querySelector('.act-reset')?.addEventListener('click', ()=>{
-          toast(`Kredensial ${u.user_name} berhasil direset`);
-          pushActivity('Super Admin', `mereset password pengguna ${u.user_name}`);
-        });
-      });
-      wrap.querySelector('#btnAddUser')?.addEventListener('click', ()=>openUserForm(null));
-    }
   });
   const cardEl = document.createElement('div'); cardEl.className='card'; cardEl.appendChild(table);
   tableMount.appendChild(cardEl);
-
-  function openUserForm(existing){
-    const isEdit = !!existing;
-    Modal.open({
-      title: isEdit ? 'Edit Pengguna' : 'Tambah Pengguna Baru',
-      subtitle: isEdit ? `Memperbarui akun ${existing.user_name}` : 'Buat akun pengguna baru di bawah mitra terpilih',
-      bodyHTML:`
-        ${rowWrap(fieldsHTML([
-          {label:'Nama Pengguna', id:'u_name', value:existing?.user_name, placeholder:'Nama lengkap'},
-          {label:'Username', id:'u_username', value:existing?.username, placeholder:'username'},
-        ]))}
-        ${rowWrap(fieldsHTML([
-          {label:'Mitra', id:'u_partner', type:'select', value:existing?.partner_id, options:DB.partners.map(p=>({value:p.id,label:p.partner_name}))},
-          {label:'Role', id:'u_role', type:'select', value:existing?.role_name, options:DB.roles.map(r=>({value:r,label:r}))},
-        ]))}
-        ${fieldsHTML([{label:'Status Pengguna', id:'u_status', type:'select', value:existing?.user_status||'Aktif', options:[{value:'Aktif',label:'Aktif'},{value:'Nonaktif',label:'Nonaktif'}]}])}
-      `,
-      footHTML:`<button class="btn btn-secondary" id="mCancel">Batal</button><button class="btn btn-primary" id="mSave">${ic('check')}${isEdit?'Simpan':'Buat Pengguna'}</button>`,
-      onOpen(body, foot){
-        foot.querySelector('#mCancel').addEventListener('click', Modal.close);
-        foot.querySelector('#mSave').addEventListener('click', ()=>{
-          const val = id => document.getElementById(id).value.trim();
-          const name = val('u_name');
-          if(!name){ toast('Nama pengguna wajib diisi'); return; }
-          if(isEdit){
-            Object.assign(existing, {user_name:name, username:val('u_username'), partner_id:val('u_partner'), role_name:val('u_role'), user_status:val('u_status')});
-            toast('Perubahan pengguna disimpan');
-            pushActivity('Administrator Mitra', `memperbarui data pengguna ${name}`);
-          } else {
-            DB.users.push({id:nextId('USR'), partner_id:val('u_partner'), user_name:name, username:val('u_username')||name.toLowerCase().replace(/\s+/g,'.'), role_name:val('u_role')||DB.roles[0], user_status:val('u_status')||'Aktif', last_login:new Date().toISOString()});
-            const p = DB.partners.find(x=>x.id===val('u_partner')); if(p) p.users_count += 1;
-            toast('Pengguna baru berhasil dibuat');
-            pushActivity('Administrator Mitra', `menambahkan pengguna baru ${name}`);
-          }
-          Modal.close();
-          kpis(); table.refresh();
-        });
-      }
-    });
-  }
-
-  function openUserDetail(u){
-    Modal.open({
-      title:u.user_name, subtitle:`@${u.username} · ${partnerName(u.partner_id)}`,
-      bodyHTML:`
-        <div class="detail-grid">
-          <div class="detail-item"><span class="dl">Role</span><span class="dv">${badge(u.role_name,'blue')}</span></div>
-          <div class="detail-item"><span class="dl">Status</span><span class="dv">${statusBadge(u.user_status)}</span></div>
-          <div class="detail-item"><span class="dl">Mitra</span><span class="dv">${partnerName(u.partner_id)}</span></div>
-          <div class="detail-item"><span class="dl">Login Terakhir</span><span class="dv">${Fmt.datetime(u.last_login)}</span></div>
-        </div>`,
-      footHTML:`<button class="btn btn-primary" id="mClose3">Tutup</button>`,
-      onOpen(body, foot){ foot.querySelector('#mClose3').addEventListener('click', Modal.close); }
-    });
-  }
 };
 
 Views['partnership.pendapatan'] = function(root){
@@ -1373,10 +1286,9 @@ Views['infra.topologi'] = function(root){
 
   function paintTree(){
     const addBtns = isSuperUser()
-      ? `<button class="btn btn-primary btn-sm" id="btnAddOlt">${ic('plus')}Tambah OLT</button>
+      ? ''
+      : `<button class="btn btn-primary btn-sm" id="btnAddOlt">${ic('plus')}Tambah OLT</button>
          <button class="btn btn-secondary btn-sm" id="btnAddInput">${ic('plus')}Tambah Input Splitter</button>
-         <button class="btn btn-secondary btn-sm" id="btnAddOutput">${ic('plus')}Tambah Output Splitter</button>`
-      : `<button class="btn btn-secondary btn-sm" id="btnAddInput">${ic('plus')}Tambah Input Splitter</button>
          <button class="btn btn-secondary btn-sm" id="btnAddOutput">${ic('plus')}Tambah Output Splitter</button>`;
     treeCard.innerHTML = `
       <div class="section-head"><h3>Topologi Infrastruktur</h3>
@@ -1407,8 +1319,8 @@ Views['infra.topologi'] = function(root){
       return;
     }
 
-    const canEdit = node.type !== 'olt' || isSuperUser();
-    const canDelete = node.type !== 'olt' || isSuperUser();
+    const canEdit = !isSuperUser();
+    const canDelete = !isSuperUser();
 
     const actionBar = `
       <div style="display:flex;gap:8px;margin-top:16px;">
@@ -1489,7 +1401,7 @@ Views['infra.topologi'] = function(root){
       panelCard.querySelector('#pSaveLoc').addEventListener('click', ()=>{
         node.lat = parseFloat(document.getElementById('pLat').value)||node.lat;
         node.lng = parseFloat(document.getElementById('pLng').value)||node.lng;
-        pushActivity('Super Admin', `memperbarui koordinat lokasi ${node.label}`);
+        pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `memperbarui koordinat lokasi ${node.label}`);
         toast('Koordinat lokasi OLT diperbarui'); paintPanel();
       });
     }
@@ -1617,7 +1529,7 @@ Views['infra.topologi'] = function(root){
           const newOlt = {id:nextId('OLT'), type:'olt', label:name, olt_type:val('n_olt_type')||'Huawei MA5800', partner_id:val('n_olt_partner'), address:val('n_olt_addr'), lat:parseFloat(val('n_olt_lat'))||0, lng:parseFloat(val('n_olt_lng'))||0, children:[]};
           DB.infrastructure.push(newOlt);
           expanded.add(newOlt.id);
-          pushActivity('Super Admin', `menambahkan Port OLT baru ${name}`);
+          pushActivity(isSuperUser()?'Super Admin':'Administrator Mitra', `menambahkan Port OLT baru ${name}`);
           toast('Port OLT baru berhasil ditambahkan');
           Modal.close(); selectedId = newOlt.id; kpis(); paintTree(); paintPanel();
         });

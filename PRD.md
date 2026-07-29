@@ -18,24 +18,23 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
 ## Daftar Modul
 
 #### Data Mitra (`partnership.mitra`)
-- **Fungsi**: Mengelola seluruh entitas mitra. Dukung dua mode: (1) Tabel daftar mitra dengan KPI dan filter, (2) Halaman penuh untuk Tambah/Edit mitra (navigasi via hash `#partnership.mitra?id=add` atau `#partnership.mitra?id=PTR-xxxx`). Halaman form mencakup Informasi Mitra, Kerja Sama B2B, Rekening Settlement, dan Konfigurasi Jatuh Tempo.
-- **Lokasi file**: `app-modules.js:54-204` (list), `app-modules.js:47-175` (`renderMitraForm`), data di `app-data.js` (`DB.partners`)
+- **Fungsi**: Menampilkan daftar mitra dengan KPI dan filter. Hanya diakses oleh Super User (read-only — tidak ada tombol Tambah/Edit).
+- **Lokasi file**: `app-modules.js` (list view), data di `app-data.js` (`DB.partners`)
 - **Data yang dibutuhkan**:
   - Input: partner_code, partner_name, company_name, pic_name, phone_number, email, status, cooperation_name, cooperation_doc_no, cooperation_start, cooperation_end, cooperation_doc_file, npwp_nib, bank_name, bank_account_no, bank_account_name, payment_due_type, payment_due_value
-  - Tampil: KPI grid, DataTable dengan kolom kode, nama mitra, nama perusahaan, wilayah, jumlah pengguna, status. Form page dengan section (Informasi, B2B, Rekening, Jatuh Tempo).
-- **Ketergantungan**: `DataTable`, `renderKPIs`, `pushActivity`
+  - Tampil: KPI grid, DataTable dengan kolom kode, nama mitra, nama perusahaan, wilayah, jumlah pengguna, status.
+- **Ketergantungan**: `DataTable`, `renderKPIs`
 - **Status**: Selesai
 - **Catatan Perubahan**:
   - 2026-07-28 — Initial prototype, 6 mitra dummy data
-  - 2026-07-28 — Konversi form dari modal ke halaman penuh (page view). Field diperbarui sesuai requirement baru (PIC, B2B, Settlement, Jatuh Tempo).
 
 #### Manajemen Pengguna (`partnership.pengguna`)
-- **Fungsi**: Mengelola akun pengguna di bawah masing-masing mitra. Setiap pengguna memiliki role (Administrator Mitra, Staf Billing, Staf Customer Service, Teknisi), status, dan last login.
-- **Lokasi file**: `app-modules.js:206-322`, data di `app-data.js` (`DB.users`, `DB.roles`)
+- **Fungsi**: Menampilkan daftar akun pengguna per mitra. Hanya diakses oleh Super User (read-only — tidak ada tombol Tambah/Edit/Reset).
+- **Lokasi file**: `app-modules.js` (list view), data di `app-data.js` (`DB.users`, `DB.roles`)
 - **Data yang dibutuhkan**:
   - Input: partner_id (FK ke partners), user_name, username, role_name, user_status
-  - Tampil: DataTable dengan kolom nama pengguna, username, role (badge), status, login terakhir. Modal detail menampilkan info lengkap + timeline aktivitas.
-- **Ketergantungan**: `DB.partners` (untuk referensi nama mitra), `DataTable`, `badge`, `openModal`
+  - Tampil: DataTable dengan kolom nama pengguna, username, role (badge), status, login terakhir.
+- **Ketergantungan**: `DB.partners` (untuk referensi nama mitra), `DataTable`, `badge`
 - **Status**: Selesai
 - **Catatan Perubahan**:
   - 2026-07-28 — Initial prototype, 8 pengguna dummy, 4 role
@@ -131,7 +130,7 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-28 — Initial prototype, status sync antara radius dan customers
 
 #### Topologi Infrastruktur (`infra.topologi`)
-- **Fungsi**: Menampilkan pohon topologi infrastruktur jaringan: OLT → Input Splitter → Output Splitter. Mendukung expand/collapse, seleksi node, panel detail (lat/lng, kapasitas, progress bar). Tiga tombol terpisah: "Tambah OLT" (hanya Super User), "Tambah Input Splitter", "Tambah Output Splitter" (kedua role). Modal Output Splitter menggunakan cascading OLT → Input Splitter. Node dapat diedit dan dihapus melalui panel detail (Admin User tidak dapat mengedit/menghapus OLT).
+- **Fungsi**: Menampilkan pohon topologi infrastruktur jaringan: OLT → Input Splitter → Output Splitter. Mendukung expand/collapse, seleksi node, panel detail (lat/lng, kapasitas, progress bar). Tiga tombol terpisah: "Tambah OLT", "Tambah Input Splitter", "Tambah Output Splitter" (hanya Admin User). Modal Output Splitter menggunakan cascading OLT → Input Splitter. Node dapat diedit dan dihapus melalui panel detail (hanya Admin User, semua tipe node).
 - **Lokasi file**: `app-modules.js:1208-1557`, data di `app-data.js` (`DB.infrastructure`)
 - **Data yang dibutuhkan**:
   - Input (OLT): id, label, partner_id, olt_type (Huawei MA5800/ZTE C320/Fiberhome AN5516), lat, lng, address
@@ -219,7 +218,7 @@ infra.topologi ──→ infra.perangkat (flatten dari tree)
 ## Catatan Teknis & Batasan Prototype
 
 - **Tidak ada persistensi**: Semua data in-memory di objek `DB` global. Reload browser = reset data. Tombol "Reset data" hanya `location.reload()`.
-- **Tidak ada autentikasi**: User Super Admin dan Admin Mitra dipilih via dropdown switcher di sidebar. Role ditegakkan via `isSuperUser()` — Admin Mitra tidak bisa mengakses modul Kemitraan dan tidak bisa menambah OLT.
+- **Tidak ada autentikasi**: User Super Admin dan Admin Mitra dipilih via dropdown switcher di sidebar. Role ditegakkan via `isSuperUser()` — Super User hanya melihat modul Kemitraan (read-only). Admin Mitra melihat semua modul non-Kemitraan termasuk kelola infrastruktur (tambah/edit/hapus semua tipe node).
 - **Tidak ada API/backend**: Semua operasi murni client-side.
 - **Tidak ada test**: Tidak ada framework atau file test.
 - **Single-user view**: Tidak ada multi-tenancy atau scoped view per mitra — Super Admin melihat semua data.
@@ -240,3 +239,4 @@ infra.topologi ──→ infra.perangkat (flatten dari tree)
 | 2026-07-28 | User switcher dropdown, role-based navigation (Super Admin / Admin Mitra) | `app-ui.js`, `app-main.js`, `app-data.js` |
 | 2026-07-28 | Registrasi ONU dikonversi dari modal ke halaman penuh (hash-based nav) | `customer.registrasi`, `customer.pelanggan` |
 | 2026-07-28 | Topologi: 3 tombol terpisah (OLT/Input/Output), cascading selector pada modal Output Splitter | `infra.topologi` |
+| 2026-07-29 | Role swap navigasi — Super User hanya melihat Kemitraan (read-only), Admin User melihat non-Kemitraan + kelola infrastruktur penuh. Form mitra dikonversi dari modal ke full page. | `app-main.js`, `app-modules.js` |
