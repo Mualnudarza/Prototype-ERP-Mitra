@@ -52,6 +52,7 @@ function pushActivity(actor, action){
 const Views = {};
 
 function renderMitraForm(root, existing){
+  if(!isSuperUser()){ window.location.hash='partnership.mitra'; return; }
   const isEdit = !!existing;
   
   if(!isEdit){
@@ -214,6 +215,7 @@ Views['partnership.mitra'] = function(root){
       {key:'status', label:'Semua Status', options:[{value:'Aktif',label:'Aktif'},{value:'Nonaktif',label:'Nonaktif'}], match:(r,v)=>r.status===v},
       {key:'area', label:'Semua Wilayah', options:WILAYAH_LIST.map(w=>({value:w,label:w})), match:(r,v)=>r.operational_area===v},
     ],
+    toolbarRight: isSuperUser() ? `<button class="btn btn-primary btn-sm" id="btnAddMitra">${ic('plus')}Tambah Mitra</button>` : '',
     columns:[
       {key:'partner_code', header:'Kode Mitra', sortable:true, render:r=>`<span class="cell-mono">${r.partner_code}</span>`},
       {key:'partner_name', header:'Nama Mitra', sortable:true, render:r=>`
@@ -225,6 +227,9 @@ Views['partnership.mitra'] = function(root){
       {key:'users_count', header:'Jumlah Pengguna', sortable:true, align:'right', render:r=>`<span class="cell-num">${r.users_count}</span>`},
       {key:'status', header:'Status', sortable:true, render:r=>statusBadge(r.status)},
     ],
+    afterRender(wrap){
+      wrap.querySelector('#btnAddMitra')?.addEventListener('click', ()=>{ window.location.hash='partnership.mitra?id=add'; });
+    }
   });
   const cardEl = document.createElement('div');
   cardEl.className = 'card';
