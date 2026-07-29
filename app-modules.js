@@ -226,7 +226,7 @@ function renderMitraForm(root, existing){
       pushActivity('Super Admin', `memperbarui profil mitra ${name}`);
       toast('Perubahan profil mitra disimpan');
     } else {
-      const newP = {id: nextId('PTR'), users_count:0, created_at:new Date().toISOString().slice(0,10), ...data};
+      const newP = {id: nextId('PTR'), users_count:1, created_at:new Date().toISOString().slice(0,10), ...data};
       DB.partners.push(newP);
       DB.users.push({id:nextId('USR'), partner_id:newP.id, user_name:name+' Admin', username:(name.split(' ')[0]||'admin').toLowerCase()+'.admin', role_name:'Administrator Mitra', user_status:'Aktif', last_login:new Date().toISOString()});
       pushActivity('Super Admin', `meregistrasikan mitra baru ${name}`);
