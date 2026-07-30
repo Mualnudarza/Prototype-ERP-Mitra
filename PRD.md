@@ -4,7 +4,7 @@
 | Tipe | : Prototype |
 | Stack | : HTML + CSS + Vanilla JS (no framework, no build system, no dependencies) |
 | Status | : Aktif |
-| Terakhir diupdate | : 2026-07-30 |
+| Terakhir diupdate | : 2026-07-31 |
 | Sumber acuan | : Belum ada BRD, ini exploratory |
 
 ---
@@ -33,6 +33,7 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
 - **Catatan Perubahan**:
   - 2026-07-28 — Initial prototype, 6 mitra dummy data
   - 2026-07-29 — Tambah tombol "Tambah Mitra" (toolbar) dan "Edit" per baris, khusus Super User. Form mitra diperluas: gabung Rekening Settlement + Jatuh Tempo jadi "Konfigurasi Keuangan". Tambah sub-bagian Deposit Kasir (minimal + nominal awal) dan Potongan (KSO + daftar potongan lainnya, masing-masing bisa persentase/nominal).
+  - 2026-07-30 — Reduksi data awal: hanya 1 mitra aktif (PTR-0001) untuk menyederhanakan prototipe. Data baru tetap bisa ditambah via form Tambah Mitra.
 
 #### Manajemen Pengguna (`partnership.pengguna`)
 - **Fungsi**: Menampilkan daftar akun pengguna per mitra. Read-only — tidak ada tombol Tambah/Edit/Reset.
@@ -59,6 +60,8 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
 ---
 
 ### Admin User — Grup Pelanggan, Keuangan & Jaringan
+
+> **Grup Keuangan** di menu kini merupakan satu view `keuangan.mitra` dengan dua tab: **Dashboard Deposit** (sub-tab: Riwayat Deposit, Pembayaran Customer, Histori Pembayaran) dan **Dashboard Settlement**. Modul `deposit.dashboard` dan `settlement.dashboard` masih ada sebagai entry point terpisah namun tidak lagi muncul di navigasi.
 
 #### Data Pelanggan (`customer.pelanggan`)
 - **Fungsi**: Mengelola data pelanggan akhir (end-user) termasuk kredensial PPPoE, informasi perangkat (modem, OLT port, ONU), koordinat lokasi, dan status langganan. Pelanggan Unregistered memiliki tombol "Registrasi" yang mengarah ke `#customer.registrasi?id={customer_id}` (halaman registrasi penuh).
@@ -99,12 +102,12 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
 
 #### Dashboard Deposit (`deposit.dashboard`)
 - **Fungsi**: Mengelola saldo deposit kasir mitra, histori transaksi deposit, penerimaan pembayaran tunai dari customer, dan histori pembayaran via payment gateway. Menampilkan KPI saldo, total deposit masuk/keluar, total pembayaran customer. Terdapat tiga submenu tab: Riwayat Deposit, Pembayaran Customer, dan Histori Pembayaran.
-- **Lokasi file**: `app-modules.js` (view `deposit.dashboard` dalam `keuangan.mitra`), data di `app-data.js` (`DB.partners`, `DB.depositHistory`, `DB.invoices`, `DB.customers`, `DB.packages`, `DB.payments`)
+- **Lokasi file**: Di-render dari `Views['keuangan.mitra']` → tab "Dashboard Deposit". Data di `app-data.js` (`DB.partners`, `DB.depositHistory`, `DB.invoices`, `DB.customers`, `DB.packages`, `DB.payments`)
 - **Data yang dibutuhkan**:
   - Input: partner_id (FK), ref, type (Deposit Masuk/Deposit Keluar), date, amount, balance_before, balance_after, note, status
   - Tampil (KPI): Saldo Deposit, Total Deposit Masuk, Total Deposit Keluar, Total Pembayaran Customer
   - Tampil (Riwayat Deposit): DataTable dengan kolom nomor transaksi, jenis transaksi, tanggal, nominal, saldo sebelum/sesudah, keterangan, status
-  - Tampil (Pembayaran Customer): DataTable daftar customer mitra dengan kolom Nama Customer, PPPoE Secret, Paket, Periode, Nominal Paket, Biaya Tambahan, Total Bayar, Status (Lunas/Belum Dibayar), Aksi (tombol Bayar untuk status Belum Dibayar). Klik Bayar membuka modal konfirmasi detail nominal paket, biaya tambahan, total bayar, dan saldo deposit. Konfirmasi: update invoice Lunas, potong deposit, catat depositHistory & payments.
+  - Tampil (Pembayaran Customer): DataTable daftar semua customer mitra dengan kolom Nama Customer, PPPoE Secret, Paket, Periode, Nominal Paket, Biaya Tambahan, Total Bayar, Status (Lunas/Belum Dibayar), Aksi (tombol Bayar untuk status Belum Dibayar). Klik Bayar membuka modal konfirmasi detail nominal paket, biaya tambahan, total bayar, dan saldo deposit. Konfirmasi: update invoice Lunas, potong deposit, catat depositHistory & payments.
   - Tampil (Histori Pembayaran): DataTable histori pembayaran via payment gateway dengan kolom Nomor Referensi, Nomor Tagihan, Nama Pelanggan, Virtual Account, Nominal Pembayaran, Tanggal Pembayaran, Status. Modal detail dengan timeline callback.
 - **Ketergantungan**: `DataTable`, `renderKPIs`, `badge`, `statusBadge`, `Modal`, `toast`, `pushActivity`, `nextId`
 - **Status**: Selesai
@@ -112,19 +115,22 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-29 — Modul baru menggantikan Billing Customer: Dashboard Deposit dengan submenu Riwayat Deposit & Pembayaran Customer. Kalkulasi biaya tambahan otomatis dari other_deductions mitra. Integrasi deposit→invoice→payment→settlement flow.
   - 2026-07-29 — Payment Gateway dipindah ke sub-tab Histori Pembayaran di Dashboard Deposit. Main menu Keuangan hanya berisi Dashboard Deposit & Dashboard Settlement.
   - 2026-07-29 — Menambahkan submenu Histori Pembayaran (sebelumnya modul Payment Gateway terpisah). KPI Pembayaran Gateway dipindah ke sub-tab Histori Pembayaran di Dashboard Deposit. Modul Payment Gateway dihapus dari menu utama.
+  - 2026-07-30 — Pembayaran Customer: dari dropdown pilih customer (single) ke DataTable daftar lengkap customer mitra dengan kolom status & tombol Bayar per baris.
 
 #### Dashboard Settlement (`settlement.dashboard`)
-- **Fungsi**: Menampilkan rekap hasil transaksi customer dalam satu periode settlement: Pendapatan Kotor (Gross), Total Potongan (KSO, Payment Gateway Fee, Biaya Admin/Lainnya), Pendapatan Bersih (Net), dan Saldo Siap Settlement. Terdapat tombol Ajukan Pencairan Settlement dan submenu Riwayat Settlement.
-- **Lokasi file**: `app-modules.js` (view `settlement.dashboard`), data di `app-data.js` (`DB.settlements`, `DB.invoices`, `DB.payments`, `DB.partners`)
+- **Fungsi**: Menampilkan rekap hasil transaksi customer dalam satu periode settlement: Pendapatan Kotor (Gross), Total Potongan (KSO, Payment Gateway Fee, Biaya Admin/Lainnya), Pendapatan Bersih (Net), dan Saldo Siap Settlement. Terdapat tombol Ajukan Pencairan Settlement dan tabel Riwayat Settlement di bawahnya.
+- **Lokasi file**: Di-render dari `Views['keuangan.mitra']` → tab "Dashboard Settlement". Data di `app-data.js` (`DB.settlements`, `DB.invoices`, `DB.payments`, `DB.partners`)
 - **Data yang dibutuhkan**:
   - Input: partner_id, ref, period, tx_count, gross_revenue, total_deduction, net_revenue, bank_account, status, date
-  - Tampil (KPI): Gross Revenue, Total Potongan, Net Revenue, Saldo Siap Settlement
-  - Tampil (Riwayat Settlement): DataTable dengan kolom nomor settlement, periode, jumlah transaksi, pendapatan kotor, total potongan, pendapatan bersih, rekening tujuan, status, tanggal
-  - Aksi: Ajukan Pencairan Settlement → membuka modal input nominal pencairan (default = saldo maksimal, minimal Rp 1.000). Validasi nominal tidak melebihi saldo tersedia. Konfirmasi: membuat record DB.settlements, jika nominal penuh tandai invoice settled=true.
+  - Tampil (KPI): Gross Revenue, Total Potongan, Net Revenue, Saldo Siap Settlement (termasuk jumlah transaksi tidak settled)
+  - Tampil (Riwayat Settlement): DataTable dengan kolom nomor settlement, periode, jumlah transaksi, pendapatan kotor, total potongan, pendapatan bersih, rekening tujuan, status, tanggal (tampil langsung di halaman, bukan sebagai sub-tab)
+  - Aksi: Ajukan Pencairan Settlement → modal input nominal pencairan (default = saldo maksimal, minimal Rp 1.000, step Rp 1.000). Validasi nominal tidak melebihi saldo tersedia. Konfirmasi: membuat record `DB.settlements`, jika nominal penuh tandai invoice `settled=true`. Tampilkan rekening tujuan dari data mitra.
 - **Ketergantungan**: `DataTable`, `renderKPIs`, `badge`, `statusBadge`, `Modal`, `toast`, `pushActivity`, `nextId`
 - **Status**: Selesai
 - **Catatan Perubahan**:
   - 2026-07-29 — Modul baru menggantikan Riwayat Settlement: Dashboard Settlement dengan kalkulasi potongan dinamis (KSO %, PG Fee Rp 3.000/transaksi non-cash, other_deductions %) dan pencairan otomatis.
+  - 2026-07-30 — Hapus submenu Riwayat Settlement (tabel riwayat tampil langsung di halaman utama). Hapus KPI "Jadwal Settlement Berikutnya". Ubah pencairan dari `confirm()` ke modal input nominal (min Rp 1.000, max = saldo tersedia, step Rp 1.000).
+  - 2026-07-31 — Perbaikan logika pencairan settlement parsial: implementasi FIFO settlement tracking via field `settled_amount` pada invoice. Partial withdraw sekarang menyelesaikan invoice berurutan hingga amount habis, sisa invoice tetap unsettled untuk pencairan selanjutnya. KPI "Saldo Siap Settlement" kini akurat hanya menghitung invoice yang belum fully settled.
 
 #### Payment Gateway (`payment.gateway`) — **Dihapus / Diankir ke Histori Pembayaran**
 - **Fungsi**: Modul terpisah dihapus. Fungsionalitas monitoring payment gateway (Paspe) dipindah ke Dashboard Deposit → sub-tab **Histori Pembayaran**. Data tetap tersedia di `DB.payments` dan diakses melalui Dashboard Deposit → sub-tab Histori Pembayaran.
@@ -182,14 +188,16 @@ partnership.mitra ──→ partnership.pengguna (FK partner_id)
                     ──→ customer.paket (FK partner_id)
 
 customer.pelanggan ──→ customer.registrasi (filter Unregistered)
-                    ──→ billing.tagihan (FK customer_id)
-                    ──→ payment.gateway (via invoice → customer)
+                    ──→ keuangan.mitra (invoice → deposit → settlement)
                     ──→ radius.monitoring (derived dari customers)
 
 customer.paket ──→ customer.pelanggan (lookup package_id)
                ──→ radius.monitoring (lookup bandwidth)
 
-infra.topologi ──→ customer.registrasi (OLT nodes untuk registrasi)
+infra.topologi ──→ customer.registrasi (ODP nodes untuk registrasi)
+
+keuangan.mitra ──→ deposit.dashboard (tab: Riwayat Deposit, Pembayaran Customer, Histori Pembayaran)
+               ──→ settlement.dashboard (tab: Gross→Potongan→Net, Ajukan Pencairan, Riwayat Settlement)
 ```
 
 ---
@@ -262,4 +270,9 @@ infra.topologi ──→ customer.registrasi (OLT nodes untuk registrasi)
 | 2026-07-29 | Radius & Control Gateway: overhaul tabel ke 10 kolom ERP Griya (Nama, PPPoE, No ONU, Status Berlangganan, Start Subscribe, ODP, Port Access, OLT RX Regist, OLT RX Now, Status OLT). Tambah olt_rx_now, olt_status di DB.radius. Rename modul dari "Radius & Status". Hapus Data Perangkat (`infra.perangkat`, `flattenInfra`, NAV_CONFIG entry). Perbaiki field registrasi: pisahkan No. ONU (text) dan Port Pelanggan (dropdown). | `app-data.js`, `app-modules.js`, `app-main.js`, `PRD.md` |
 | 2026-07-29 | Data Mitra: tambah tombol "Tambah Mitra" (toolbar) dan "Edit" per baris, khusus Super User. Form mitra diperluas: gabung Rekening Settlement + Jatuh Tempo jadi "Konfigurasi Keuangan" dengan 4 sub-bagian (Jatuh Tempo, Settlement, Deposit Kasir, Potongan KSO + Lainnya). | `app-data.js`, `app-modules.js`, `PRD.md` |
 | 2026-07-29 | Modul Keuangan Mitra: gabung Payment Gateway ke Dashboard Deposit (sub-tab Histori Pembayaran). Main menu Keuangan: Dashboard Deposit (sub-tab Riwayat Deposit, Pembayaran Customer, Histori Pembayaran) & Dashboard Settlement. | `app-main.js`, `app-modules.js`, `PRD.md` |
+| 2026-07-30 | Reduksi data awal: hanya 1 mitra aktif (PTR-0001) dengan data terkait. Mitra baru dibuat otomatis dengan 1 admin user. | `app-data.js`, `app-modules.js` |
+| 2026-07-30 | Unified menu Keuangan: NAV_CONFIG menu grup Keuangan jadi satu entry `keuangan.mitra` (tab: Dashboard Deposit + Dashboard Settlement). Hapus entry `deposit.dashboard` & `settlement.dashboard` dari NAV_CONFIG. | `app-main.js`, `app-modules.js` |
+| 2026-07-30 | Dashboard Settlement: hapus submenu Riwayat Settlement (tabel tampil langsung di halaman), hapus KPI "Jadwal Settlement Berikutnya", ubah Ajukan Pencairan ke modal input nominal. | `app-modules.js`, `PRD.md` |
+| 2026-07-30 | Pembayaran Customer: konversi dari dropdown single-customer ke DataTable daftar lengkap customer mitra dengan status & tombol Bayar per baris. | `app-modules.js`, `PRD.md` |
+| 2026-07-31 | Perbaikan logika pencairan settlement parsial (FIFO): field `settled_amount` per invoice, partial withdraw settle invoice berurutan hingga amount habis, sisa tetap unsettled untuk pencairan berikutnya. KPI Saldo Siap Settlement akurat. | `app-modules.js`, `PRD.md` |
 

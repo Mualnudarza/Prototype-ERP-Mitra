@@ -45,6 +45,125 @@ function pushActivity(actor, action){
   DB.activityLog.unshift({actor, action, time:new Date().toISOString()});
 }
 
+function openBulkPaymentModal(selectedRows, partner){
+  const totalAmount = selectedRows.reduce((s, r) => s + r.totalPayable, 0);
+  const totalDeposit = partner.deposit_balance;
+  const totalExtra = selectedRows.reduce((s, r) => s + r.extraCharge, 0);
+  const totalPackage = selectedRows.reduce((s, r) => s + r.invoice.billing_amount, 0);
+
+  // Build detail rows for each selected invoice
+  let detailRows = '';
+  selectedRows.forEach((r, idx) => {
+    // Calculate deductions breakdown
+    const packagePrice = r.invoice.billing_amount;
+    let ksoAmt = 0, pgFee = 0, adminFee = 0, otherDed = 0;
+    if(partner.kso_type === 'percentage'){
+      ksoAmt = Math.round(packagePrice * (partner.kso_value / 100));
+    } else {
+      ksoAmt = partner.kso_value || 0;
+    }
+    if(r.invoice.payment_method !== 'TUNAI/KASIR') pgFee = 3000; // conceptual
+    if(partner.other_deductions && partner.other_deductions.length > 0){
+      partner.other_deductions.forEach(d => {
+        if(d.type === 'percentage'){
+          adminFee += Math.round(packagePrice * (d.value / 100));
+        } else {
+          adminFee += d.value;
+        }
+      });
+    } else if(r.extraCharge > 0) {
+      adminFee = r.extraCharge;
+    }
+
+    detailRows += `
+      <div style="border:1px solid var(--color-border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--color-background-muted);">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-weight:600;">
+          <span>${idx+1}. ${r.customer.customer_name}</span>
+          <span class="cell-mono">${r.invoice.invoice_number}</span>
+        </div>
+        <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:8px;">
+          Paket: ${r.pkg ? r.pkg.package_name + ' (' + r.pkg.bandwidth + ')' : '-'} | Periode: ${r.invoice.billing_period}
+        </div>
+        <table style="width:100%;font-size:12px;border-collapse:collapse;">
+          <tr><td style="padding:4px 0;color:var(--color-text-secondary);">Harga Paket (Termasuk Potongan)</td><td style="padding:4px 0;text-align:right;font-weight:600;">${Fmt.rupiah(r.invoice.billing_amount)}</td></tr>
+          <tr><td style="padding:4px 0;color:var(--color-text-secondary);">Biaya Tambahan</td><td style="padding:4px 0;text-align:right;">${Fmt.rupiah(r.extraCharge)}</td></tr>
+          <tr style="border-top:1px solid var(--color-border);"><td style="padding:4px 0;font-weight:600;">Total Bayar</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--color-accent);">${Fmt.rupiah(r.totalPayable)}</td></tr>
+        </table>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--color-border);font-size:12px;color:var(--color-text-secondary);">
+          <strong>Rincian Potongan (Konseptual):</strong><br>
+          KSO: ${Fmt.rupiah(ksoAmt)} | PG Fee: ${Fmt.rupiah(pgFee)} | Admin: ${Fmt.rupiah(adminFee)} | Lainnya: ${Fmt.rupiah(otherDed)}<br>
+          <em>Catatan: Harga paket di atas sudah termasuk potongan yang disepakati. Rincian di atas untuk referensi perhitungan laba bersih.</em>
+        </div>
+      </div>
+    `;
+  });
+
+  Modal.open({
+    title:'Konfirmasi Pembayaran Bulk', subtitle:`${selectedRows.length} customer dipilih`,
+    bodyHTML:`<div style="max-height:50vh;overflow-y:auto;">
+      <div class="detail-grid" style="margin-bottom:16px;">
+        <div class="detail-item"><span class="dl">Total Customer</span><span class="dv">${selectedRows.length}</span></div>
+        <div class="detail-item"><span class="dl">Total Harga Paket</span><span class="dv">${Fmt.rupiah(selectedRows.reduce((s,r)=>s+r.invoice.billing_amount,0))}</span></div>
+        <div class="detail-item"><span class="dl">Total Biaya Tambahan</span><span class="dv">${Fmt.rupiah(selectedRows.reduce((s,r)=>s+r.extraCharge,0))}</span></div>
+        <div class="detail-item" style="font-weight:700;font-size:15px;color:var(--color-accent);"><span class="dl">Total Bayar</span><span class="dv">${Fmt.rupiah(selectedRows.reduce((s,r)=>s+r.totalPayable,0))}</span></div>
+        <div class="detail-item" style="font-size:12px;color:var(--color-text-secondary);"><span class="dl">Saldo Deposit Saat Ini</span><span class="dv">${Fmt.rupiah(partner.deposit_balance)}</span></div>
+      </div>
+      <div style="border-top:1px solid var(--color-border);padding-top:12px;margin-bottom:12px;">
+        <strong style="font-size:13px;">Rincian Per Customer:</strong>
+        <div style="margin-top:8px;">${detailRows}</div>
+      </div>
+    </div>`,
+    footHTML:`<button class="btn btn-secondary" id="mCloseBulk">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmBulk">${ic('check')} Konfirmasi Bayar Bulk</button>`,
+    onOpen(b, f){
+      f.querySelector('#mCloseBulk').addEventListener('click', Modal.close);
+      f.querySelector('#mConfirmBulk').addEventListener('click', () => {
+        const totalAmount = selectedRows.reduce((s, r) => s + r.totalPayable, 0);
+        if(partner.deposit_balance < totalAmount) {
+          toast('Saldo deposit tidak mencukupi untuk pembayaran bulk ini.');
+          return;
+        }
+        const oldBalance = partner.deposit_balance;
+        partner.deposit_balance -= totalAmount;
+        let successCount = 0;
+        selectedRows.forEach(r => {
+          const inv = r.invoice;
+          inv.billing_status = 'Lunas';
+          inv.extra_charge = r.extraCharge;
+          inv.total_paid = r.totalPayable;
+          inv.settled = false;
+          const depId = nextId('DEP');
+          DB.depositHistory.push({
+            id: depId,
+            partner_id: partner.id,
+            ref: 'DEP/2026/07/' + String(DB.depositHistory.length+1).padStart(4,'0'),
+            type: 'Deposit Keluar',
+            date: new Date().toISOString().slice(0,10),
+            amount: -r.totalPayable,
+            balance_before: oldBalance,
+            balance_after: partner.deposit_balance,
+            note: `Pembayaran bulk ${r.customer.customer_name} (${inv.invoice_number})`,
+            status: 'Berhasil'
+          });
+          DB.payments.push({
+            id: nextId('PAY'),
+            invoice_id: inv.id,
+            payment_reference: 'CSH-BULK-' + Date.now() + '-' + successCount,
+            virtual_account: 'TUNAI/KASIR',
+            billing_amount: r.totalPayable,
+            payment_date: new Date().toISOString(),
+            payment_status: 'Berhasil'
+          });
+          successCount++;
+        });
+        pushActivity(CURRENT_USER.name, `menerima pembayaran bulk ${selectedRows.length} customer sebesar ${Fmt.rupiah(totalAmount)}`);
+        toast(`Pembayaran bulk ${selectedRows.length} customer berhasil dikonfirmasi!`);
+        window.dispatchEvent(new CustomEvent('keuangan-refresh'));
+        Modal.close();
+      });
+    }
+  });
+}
+
 function openPaymentModal(customer, invoice, pkg, extraCharge, totalPayable, partner){
   const breakdownHTML = extraCharge > 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;color:var(--color-text-secondary);">
           <span>Biaya Tambahan</span>
@@ -1291,9 +1410,9 @@ Views['keuangan.mitra'] = function(root){
       subContent.appendChild(card);
     }
  
-    function showPaymentTab(){
+function showPaymentTab(){
       subTabs.forEach(b=>b.classList.toggle('active', b.dataset.subtab==='payment'));
- 
+
       const customersWithInvoices = DB.customers
         .filter(c => c.partner_id === partner.id)
         .map(c => {
@@ -1312,21 +1431,35 @@ Views['keuangan.mitra'] = function(root){
           return { customer: c, invoice, pkg, extraCharge, totalPayable, status: invoice.billing_status === 'Lunas' ? 'Lunas' : 'Belum Dibayar' };
         })
         .filter(x => x !== null);
- 
-      subContent.innerHTML = `<div id="paymentTableSlot"></div>`;
+
+      subContent.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="margin:0;">Pembayaran Customer (Bulk)</h3>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary btn-sm" id="btnSelectAll">${ic('checkAll')} Pilih Semua</button>
+            <button class="btn btn-primary" id="btnBulkPay" style="display:none;">${ic('check')} Bayar Terpilih (<span id="bulkCount">0</span>)</button>
+          </div>
+        </div>
+        <div id="paymentTableSlot"></div>
+      `;
+
       const tableSlot = subContent.querySelector('#paymentTableSlot');
- 
+      const btnSelectAll = subContent.querySelector('#btnSelectAll');
+      const btnBulkPay = subContent.querySelector('#btnBulkPay');
+      const bulkCount = subContent.querySelector('#bulkCount');
+
       const table = DataTable({
         rows: () => customersWithInvoices,
         rowKey: 'invoice.id',
         searchPlaceholder: 'Cari nama customer, PPPoE, atau paket…',
         searchFields: ['customer.customer_name', 'customer.pppoe_secret', 'pkg.package_name'],
         columns: [
+          {key:'select', header:'<input type="checkbox" id="chkAll">', sortable:false, align:'center', render:r=> r.status === 'Lunas' ? '' : `<input type="checkbox" class="row-chk" data-invoice="${r.invoice.id}" data-customer="${r.customer.id}">`},
           {key:'customer.customer_name', header:'Nama Customer', sortable:true, render:r=>`<span class="cell-strong">${r.customer.customer_name}</span>`},
           {key:'customer.pppoe_secret', header:'PPPoE Secret', sortable:true, render:r=>`<span class="cell-mono">${r.customer.pppoe_secret}</span>`},
           {key:'pkg.package_name', header:'Paket', sortable:true, render:r=>r.pkg ? `${r.pkg.package_name} (${r.pkg.bandwidth})` : '-'},
           {key:'invoice.billing_period', header:'Periode', sortable:true},
-          {key:'invoice.billing_amount', header:'Nominal Paket', sortable:true, align:'right', render:r=>Fmt.rupiah(r.invoice.billing_amount)},
+          {key:'invoice.billing_amount', header:'Harga Paket (Termasuk Potongan)', sortable:true, align:'right', render:r=>Fmt.rupiah(r.invoice.billing_amount)},
           {key:'extraCharge', header:'Biaya Tambahan', align:'right', render:r=>Fmt.rupiah(r.extraCharge)},
           {key:'totalPayable', header:'Total Bayar', sortable:true, align:'right', render:r=>`<span class="cell-num" style="color:var(--color-accent);font-weight:700;">${Fmt.rupiah(r.totalPayable)}</span>`},
           {key:'status', header:'Status', sortable:true, render:r=>statusBadge(r.status)},
@@ -1335,19 +1468,56 @@ Views['keuangan.mitra'] = function(root){
             : `<button class="btn btn-primary btn-sm act-pay" data-invoice="${r.invoice.id}" data-customer="${r.customer.id}">${ic('check')} Bayar</button>`}
         ],
         afterRender(wrap, rows){
+          // Header checkbox
+          const chkAll = wrap.querySelector('#chkAll');
+          if(chkAll){
+            chkAll.addEventListener('change', ()=>{
+              wrap.querySelectorAll('.row-chk').forEach(cb=>{ cb.checked = chkAll.checked; cb.dispatchEvent(new Event('change')); });
+            });
+          }
+          // Row checkboxes
+          wrap.querySelectorAll('.row-chk').forEach(cb=>{
+            cb.addEventListener('change', ()=>{
+              const checked = wrap.querySelectorAll('.row-chk:checked').length;
+              bulkCount.textContent = checked;
+              btnBulkPay.style.display = checked > 0 ? 'inline-flex' : 'none';
+              btnSelectAll.textContent = checked === wrap.querySelectorAll('.row-chk').length ? ' Batal Pilih' : ' Pilih Semua';
+            });
+          });
+          // Individual pay buttons
           wrap.querySelectorAll('.act-pay').forEach(btn=>{
             btn.addEventListener('click', ()=>{
               const invoiceId = btn.dataset.invoice;
               const custId = btn.dataset.customer;
               const row = rows.find(r=>r.invoice.id===invoiceId);
               if(!row) return;
-openPaymentModal(row.customer, row.invoice, row.pkg, row.extraCharge, row.totalPayable, partner);
+              openPaymentModal(row.customer, row.invoice, row.pkg, row.extraCharge, row.totalPayable, partner);
             });
           });
         }
       });
       const card = document.createElement('div'); card.className='card'; card.appendChild(table);
       tableSlot.appendChild(card);
+
+      // Bulk pay button
+      btnBulkPay.addEventListener('click', ()=>{
+        const checked = subContent.querySelectorAll('.row-chk:checked');
+        if(checked.length === 0) return;
+        const selectedRows = Array.from(checked).map(cb=>{
+          const invoiceId = cb.dataset.invoice;
+          return customersWithInvoices.find(r=>r.invoice.id===invoiceId);
+        }).filter(Boolean);
+        openBulkPaymentModal(selectedRows, partner);
+      });
+
+      // Select all button
+      btnSelectAll.addEventListener('click', ()=>{
+        const chkAll = subContent.querySelector('#chkAll');
+        if(chkAll){
+          chkAll.checked = !chkAll.checked;
+          chkAll.dispatchEvent(new Event('change'));
+        }
+      });
     }
  
     function showGatewayTab(){
@@ -1499,63 +1669,80 @@ openPaymentModal(row.customer, row.invoice, row.pkg, row.extraCharge, row.totalP
           });
         });
       }
-    });
+});
     const card = document.createElement('div'); card.className = 'card'; card.appendChild(table);
     tableSlot.appendChild(card);
- 
-    // Settlement modal handler
-    content.querySelector('#btnRequestSettlement').addEventListener('click', () => {
-      if(unsettledInvoices.length === 0) {
-        toast('Tidak ada transaksi lunas yang siap dicairkan.');
-        return;
-      }
-      Modal.open({
-        title:'Ajukan Pencairan Settlement', subtitle:`Saldo tersedia: ${Fmt.rupiah(net)}`,
-        bodyHTML:`<div class="detail-grid">
-          <div class="detail-item"><span class="dl">Jumlah Transaksi Tersedia</span><span class="dv">${unsettledInvoices.length} transaksi</span></div>
-          <div class="detail-item"><span class="dl">Saldo Maksimal</span><span class="dv">${Fmt.rupiah(net)}</span></div>
-          <div class="detail-item" style="grid-column:1/-1;">
-            <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Nominal Pencairan (Rp)</label>
-            <input type="number" id="settleAmount" class="input" style="width:100%;font-size:14px;" value="${net}" min="1000" max="${net}" step="1000">
-            <div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px;">Minimal Rp 1.000. Maksimal ${Fmt.rupiah(net)}</div>
-          </div>
-          <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--color-text-secondary);">
-            Rekening tujuan: ${partner.bank_name} - ${partner.bank_account_no} a.n. ${partner.bank_account_name}
-          </div>
-        </div>`,
-        footHTML:`<button class="btn btn-secondary" id="mCloseSettle">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmSettle">${ic('check')} Ajukan Pencairan</button>`,
-        onOpen(b, f){
-          f.querySelector('#mCloseSettle').addEventListener('click', Modal.close);
-          f.querySelector('#mConfirmSettle').addEventListener('click', () => {
-            const amount = parseFloat(f.querySelector('#settleAmount').value) || 0;
-            if(amount <= 0 || amount > net) {
-              toast('Nominal tidak valid. Minimal Rp 1.000, maksimal ' + Fmt.rupiah(net));
-              return;
-            }
-            const setRef = 'SET/2026/07/' + String(DB.settlements.length+1).padStart(4,'0');
-            DB.settlements.push({
-              id: nextId('SET'),
-              partner_id: partner.id,
-              ref: setRef,
-              period: 'Juli 2026',
-              tx_count: unsettledInvoices.length,
-              gross_revenue: gross,
-              total_deduction: total_potongan,
-              net_revenue: amount,
-              bank_account: `${partner.bank_name} - ${partner.bank_account_no}`,
-              status: 'Selesai',
-              date: new Date().toISOString().slice(0,10)
-            });
-            if(amount === net) {
-              unsettledInvoices.forEach(inv => { inv.settled = true; });
-            }
-            pushActivity(CURRENT_USER.name, `mengajukan pencairan settlement ${setRef} sebesar ${Fmt.rupiah(amount)}`);
-            toast('Pencairan settlement berhasil diajukan!');
-            renderSettlement();
-            Modal.close();
-          });
+
+    // Settlement modal handler - step 1: input nominal
+root.addEventListener('click', function handleSettlementClick(e){
+      const btn = e.target.closest('#btnRequestSettlement');
+      if(btn){
+        if(unsettledInvoices.length === 0) {
+          toast('Tidak ada transaksi lunas yang siap dicairkan.');
+          return;
         }
-      });
+        // Step 1: simple modal to input withdrawal amount
+        Modal.open({
+          title:'Withdraw Settlement', subtitle:`Saldo tersedia: ${Fmt.rupiah(net)} (${unsettledInvoices.length} transaksi)`,
+          bodyHTML:`<div class="detail-grid">
+            <div class="detail-item"><span class="dl">Jumlah Transaksi</span><span class="dv">${unsettledInvoices.length}</span></div>
+            <div class="detail-item"><span class="dl">Gross Revenue</span><span class="dv">${Fmt.rupiah(gross)}</span></div>
+            <div class="detail-item"><span class="dl">Total Potongan</span><span class="dv" style="color:var(--badge-red-fg);">-${Fmt.rupiah(total_potongan)}</span></div>
+            <div class="detail-item" style="font-weight:700;font-size:15px;color:var(--badge-green-fg);"><span class="dl">Laba Bersih (Net)</span><span class="dv">${Fmt.rupiah(net)}</span></div>
+            <div class="detail-item" style="grid-column:1/-1;">
+              <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Nominal Withdraw (Rp)</label>
+              <input type="number" id="withdrawAmount" class="input" style="width:100%;font-size:14px;" value="${net}" min="1000" max="${net}" step="1000">
+              <div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px;">Min Rp 1.000, Maks ${Fmt.rupiah(net)}</div>
+            </div>
+            <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--color-text-secondary);">
+              Rekening: ${partner.bank_name} - ${partner.bank_account_no} a.n. ${partner.bank_account_name}
+            </div>
+          </div>`,
+          footHTML:`<button class="btn btn-secondary" id="mCloseWithdraw">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmWithdraw">${ic('check')} Withdraw</button>`,
+          onOpen(b, f){
+            f.querySelector('#mCloseWithdraw').addEventListener('click', Modal.close);
+            f.querySelector('#mConfirmWithdraw').addEventListener('click', () => {
+              const amount = parseFloat(b.querySelector('#withdrawAmount').value) || 0;
+              if(amount <= 0 || amount > net) {
+                toast('Nominal tidak valid. Min Rp 1.000, maks ' + Fmt.rupiah(net));
+                return;
+              }
+              // Process settlement
+              const setRef = 'SET/2026/07/' + String(DB.settlements.length+1).padStart(4,'0');
+              DB.settlements.push({
+                id: nextId('SET'),
+                partner_id: partner.id,
+                ref: setRef,
+                period: 'Juli 2026',
+                tx_count: unsettledInvoices.length,
+                gross_revenue: gross,
+                total_deduction: total_potongan,
+                net_revenue: amount,
+                bank_account: `${partner.bank_name} - ${partner.bank_account_no}`,
+                status: 'Selesai',
+                date: new Date().toISOString().slice(0,10)
+              });
+              // Settle invoices FIFO
+              let remaining = amount;
+              for(const inv of unsettledInvoices) {
+                const invoiceTotal = (inv.total_paid || inv.billing_amount) + (inv.extra_charge || 0);
+                const alreadySettled = inv.settled_amount || 0;
+                const canSettle = Math.min(invoiceTotal - alreadySettled, remaining);
+                if(canSettle > 0) {
+                  inv.settled_amount = alreadySettled + canSettle;
+                  remaining -= canSettle;
+                  if(inv.settled_amount >= invoiceTotal) inv.settled = true;
+                }
+                if(remaining <= 0) break;
+              }
+              pushActivity(CURRENT_USER.name, `mengajukan pencairan settlement ${setRef} sebesar ${Fmt.rupiah(amount)}`);
+              Modal.close();
+              // Step 2: show invoice modal
+              openSettlementInvoiceModal(unsettledInvoices, partner, gross, total_potongan, amount, setRef);
+            });
+          }
+        });
+      }
     });
   }
  
@@ -1761,64 +1948,294 @@ Views['settlement.dashboard'] = function(root){
     tableMount.appendChild(card);
   }
 
-  function openSettlementModal(maxAmount, invoices){
-    Modal.open({
-      title:'Ajukan Pencairan Settlement', subtitle:`Saldo tersedia: ${Fmt.rupiah(maxAmount)}`,
-      bodyHTML:`<div class="detail-grid">
-        <div class="detail-item"><span class="dl">Jumlah Transaksi Tersedia</span><span class="dv">${invoices.length} transaksi</span></div>
-        <div class="detail-item"><span class="dl">Saldo Maksimal</span><span class="dv">${Fmt.rupiah(maxAmount)}</span></div>
-        <div class="detail-item" style="grid-column:1/-1;">
-          <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Nominal Pencairan (Rp)</label>
-          <input type="number" id="settleAmount" class="input" style="width:100%;font-size:14px;" value="${maxAmount}" min="1000" max="${maxAmount}" step="1000">
-          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px;">Minimal Rp 1.000. Maksimal ${Fmt.rupiah(maxAmount)}</div>
-        </div>
-        <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--color-text-secondary);">
-          Rekening tujuan: ${partner.bank_name} - ${partner.bank_account_no} a.n. ${partner.bank_account_name}
-        </div>
-      </div>`,
-      footHTML:`<button class="btn btn-secondary" id="mCloseSettle">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmSettle">${ic('check')} Ajukan Pencairan</button>`,
-      onOpen(b, f){
-        f.querySelector('#mCloseSettle').addEventListener('click', Modal.close);
-        f.querySelector('#mConfirmSettle').addEventListener('click', () => {
-          const amount = parseFloat(f.querySelector('#settleAmount').value) || 0;
-          if(amount <= 0 || amount > maxAmount) {
-            toast('Nominal tidak valid. Minimal Rp 1.000, maksimal ' + Fmt.rupiah(maxAmount));
-            return;
-          }
-          const setRef = 'SET/2026/07/' + String(DB.settlements.length+1).padStart(4,'0');
-          DB.settlements.push({
-            id: nextId('SET'),
-            partner_id: partner.id,
-            ref: setRef,
-            period: 'Juli 2026',
-            tx_count: invoices.length,
-            gross_revenue: gross,
-            total_deduction: total_potongan,
-            net_revenue: amount,
-            bank_account: `${partner.bank_name} - ${partner.bank_account_no}`,
-            status: 'Selesai',
-            date: new Date().toISOString().slice(0,10)
-          });
-          // If full amount, mark all invoices as settled
-          if(amount === maxAmount) {
-            invoices.forEach(inv => { inv.settled = true; });
-          }
-          pushActivity(CURRENT_USER.name, `mengajukan pencairan settlement ${setRef} sebesar ${Fmt.rupiah(amount)}`);
-          toast('Pencairan settlement berhasil diajukan!');
-          renderDashboard();
-          Modal.close();
-        });
-      }
+function openSettlementModal(unsettledInvoices, partner){
+  // Calculate totals
+  const gross = unsettledInvoices.reduce((s, i) => s + (i.total_paid || i.billing_amount), 0);
+  let kso = 0;
+  if(partner.kso_type === 'percentage'){
+    kso = Math.round(gross * (partner.kso_value / 100));
+  } else {
+    kso = unsettledInvoices.length * (partner.kso_value || 0);
+  }
+  let pg_fee = 0;
+  unsettledInvoices.forEach(inv => {
+    const pay = DB.payments.find(p => p.invoice_id === inv.id && p.payment_status === 'Berhasil');
+    if (pay && pay.virtual_account !== 'TUNAI/KASIR') pg_fee += 3000;
+  });
+  let other_deductions_val = 0;
+  if(partner.other_deductions && partner.other_deductions.length > 0){
+    partner.other_deductions.forEach(d => {
+      if(d.type === 'percentage') other_deductions_val += Math.round(gross * (d.value / 100));
+      else other_deductions_val += d.value * unsettledInvoices.length;
     });
   }
+  const total_potongan = kso + pg_fee + other_deductions_val;
+  const net = gross - total_potongan;
 
-  root.querySelector('#btnRequestSettlement').addEventListener('click', () => {
-    calculateStats();
-    if(unsettledInvoices.length === 0) {
-      toast('Tidak ada transaksi lunas yang siap dicairkan.');
-      return;
+  // Build invoice rows with detailed breakdown
+  let invoiceRows = '';
+  let totalKSO = 0, totalPgFee = 0, totalAdmin = 0;
+  unsettledInvoices.forEach((inv, idx) => {
+    const packagePrice = inv.billing_amount;
+    let ksoAmt = 0, pgFee = 0, adminFee = 0, otherDed = 0;
+    if(partner.kso_type === 'percentage'){
+      ksoAmt = Math.round(packagePrice * (partner.kso_value / 100));
+    } else {
+      ksoAmt = partner.kso_value || 0;
     }
-    openSettlementModal(net, unsettledInvoices);
+    const pay = DB.payments.find(p => p.invoice_id === inv.id && p.payment_status === 'Berhasil');
+    if (pay && pay.virtual_account !== 'TUNAI/KASIR') pgFee = 3000;
+    if(partner.other_deductions && partner.other_deductions.length > 0){
+      partner.other_deductions.forEach(d => {
+        if(d.type === 'percentage'){
+          adminFee += Math.round(packagePrice * (d.value / 100));
+        } else {
+          adminFee += d.value;
+        }
+      });
+    } else if(inv.extra_charge > 0) {
+      adminFee = inv.extra_charge;
+    }
+
+    const netInv = packagePrice + inv.extra_charge - (ksoAmt + pgFee + adminFee);
+
+invoiceRows += `
+      <div style="border:1px solid var(--color-border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--color-background-muted);">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-weight:600;">
+          <span>${idx+1}. ${inv.customer_name || 'Customer'}</span>
+          <span class="cell-mono">${inv.invoice_number}</span>
+        </div>
+        <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:8px;">
+          Paket: ${inv.package_name || 'Paket'} | Periode: ${inv.billing_period}
+        </div>
+        <table style="width:100%;font-size:12px;border-collapse:collapse;">
+          <tr><td style="padding:4px 0;color:var(--color-text-secondary);">Harga Paket (Termasuk Potongan)</td><td style="padding:4px 0;text-align:right;font-weight:600;">${Fmt.rupiah(packagePrice)}</td></tr>
+          <tr><td style="padding:4px 0;color:var(--color-text-secondary);">Biaya Tambahan</td><td style="padding:4px 0;text-align:right;">${Fmt.rupiah(inv.extra_charge || 0)}</td></tr>
+          <tr style="border-top:1px solid var(--color-border);"><td style="padding:4px 0;font-weight:600;">Total Bayar</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--color-accent);">${Fmt.rupiah(inv.total_paid || packagePrice + inv.extra_charge)}</td></tr>
+        </table>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--color-border);font-size:12px;color:var(--color-text-secondary);">
+          <strong>Rincian Potongan (Konseptual):</strong><br>
+          KSO: ${Fmt.rupiah(ksoAmt)} | PG Fee: ${Fmt.rupiah(pgFee)} | Admin: ${Fmt.rupiah(adminFee)} | Lainnya: ${Fmt.rupiah(otherDed)}<br>
+          <em>Catatan: Harga paket di atas sudah termasuk potongan yang disepakati. Rincian di atas untuk referensi perhitungan laba bersih.</em>
+        </div>
+      </div>
+    `;
+  });
+  let pgFeeSum = 0;
+  unsettledInvoices.forEach(inv => {
+    const pay = DB.payments.find(p => p.invoice_id === inv.id && p.payment_status === 'Berhasil');
+    if (pay && pay.virtual_account !== 'TUNAI/KASIR') pgFeeSum += 3000;
+});
+  let adminSum = 0;
+  if(partner.other_deductions && partner.other_deductions.length > 0){
+    partner.other_deductions.forEach(d => {
+      if(d.type === 'percentage') adminSum += Math.round(gross * (d.value / 100));
+      else adminSum += d.value * unsettledInvoices.length;
+    });
+  }
+  const settlementTotalPotongan = totalKSO + pgFeeSum + adminSum;
+  const settlementNetAmount = gross - settlementTotalPotongan;
+
+  Modal.open({
+    title:'Ajukan Pencairan Settlement', subtitle:`Saldo tersedia: ${Fmt.rupiah(settlementNetAmount)} (Laba Bersih ${unsettledInvoices.length} transaksi)`,
+    bodyHTML:`<div style="max-height:70vh;overflow-y:auto;">
+      <div class="detail-grid" style="margin-bottom:16px;">
+        <div class="detail-item"><span class="dl">Jumlah Transaksi</span><span class="dv">${unsettledInvoices.length} transaksi</span></div>
+        <div class="detail-item"><span class="dl">Gross Revenue (Total Harga Paket)</span><span class="dv">${Fmt.rupiah(gross)}</span></div>
+        <div class="detail-item"><span class="dl">Total Potongan</span><span class="dv" style="color:var(--badge-red-fg);">-${Fmt.rupiah(settlementTotalPotongan)}</span></div>
+        <div class="detail-item" style="font-weight:700;font-size:15px;color:var(--badge-green-fg);"><span class="dl">Laba Bersih (Net)</span><span class="dv">${Fmt.rupiah(settlementNetAmount)}</span></div>
+      </div>
+      <div style="border-top:1px solid var(--color-border);padding-top:12px;margin-bottom:12px;">
+        <strong style="font-size:13px;">Rincian Potongan:</strong>
+        <div style="margin-top:8px;font-size:13px;color:var(--color-text-secondary);">
+          KSO: ${Fmt.rupiah(totalKSO)} | PG Fee: ${Fmt.rupiah(pgFeeSum)} | Admin/Lainnya: ${Fmt.rupiah(adminSum)}
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:var(--color-text-secondary);"><em>Catatan: Harga paket di atas sudah termasuk potongan. Rincian di atas untuk referensi perhitungan laba bersih.</em></div>
+      </div>
+      <div style="border-top:1px solid var(--color-border);padding-top:12px;margin-bottom:12px;">
+        <strong style="font-size:13px;">Rincian Per Transaksi:</strong>
+        <div style="margin-top:8px;">${invoiceRows}</div>
+      </div>
+      <div style="border-top:1px solid var(--color-border);padding-top:12px;margin-bottom:12px;">
+        <div class="detail-grid">
+          <div class="detail-item"><span class="dl">Nominal Pencairan (Rp)</span><span class="dv">
+            <input type="number" id="settleAmount" class="input" style="width:100%;font-size:14px;" value="${netAmount}" min="1000" max="${netAmount}" step="1000">
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px;">Minimal Rp 1.000. Maksimal ${Fmt.rupiah(netAmount)}</div>
+          </span></div>
+          <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--color-text-secondary);">
+            Rekening tujuan: ${partner.bank_name} - ${partner.bank_account_no} a.n. ${partner.bank_account_name}
+          </div>
+        </div>
+      </div>
+    </div>`,
+    footHTML:`<button class="btn btn-secondary" id="mCloseSettle">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmSettle">${ic('check')} Ajukan Pencairan</button>`,
+    onOpen(b, f){
+      f.querySelector('#mCloseSettle').addEventListener('click', Modal.close);
+      f.querySelector('#mConfirmSettle').addEventListener('click', () => {
+        const amount = parseFloat(f.querySelector('#settleAmount').value) || 0;
+        if(amount <= 0 || amount > settlementNetAmount) {
+          toast('Nominal tidak valid. Minimal Rp 1.000, maksimal ' + Fmt.rupiah(settlementNetAmount));
+          return;
+        }
+        const setRef = 'SET/2026/07/' + String(DB.settlements.length+1).padStart(4,'0');
+        DB.settlements.push({
+          id: nextId('SET'),
+          partner_id: partner.id,
+          ref: setRef,
+          period: 'Juli 2026',
+          tx_count: unsettledInvoices.length,
+          gross_revenue: gross,
+          total_deduction: settlementTotalPotongan,
+          net_revenue: amount,
+          bank_account: `${partner.bank_name} - ${partner.bank_account_no}`,
+          status: 'Selesai',
+          date: new Date().toISOString().slice(0,10)
+        });
+        if(amount === settlementNetAmount) {
+          unsettledInvoices.forEach(inv => { inv.settled = true; });
+        }
+        pushActivity(CURRENT_USER.name, `mengajukan pencairan settlement ${setRef} sebesar ${Fmt.rupiah(amount)}`);
+        toast('Pencairan settlement berhasil diajukan!');
+        renderSettlement();
+        Modal.close();
+      });
+    }
+  });
+}
+
+function openSettlementInvoiceModal(unsettledInvoices, partner, gross, totalPotongan, amount, setRef){
+  let invoiceRows = '';
+  unsettledInvoices.forEach((inv, idx) => {
+    const pkg = DB.packages.find(p => p.id === inv.package_id);
+    const cust = DB.customers.find(c => c.id === inv.customer_id);
+    const paketPrice = inv.billing_amount;
+    let ksoAmt = 0, adminFee = 0;
+    if(partner.kso_type === 'percentage') ksoAmt = Math.round(paketPrice * (partner.kso_value / 100));
+    else ksoAmt = partner.kso_value || 0;
+    const pgFee = (DB.payments.find(p => p.invoice_id === inv.id && p.payment_status === 'Berhasil')?.virtual_account !== 'TUNAI/KASIR') ? 3000 : 0;
+    if(partner.other_deductions && partner.other_deductions.length > 0){
+      partner.other_deductions.forEach(d => {
+        if(d.type === 'percentage') adminFee += Math.round(paketPrice * (d.value / 100));
+        else adminFee += d.value;
+      });
+    }
+    invoiceRows += `
+      <div style="border:1px solid var(--color-border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--color-background-muted);">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-weight:600;">
+          <span>${idx+1}. ${custName(inv.customer_id)}</span>
+          <span class="cell-mono">${inv.invoice_number}</span>
+        </div>
+        <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:8px;">
+          Paket: ${pkg ? pkg.package_name + ' (' + pkg.bandwidth + ')' : '-'} | Periode: ${inv.billing_period}
+        </div>
+        <table style="width:100%;font-size:12px;border-collapse:collapse;">
+          <tr><td style="padding:4px 0;color:var(--color-text-secondary);">Harga Paket (Termasuk Potongan)</td><td style="padding:4px 0;text-align:right;font-weight:600;">${Fmt.rupiah(paketPrice)}</td></tr>
+          <tr><td style="padding:4px 0;color:var(--color-text-secondary);">KSO</td><td style="padding:4px 0;text-align:right;color:var(--badge-red-fg);">-${Fmt.rupiah(ksoAmt)}</td></tr>
+          <tr><td style="padding:4px 0;color:var(--color-text-secondary);">PG Fee</td><td style="padding:4px 0;text-align:right;color:var(--badge-red-fg);">-${Fmt.rupiah(pgFee)}</td></tr>
+          <tr><td style="padding:4px 0;color:var(--color-text-secondary);">Admin / Lainnya</td><td style="padding:4px 0;text-align:right;color:var(--badge-red-fg);">-${Fmt.rupiah(adminFee)}</td></tr>
+          <tr style="border-top:1px solid var(--color-border);"><td style="padding:4px 0;font-weight:600;">Laba Bersih (Net)</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(paketPrice - ksoAmt - pgFee - adminFee)}</td></tr>
+        </table>
+      </div>
+    `;
+  });
+  Modal.open({
+    title:'Invoice Withdrawal', subtitle:`${setRef} · ${Fmt.rupiah(amount)}`,
+    bodyHTML:`<div style="max-height:70vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;padding:12px;border:2px solid var(--badge-green-fg);border-radius:11px;margin-bottom:16px;background:var(--badge-green-bg);">
+        <div><strong>Total Withdraw</strong><br><span style="font-size:11px;color:var(--color-text-secondary);">${setRef} · ${Fmt.date(new Date())}</span></div>
+        <div style="font-size:18px;font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(amount)}</div>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-item"><span class="dl">Periode</span><span class="dv">Juli 2026</span></div>
+        <div class="detail-item"><span class="dl">Jumlah Transaksi</span><span class="dv">${unsettledInvoices.length}</span></div>
+        <div class="detail-item"><span class="dl">Gross Revenue</span><span class="dv">${Fmt.rupiah(gross)}</span></div>
+        <div class="detail-item"><span class="dl">Total Potongan</span><span class="dv" style="color:var(--badge-red-fg);">-${Fmt.rupiah(totalPotongan)}</span></div>
+        <div class="detail-item" style="font-weight:700;font-size:15px;color:var(--badge-green-fg);"><span class="dl">Net Revenue (Withdraw)</span><span class="dv">${Fmt.rupiah(amount)}</span></div>
+        <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--color-text-secondary);border-top:1px solid var(--color-border);padding-top:8px;">
+          Rekening tujuan: ${partner.bank_name} - ${partner.bank_account_no} a.n. ${partner.bank_account_name}
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--color-border);padding-top:12px;margin-top:12px;">
+        <strong style="font-size:13px;">Rincian Per Transaksi:</strong>
+        <div style="margin-top:8px;">${invoiceRows}</div>
+      </div>
+    </div>`,
+    footHTML:`<button class="btn btn-primary" id="mCloseInvoice">${ic('check')} Tutup & Selesai</button>`,
+    onOpen(b, f){
+      f.querySelector('#mCloseInvoice').addEventListener('click', ()=>{
+        Modal.close();
+        renderSettlement();
+      });
+    }
+  });
+}
+
+  content.addEventListener('click', function handleSettlementClick(e){
+    const btn = e.target.closest('#btnRequestSettlement');
+    if(btn){
+      if(unsettledInvoices.length === 0) {
+        toast('Tidak ada transaksi lunas yang siap dicairkan.');
+        return;
+      }
+      Modal.open({
+        title:'Withdraw Settlement', subtitle:`Saldo tersedia: ${Fmt.rupiah(net)} (${unsettledInvoices.length} transaksi)`,
+        bodyHTML:`<div class="detail-grid">
+          <div class="detail-item"><span class="dl">Jumlah Transaksi</span><span class="dv">${unsettledInvoices.length}</span></div>
+          <div class="detail-item"><span class="dl">Gross Revenue</span><span class="dv">${Fmt.rupiah(gross)}</span></div>
+          <div class="detail-item"><span class="dl">Total Potongan</span><span class="dv" style="color:var(--badge-red-fg);">-${Fmt.rupiah(total_potongan)}</span></div>
+          <div class="detail-item" style="font-weight:700;font-size:15px;color:var(--badge-green-fg);"><span class="dl">Laba Bersih (Net)</span><span class="dv">${Fmt.rupiah(net)}</span></div>
+          <div class="detail-item" style="grid-column:1/-1;">
+            <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Nominal Withdraw (Rp)</label>
+            <input type="number" id="withdrawAmount" class="input" style="width:100%;font-size:14px;" value="${net}" min="1000" max="${net}" step="1000">
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px;">Min Rp 1.000, Maks ${Fmt.rupiah(net)}</div>
+          </div>
+          <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--color-text-secondary);">
+            Rekening: ${partner.bank_name} - ${partner.bank_account_no} a.n. ${partner.bank_account_name}
+          </div>
+        </div>`,
+        footHTML:`<button class="btn btn-secondary" id="mCloseWithdraw2">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmWithdraw2">${ic('check')} Withdraw</button>`,
+        onOpen(b, f){
+          f.querySelector('#mCloseWithdraw2').addEventListener('click', Modal.close);
+          f.querySelector('#mConfirmWithdraw2').addEventListener('click', () => {
+            const amount = parseFloat(b.querySelector('#withdrawAmount').value) || 0;
+            if(amount <= 0 || amount > net) {
+              toast('Nominal tidak valid. Min Rp 1.000, maks ' + Fmt.rupiah(net));
+              return;
+            }
+            const setRef = 'SET/2026/07/' + String(DB.settlements.length+1).padStart(4,'0');
+            DB.settlements.push({
+              id: nextId('SET'),
+              partner_id: partner.id,
+              ref: setRef,
+              period: 'Juli 2026',
+              tx_count: unsettledInvoices.length,
+              gross_revenue: gross,
+              total_deduction: total_potongan,
+              net_revenue: amount,
+              bank_account: `${partner.bank_name} - ${partner.bank_account_no}`,
+              status: 'Selesai',
+              date: new Date().toISOString().slice(0,10)
+            });
+            // Settle invoices FIFO
+            let remaining = amount;
+            for(const inv of unsettledInvoices) {
+              const invoiceTotal = (inv.total_paid || inv.billing_amount) + (inv.extra_charge || 0);
+              const alreadySettled = inv.settled_amount || 0;
+              const canSettle = Math.min(invoiceTotal - alreadySettled, remaining);
+              if(canSettle > 0) {
+                inv.settled_amount = alreadySettled + canSettle;
+                remaining -= canSettle;
+                if(inv.settled_amount >= invoiceTotal) inv.settled = true;
+              }
+              if(remaining <= 0) break;
+            }
+            pushActivity(CURRENT_USER.name, `mengajukan pencairan settlement ${setRef} sebesar ${Fmt.rupiah(amount)}`);
+            Modal.close();
+            openSettlementInvoiceModal(unsettledInvoices, partner, gross, total_potongan, amount, setRef);
+          });
+        }
+      });
+    }
   });
 
   renderDashboard();
@@ -2443,5 +2860,8 @@ Views['infra.topologi'] = function(root){
   paintTree();
   paintPanel();
 };
+ 
+// Ensure global availability
+window.openSettlementModal = openSettlementModal;
 
 
