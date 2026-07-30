@@ -1,0 +1,222 @@
+{
+  "communities": {
+    "0": [
+      "app_data",
+      "app_data_allinputsplitters",
+      "app_data_allodps",
+      "app_data_alloltnodes",
+      "app_data_alloutputsplitters",
+      "app_data_avatar_palette",
+      "app_data_colorfor",
+      "app_data_custname",
+      "app_data_db",
+      "app_data_findinputsplitter",
+      "app_data_findodpnode",
+      "app_data_findoltnode",
+      "app_data_findoutputsplitter",
+      "app_data_genonuscripts",
+      "app_data_nextid",
+      "app_data_partnername",
+      "app_data_pkgname",
+      "app_data_pkgprice",
+      "app_data_wilayah_list"
+    ],
+    "1": [
+      "app_data_fmt",
+      "app_modules_activitytimeline",
+      "app_modules_afterrender",
+      "app_modules_calculatestats",
+      "app_modules_odpname",
+      "app_modules_opencustomerform",
+      "app_modules_opendetail",
+      "app_modules_openpaymentmodal",
+      "app_modules_opensettlementmodal",
+      "app_modules_paint",
+      "app_modules_renderdashboard",
+      "app_modules_row3wrap",
+      "app_modules_showhistorytab",
+      "app_modules_showpaymenttab"
+    ],
+    "2": [
+      "app_data_users",
+      "app_ui",
+      "app_ui_badge",
+      "app_ui_barchart",
+      "app_ui_datatable",
+      "app_ui_ic",
+      "app_ui_icons",
+      "app_ui_modal",
+      "app_ui_renderkpis",
+      "app_ui_rendersidebar",
+      "app_ui_status_variant",
+      "app_ui_statusbadge",
+      "app_ui_toast"
+    ],
+    "3": [
+      "app_modules",
+      "app_modules_countinfra",
+      "app_modules_deletenode",
+      "app_modules_findparentarray",
+      "app_modules_kpis",
+      "app_modules_modulecard",
+      "app_modules_nodeicon",
+      "app_modules_pageintro",
+      "app_modules_paintbanner",
+      "app_modules_rendernode",
+      "app_modules_views"
+    ],
+    "4": [
+      "app_main",
+      "app_main_all_items",
+      "app_main_currentroute",
+      "app_main_issuperuser",
+      "app_main_nav_config",
+      "app_main_navwithbadges",
+      "app_main_partnership_keys",
+      "app_main_renderroute",
+      "app_main_syncnavbadge"
+    ],
+    "5": [
+      "app_modules_fieldshtml",
+      "app_modules_openaddinputsplitterform",
+      "app_modules_openaddoltform",
+      "app_modules_openaddoutputsplitterform",
+      "app_modules_openpkgform",
+      "app_modules_painttree",
+      "app_modules_rowwrap"
+    ],
+    "6": [
+      "app_modules_findnode",
+      "app_modules_openeditnodeform",
+      "app_modules_paintpanel"
+    ],
+    "7": [
+      "app_modules_pushactivity",
+      "app_modules_rendermitraform",
+      "app_modules_renderregistrationpage"
+    ]
+  },
+  "cohesion": {
+    "0": 0.1286549707602339,
+    "1": 0.17582417582417584,
+    "2": 0.21794871794871795,
+    "3": 0.2545454545454545,
+    "4": 0.4444444444444444,
+    "5": 0.5238095238095238,
+    "6": 0.6666666666666666,
+    "7": 0.6666666666666666
+  },
+  "gods": [
+    {
+      "id": "app_data_fmt",
+      "label": "Fmt",
+      "degree": 12
+    },
+    {
+      "id": "app_modules_fieldshtml",
+      "label": "fieldsHTML()",
+      "degree": 9
+    },
+    {
+      "id": "app_modules_rowwrap",
+      "label": "rowWrap()",
+      "degree": 9
+    },
+    {
+      "id": "app_modules_painttree",
+      "label": "paintTree()",
+      "degree": 7
+    },
+    {
+      "id": "app_modules_afterrender",
+      "label": "afterRender()",
+      "degree": 6
+    },
+    {
+      "id": "app_modules_opencustomerform",
+      "label": "openCustomerForm()",
+      "degree": 6
+    },
+    {
+      "id": "app_modules_paintpanel",
+      "label": "paintPanel()",
+      "degree": 6
+    },
+    {
+      "id": "app_modules_deletenode",
+      "label": "deleteNode()",
+      "degree": 6
+    },
+    {
+      "id": "app_main_currentroute",
+      "label": "currentRoute()",
+      "degree": 5
+    },
+    {
+      "id": "app_modules_pushactivity",
+      "label": "pushActivity()",
+      "degree": 5
+    }
+  ],
+  "surprises": [
+    {
+      "source": "kpis()",
+      "target": "Fmt",
+      "source_files": [
+        "app-modules.js",
+        "app-data.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "openPaymentModal()",
+      "target": "Fmt",
+      "source_files": [
+        "app-modules.js",
+        "app-data.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "connects across different repos/directories; peripheral node `openPaymentModal()` unexpectedly reaches hub `Fmt`"
+    },
+    {
+      "source": "openSettlementModal()",
+      "target": "Fmt",
+      "source_files": [
+        "app-modules.js",
+        "app-data.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "connects across different repos/directories; peripheral node `openSettlementModal()` unexpectedly reaches hub `Fmt`"
+    },
+    {
+      "source": "paint()",
+      "target": "Fmt",
+      "source_files": [
+        "app-modules.js",
+        "app-data.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "connects across different repos/directories; peripheral node `paint()` unexpectedly reaches hub `Fmt`"
+    },
+    {
+      "source": "showHistoryTab()",
+      "target": "Fmt",
+      "source_files": [
+        "app-modules.js",
+        "app-data.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "connects across different repos/directories; peripheral node `showHistoryTab()` unexpectedly reaches hub `Fmt`"
+    }
+  ],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}

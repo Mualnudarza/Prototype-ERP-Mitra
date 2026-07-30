@@ -22,9 +22,7 @@ const NAV_CONFIG = [
   {
     group:'Keuangan',
     items:[
-      {key:'deposit.dashboard', label:'Dashboard Deposit', icon:'wallet', eyebrow:'Keuangan Mitra', title:'Dashboard Deposit'},
-      {key:'settlement.dashboard', label:'Dashboard Settlement', icon:'history', eyebrow:'Keuangan Mitra', title:'Dashboard Settlement'},
-      {key:'payment.gateway', label:'Payment Gateway', icon:'creditCard', eyebrow:'Payment Gateway (Paspe)', title:'Monitoring Pembayaran'},
+      {key:'keuangan.mitra', label:'Keuangan Mitra', icon:'wallet', eyebrow:'Keuangan Mitra', title:'Keuangan Mitra'},
     ]
   },
   {
