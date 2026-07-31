@@ -46,98 +46,103 @@ function pushActivity(actor, action){
 }
 
 function openBulkPaymentModal(selectedRows, partner){
-  const totalAmount = selectedRows.reduce((s, r) => s + r.totalPayable, 0);
-  const totalDeposit = partner.deposit_balance;
-  const totalExtra = selectedRows.reduce((s, r) => s + r.extraCharge, 0);
-  const totalPackage = selectedRows.reduce((s, r) => s + r.invoice.billing_amount, 0);
+  const totalBilling = selectedRows.reduce((s, r) => s + r.invoice.billing_amount, 0);
+  let totalKso = 0, totalPgFee = 0, totalAdmin = 0;
+  if(partner.kso_type === 'percentage'){
+    totalKso = Math.round(totalBilling * (partner.kso_value / 100));
+  } else {
+    totalKso = (partner.kso_value || 0) * selectedRows.length;
+  }
+  totalPgFee = 3000 * selectedRows.length;
+  if(partner.other_deductions && partner.other_deductions.length > 0){
+    partner.other_deductions.forEach(d => {
+      totalAdmin += d.type === 'percentage' ? Math.round(totalBilling * (d.value / 100)) : d.value * selectedRows.length;
+    });
+  } else {
+    totalAdmin = 5000 * selectedRows.length;
+  }
+  const totalPotongan = totalKso + totalPgFee + totalAdmin;
+  const totalNet = totalBilling - totalPotongan;
 
-  // Build detail rows for each selected invoice
-  let detailRows = '';
+  let invoiceCards = '';
   selectedRows.forEach((r, idx) => {
-    // Calculate deductions breakdown
-    const packagePrice = r.invoice.billing_amount;
-    let ksoAmt = 0, pgFee = 0, adminFee = 0, otherDed = 0;
-    if(partner.kso_type === 'percentage'){
-      ksoAmt = Math.round(packagePrice * (partner.kso_value / 100));
-    } else {
-      ksoAmt = partner.kso_value || 0;
-    }
-    if(r.invoice.payment_method !== 'TUNAI/KASIR') pgFee = 3000; // conceptual
-    if(partner.other_deductions && partner.other_deductions.length > 0){
-      partner.other_deductions.forEach(d => {
-        if(d.type === 'percentage'){
-          adminFee += Math.round(packagePrice * (d.value / 100));
-        } else {
-          adminFee += d.value;
-        }
-      });
-    } else if(r.extraCharge > 0) {
-      adminFee = r.extraCharge;
-    }
-
-    detailRows += `
-      <div style="border:1px solid var(--color-border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--color-background-muted);">
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-weight:600;">
-          <span>${idx+1}. ${r.customer.customer_name}</span>
-          <span class="cell-mono">${r.invoice.invoice_number}</span>
+    const invData = buildPaymentInvoiceHTML(r.customer, r.invoice, r.pkg, partner);
+    invoiceCards += `
+      <div style="border:1px solid var(--color-border);border-radius:8px;padding:16px;margin-bottom:12px;page-break-inside:avoid;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--color-border);">
+          <div style="font-weight:700;font-size:14px;color:var(--color-text-primary);">${idx+1}. ${r.customer.customer_name}</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);">${r.invoice.invoice_number}</div>
         </div>
-        <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:8px;">
-          Paket: ${r.pkg ? r.pkg.package_name + ' (' + r.pkg.bandwidth + ')' : '-'} | Periode: ${r.invoice.billing_period}
+        <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px;">
+          Paket: ${r.pkg ? r.pkg.package_name + ' (' + r.pkg.bandwidth + ')' : '-'} &nbsp;|&nbsp; Periode: ${r.invoice.billing_period}
         </div>
-        <table style="width:100%;font-size:12px;border-collapse:collapse;">
-          <tr><td style="padding:4px 0;color:var(--color-text-secondary);">Harga Paket (Termasuk Potongan)</td><td style="padding:4px 0;text-align:right;font-weight:600;">${Fmt.rupiah(r.invoice.billing_amount)}</td></tr>
-          <tr><td style="padding:4px 0;color:var(--color-text-secondary);">Biaya Tambahan</td><td style="padding:4px 0;text-align:right;">${Fmt.rupiah(r.extraCharge)}</td></tr>
-          <tr style="border-top:1px solid var(--color-border);"><td style="padding:4px 0;font-weight:600;">Total Bayar</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--color-accent);">${Fmt.rupiah(r.totalPayable)}</td></tr>
-        </table>
-        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--color-border);font-size:12px;color:var(--color-text-secondary);">
-          <strong>Rincian Potongan (Konseptual):</strong><br>
-          KSO: ${Fmt.rupiah(ksoAmt)} | PG Fee: ${Fmt.rupiah(pgFee)} | Admin: ${Fmt.rupiah(adminFee)} | Lainnya: ${Fmt.rupiah(otherDed)}<br>
-          <em>Catatan: Harga paket di atas sudah termasuk potongan yang disepakati. Rincian di atas untuk referensi perhitungan laba bersih.</em>
-        </div>
+        ${invData.html}
       </div>
     `;
   });
 
   Modal.open({
-    title:'Konfirmasi Pembayaran Bulk', subtitle:`${selectedRows.length} customer dipilih`,
-    bodyHTML:`<div style="max-height:50vh;overflow-y:auto;">
-      <div class="detail-grid" style="margin-bottom:16px;">
-        <div class="detail-item"><span class="dl">Total Customer</span><span class="dv">${selectedRows.length}</span></div>
-        <div class="detail-item"><span class="dl">Total Harga Paket</span><span class="dv">${Fmt.rupiah(selectedRows.reduce((s,r)=>s+r.invoice.billing_amount,0))}</span></div>
-        <div class="detail-item"><span class="dl">Total Biaya Tambahan</span><span class="dv">${Fmt.rupiah(selectedRows.reduce((s,r)=>s+r.extraCharge,0))}</span></div>
-        <div class="detail-item" style="font-weight:700;font-size:15px;color:var(--color-accent);"><span class="dl">Total Bayar</span><span class="dv">${Fmt.rupiah(selectedRows.reduce((s,r)=>s+r.totalPayable,0))}</span></div>
-        <div class="detail-item" style="font-size:12px;color:var(--color-text-secondary);"><span class="dl">Saldo Deposit Saat Ini</span><span class="dv">${Fmt.rupiah(partner.deposit_balance)}</span></div>
-        <div class="detail-item" style="font-size:12px;color:var(--badge-orange-fg);"><strong>Catatan: Pembayaran akan dikirim untuk verifikasi Super User sebelum saldo deposit terpotong.</strong></div>
+    title:'', subtitle:'',
+    size:'lg',
+    bodyHTML:`<div style="max-height:55vh;overflow-y:auto;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#555;line-height:24px;font-size:14px;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:22px;font-weight:700;color:var(--color-accent);letter-spacing:1px;">INVOICE BULK</div>
+        <div style="font-size:13px;color:var(--color-text-secondary);margin-top:4px;">${selectedRows.length} customer &nbsp;|&nbsp; ${Fmt.date(new Date().toISOString().slice(0,10))}</div>
       </div>
-      <div style="border-top:1px solid var(--color-border);padding-top:12px;margin-bottom:12px;">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:var(--color-background-muted);border-radius:8px;">
+        <tr>
+          <td style="padding:12px 16px;width:50%;vertical-align:top;">
+            <div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:4px;">Dari</div>
+            <div style="font-weight:600;color:var(--color-text-primary);">${partner.partner_name}</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);">${partner.company_name || ''}</div>
+          </td>
+          <td style="padding:12px 16px;width:50%;vertical-align:top;">
+            <div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:4px;">Ringkasan</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);">Total Customer: <strong>${selectedRows.length}</strong></div>
+            <div style="font-size:12px;color:var(--color-text-secondary);">Total Tagihan: <strong>${Fmt.rupiah(totalBilling)}</strong></div>
+          </td>
+        </tr>
+      </table>
+      <div style="margin-bottom:16px;">
         <strong style="font-size:13px;">Rincian Per Customer:</strong>
-        <div style="margin-top:8px;">${detailRows}</div>
+        <div style="margin-top:8px;">${invoiceCards}</div>
+      </div>
+      <div style="background:var(--color-background-muted);border:1px solid var(--color-border);border-radius:8px;padding:16px;margin-bottom:16px;">
+        <div style="font-size:12px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:8px;font-weight:600;">Rekap Seluruh Invoice</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <tr><td style="padding:6px 8px;font-weight:600;">Total Tagihan (${selectedRows.length} invoice)</td><td style="padding:6px 8px;text-align:right;font-weight:600;">${Fmt.rupiah(totalBilling)}</td></tr>
+          <tr><td style="padding:6px 8px;color:var(--badge-red-fg);">Total Potongan</td><td style="padding:6px 8px;text-align:right;color:var(--badge-red-fg);">- ${Fmt.rupiah(totalPotongan)}</td></tr>
+          <tr style="border-top:2px solid var(--color-border);"><td style="padding:10px 8px;font-weight:700;font-size:14px;">Total yang Diterima Mitra</td><td style="padding:10px 8px;text-align:right;font-weight:700;font-size:16px;color:var(--badge-green-fg);">${Fmt.rupiah(totalNet)}</td></tr>
+        </table>
+      </div>
+      <div style="padding:10px;background:var(--color-background-muted);border-radius:6px;font-size:11px;color:var(--color-text-secondary);">
+        <strong>Saldo Deposit Mitra:</strong> ${Fmt.rupiah(partner.deposit_balance)} &nbsp;|&nbsp;
+        <strong style="color:var(--badge-orange-fg);">Catatan: Pembayaran akan dikirim untuk verifikasi Super User sebelum saldo deposit terpotong.</strong>
       </div>
     </div>`,
     footHTML:`<button class="btn btn-secondary" id="mCloseBulk">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmBulk">${ic('check')} Ajukan Verifikasi Bulk</button>`,
     onOpen(b, f){
       f.querySelector('#mCloseBulk').addEventListener('click', Modal.close);
       f.querySelector('#mConfirmBulk').addEventListener('click', () => {
-        const totalAmount = selectedRows.reduce((s, r) => s + r.totalPayable, 0);
         let successCount = 0;
         selectedRows.forEach(r => {
           const inv = r.invoice;
           inv.billing_status = 'Menunggu Verifikasi';
           inv.extra_charge = r.extraCharge;
-          inv.total_paid = r.totalPayable;
+          inv.total_paid = r.invoice.billing_amount;
           inv.settled = false;
           DB.payments.push({
             id: nextId('PAY'),
             invoice_id: inv.id,
             payment_reference: 'VER-BULK-' + Date.now() + '-' + successCount,
             virtual_account: 'TUNAI/KASIR',
-            billing_amount: r.totalPayable,
+            billing_amount: r.invoice.billing_amount,
             payment_date: new Date().toISOString(),
             payment_status: 'Menunggu Verifikasi'
           });
           successCount++;
         });
-        pushActivity(CURRENT_USER.name, `mengajukan verifikasi pembayaran bulk ${selectedRows.length} customer sebesar ${Fmt.rupiah(totalAmount)}`);
+        pushActivity(CURRENT_USER.name, `mengajukan verifikasi pembayaran bulk ${selectedRows.length} customer sebesar ${Fmt.rupiah(totalBilling)}`);
         toast(`Pembayaran bulk ${selectedRows.length} customer diajukan untuk verifikasi!`);
         window.dispatchEvent(new CustomEvent('keuangan-refresh'));
         Modal.close();
@@ -146,44 +151,119 @@ function openBulkPaymentModal(selectedRows, partner){
   });
 }
 
+function buildPaymentInvoiceHTML(customer, invoice, pkg, partner){
+  const billingAmt = invoice.billing_amount;
+  let ksoAmt = 0, pgFee = 0, adminItems = [];
+  if(partner.kso_type === 'percentage'){
+    ksoAmt = Math.round(billingAmt * (partner.kso_value / 100));
+  } else {
+    ksoAmt = partner.kso_value || 0;
+  }
+  pgFee = 3000;
+  if(partner.other_deductions && partner.other_deductions.length > 0){
+    partner.other_deductions.forEach(d => {
+      const amt = d.type === 'percentage' ? Math.round(billingAmt * (d.value / 100)) : d.value;
+      adminItems.push({name: d.name, value: d.value, type: d.type, amount: amt});
+    });
+  } else {
+    adminItems.push({name: 'Biaya Administrasi', value: 5000, type: 'nominal', amount: 5000});
+  }
+  const totalPotongan = ksoAmt + pgFee + adminItems.reduce((s,a) => s + a.amount, 0);
+  const netToMitra = billingAmt - totalPotongan;
+  const now = new Date();
+  const due = new Date(now); due.setDate(due.getDate() + 7);
+
+  let potonganRows = '';
+  if(ksoAmt > 0){
+    potonganRows += '<tr><td style="padding:6px 8px;color:var(--color-text-secondary);">KSO' + (partner.kso_type==='percentage'?' ('+partner.kso_value+'%)':'') + '</td><td style="padding:6px 8px;text-align:right;color:var(--badge-red-fg);">- ' + Fmt.rupiah(ksoAmt) + '</td></tr>';
+  }
+  if(pgFee > 0){
+    potonganRows += '<tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Payment Gateway Fee</td><td style="padding:6px 8px;text-align:right;color:var(--badge-red-fg);">- ' + Fmt.rupiah(pgFee) + '</td></tr>';
+  }
+  adminItems.forEach(a => {
+    const label = a.type === 'percentage' ? a.name + ' (' + a.value + '%)' : a.name;
+    potonganRows += '<tr><td style="padding:6px 8px;color:var(--color-text-secondary);">' + label + '</td><td style="padding:6px 8px;text-align:right;color:var(--badge-red-fg);">- ' + Fmt.rupiah(a.amount) + '</td></tr>';
+  });
+
+  return { billingAmt: billingAmt, totalPotongan: totalPotongan, netToMitra: netToMitra, html: '\
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">\
+        <tr><td style="padding:0;vertical-align:top;">\
+          <div style="font-size:22px;font-weight:700;color:var(--color-accent);letter-spacing:1px;">INVOICE</div>\
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;">Pembayaran Tunai / Kasir</div>\
+        </td><td style="padding:0;vertical-align:top;text-align:right;">\
+          <div style="font-weight:600;">' + invoice.invoice_number + '</div>\
+          <div style="font-size:12px;color:var(--color-text-secondary);">Tanggal: ' + Fmt.date(now.toISOString().slice(0,10)) + '</div>\
+          <div style="font-size:12px;color:var(--color-text-secondary);">Jatuh Tempo: ' + Fmt.date(due.toISOString().slice(0,10)) + '</div>\
+        </td></tr>\
+      </table>\
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">\
+        <tr>\
+          <td style="padding:0;vertical-align:top;width:50%;">\
+            <div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:4px;">Dari</div>\
+            <div style="font-weight:600;color:var(--color-text-primary);">' + partner.partner_name + '</div>\
+            <div style="font-size:12px;color:var(--color-text-secondary);">' + (partner.company_name || '') + '</div>\
+            <div style="font-size:12px;color:var(--color-text-secondary);">' + (partner.address || '') + '</div>\
+          </td>\
+          <td style="padding:0;vertical-align:top;width:50%;">\
+            <div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:4px;">Kepada</div>\
+            <div style="font-weight:600;color:var(--color-text-primary);">' + customer.customer_name + '</div>\
+            <div style="font-size:12px;color:var(--color-text-secondary);">PPPoE: ' + customer.pppoe_secret + '</div>\
+            <div style="font-size:12px;color:var(--color-text-secondary);">Paket: ' + (pkg ? pkg.package_name + ' (' + pkg.bandwidth + ')' : '-') + '</div>\
+            <div style="font-size:12px;color:var(--color-text-secondary);">Periode: ' + invoice.billing_period + '</div>\
+          </td>\
+        </tr>\
+      </table>\
+      <div style="background:var(--color-background-muted);border:1px solid var(--color-border);border-radius:8px;padding:16px;margin-bottom:20px;">\
+        <div style="font-size:12px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:8px;font-weight:600;">Rincian Tagihan</div>\
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">\
+          <tr><td style="padding:6px 8px;border-bottom:1px solid var(--color-border);font-weight:600;">Paket Internet</td><td style="padding:6px 8px;border-bottom:1px solid var(--color-border);text-align:right;font-weight:600;">' + Fmt.rupiah(billingAmt) + '</td></tr>\
+          ' + potonganRows + '\
+        </table>\
+      </div>\
+      <table style="width:100%;border-collapse:collapse;">\
+        <tr style="border-top:2px solid var(--color-border);">\
+          <td style="padding:10px 8px;font-weight:700;font-size:14px;">Total yang Dibayar Customer</td>\
+          <td style="padding:10px 8px;text-align:right;font-weight:700;font-size:16px;color:var(--color-accent);">' + Fmt.rupiah(billingAmt) + '</td>\
+        </tr>\
+        <tr>\
+          <td style="padding:6px 8px;font-size:12px;color:var(--color-text-secondary);">Total Potongan</td>\
+          <td style="padding:6px 8px;text-align:right;font-size:12px;color:var(--badge-red-fg);">- ' + Fmt.rupiah(totalPotongan) + '</td>\
+        </tr>\
+        <tr style="border-top:1px solid var(--color-border);">\
+          <td style="padding:10px 8px;font-weight:700;font-size:14px;">Total yang Diterima Mitra</td>\
+          <td style="padding:10px 8px;text-align:right;font-weight:700;font-size:16px;color:var(--badge-green-fg);">' + Fmt.rupiah(netToMitra) + '</td>\
+        </tr>\
+      </table>\
+      <div style="margin-top:16px;padding:10px;background:var(--color-background-muted);border-radius:6px;font-size:11px;color:var(--color-text-secondary);">\
+        <strong>Metode Pembayaran:</strong> Tunai / Kasir &nbsp;|&nbsp; <strong>Saldo Deposit Mitra:</strong> ' + Fmt.rupiah(partner.deposit_balance) + '\
+      </div>'
+  };
+}
+
 function openPaymentModal(customer, invoice, pkg, extraCharge, totalPayable, partner){
-  const breakdownHTML = extraCharge > 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;color:var(--color-text-secondary);">
-          <span>Biaya Tambahan</span>
-          <span>+ ${Fmt.rupiah(extraCharge)}</span>
-        </div>` : '';
+  var inv = buildPaymentInvoiceHTML(customer, invoice, pkg, partner);
   Modal.open({
-    title:'Konfirmasi Pembayaran Tunai', subtitle:customer.customer_name,
-    bodyHTML:`<div class="detail-grid">
-      <div class="detail-item"><span class="dl">Nomor Tagihan</span><span class="dv cell-mono font-bold">${invoice.invoice_number}</span></div>
-      <div class="detail-item"><span class="dl">Paket Layanan</span><span class="dv">${pkg ? pkg.package_name + ' (' + pkg.bandwidth + ')' : '-'}</span></div>
-      <div class="detail-item"><span class="dl">Periode Billing</span><span class="dv">${invoice.billing_period}</span></div>
-      <div class="detail-item"><span class="dl">Nominal Paket</span><span class="dv">${Fmt.rupiah(invoice.billing_amount)}</span></div>
-      ${breakdownHTML}
-      <div class="detail-item" style="display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--color-border);font-weight:700;font-size:15px;color:var(--color-text-primary);">
-        <span>Total yang Harus Dibayar</span>
-        <span style="color:var(--color-accent);">${Fmt.rupiah(totalPayable)}</span>
-      </div>
-      <div class="detail-item" style="font-size:12px;color:var(--color-text-secondary);margin-top:8px;">Saldo deposit mitra saat ini: ${Fmt.rupiah(partner.deposit_balance)}</div>
-      <div class="detail-item" style="font-size:12px;color:var(--badge-orange-fg);margin-top:8px;"><strong>Catatan: Pembayaran akan dikirim untuk verifikasi Super User sebelum saldo deposit terpotong.</strong></div>
-    </div>`,
-    footHTML:`<button class="btn btn-secondary" id="mClosePay">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmPay">${ic('check')} Ajukan Verifikasi</button>`,
-    onOpen(b, f){
+    title:'', subtitle:'',
+    size:'lg',
+    bodyHTML:'<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;color:#555;line-height:24px;font-size:14px;">' + inv.html + '</div>',
+    footHTML:'<button class="btn btn-secondary" id="mClosePay">' + ic('x') + ' Batal</button> <button class="btn btn-primary" id="mConfirmPay">' + ic('check') + ' Ajukan Verifikasi</button>',
+    onOpen: function(b, f){
       f.querySelector('#mClosePay').addEventListener('click', Modal.close);
-      f.querySelector('#mConfirmPay').addEventListener('click', () => {
+      f.querySelector('#mConfirmPay').addEventListener('click', function(){
         invoice.billing_status = 'Menunggu Verifikasi';
         invoice.extra_charge = extraCharge;
-        invoice.total_paid = totalPayable;
+        invoice.total_paid = inv.billingAmt;
         invoice.settled = false;
         DB.payments.push({
           id: nextId('PAY'),
           invoice_id: invoice.id,
           payment_reference: 'VER-' + Date.now(),
           virtual_account: 'TUNAI/KASIR',
-          billing_amount: totalPayable,
+          billing_amount: inv.billingAmt,
           payment_date: new Date().toISOString(),
           payment_status: 'Menunggu Verifikasi'
         });
-        pushActivity(CURRENT_USER.name, `mengajukan verifikasi pembayaran ${customer.customer_name} sebesar ${Fmt.rupiah(totalPayable)}`);
+        pushActivity(CURRENT_USER.name, 'mengajukan verifikasi pembayaran ' + customer.customer_name + ' sebesar ' + Fmt.rupiah(inv.billingAmt));
         toast('Pembayaran diajukan untuk verifikasi Super User!');
         window.dispatchEvent(new CustomEvent('keuangan-refresh'));
         Modal.close();
@@ -1167,65 +1247,121 @@ Views['deposit.dashboard'] = function(root){
     tabContent.appendChild(card);
   }
 
+  function buildPaymentInvoiceHTML(customer, invoice, pkg, partner){
+    const billingAmt = invoice.billing_amount;
+    let ksoAmt = 0, pgFee = 0, adminItems = [];
+    if(partner.kso_type === 'percentage'){
+      ksoAmt = Math.round(billingAmt * (partner.kso_value / 100));
+    } else {
+      ksoAmt = partner.kso_value || 0;
+    }
+    pgFee = 3000;
+    if(partner.other_deductions && partner.other_deductions.length > 0){
+      partner.other_deductions.forEach(d => {
+        const amt = d.type === 'percentage' ? Math.round(billingAmt * (d.value / 100)) : d.value;
+        adminItems.push({name: d.name, value: d.value, type: d.type, amount: amt});
+      });
+    } else {
+      adminItems.push({name: 'Biaya Administrasi', value: 5000, type: 'nominal', amount: 5000});
+    }
+    const totalPotongan = ksoAmt + pgFee + adminItems.reduce((s,a) => s + a.amount, 0);
+    const netToMitra = billingAmt - totalPotongan;
+    const now = new Date();
+    const due = new Date(now); due.setDate(due.getDate() + 7);
+
+    let potonganRows = '';
+    if(ksoAmt > 0){
+      potonganRows += `<tr><td style="padding:6px 8px;color:var(--color-text-secondary);">KSO${partner.kso_type==='percentage'?' ('+partner.kso_value+'%)':''}</td><td style="padding:6px 8px;text-align:right;color:var(--badge-red-fg);">- ${Fmt.rupiah(ksoAmt)}</td></tr>`;
+    }
+    if(pgFee > 0){
+      potonganRows += `<tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Payment Gateway Fee</td><td style="padding:6px 8px;text-align:right;color:var(--badge-red-fg);">- ${Fmt.rupiah(pgFee)}</td></tr>`;
+    }
+    adminItems.forEach(a => {
+      const label = a.type === 'percentage' ? `${a.name} (${a.value}%)` : a.name;
+      potonganRows += `<tr><td style="padding:6px 8px;color:var(--color-text-secondary);">${label}</td><td style="padding:6px 8px;text-align:right;color:var(--badge-red-fg);">- ${Fmt.rupiah(a.amount)}</td></tr>`;
+    });
+
+    return { billingAmt, totalPotongan, netToMitra, ksoAmt, pgFee, adminItems, html: `
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        <tr><td style="padding:0;vertical-align:top;">
+          <div style="font-size:22px;font-weight:700;color:var(--color-accent);letter-spacing:1px;">INVOICE</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;">Pembayaran Tunai / Kasir</div>
+        </td><td style="padding:0;vertical-align:top;text-align:right;">
+          <div style="font-weight:600;">${invoice.invoice_number}</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);">Tanggal: ${Fmt.date(now.toISOString().slice(0,10))}</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);">Jatuh Tempo: ${Fmt.date(due.toISOString().slice(0,10))}</div>
+        </td></tr>
+      </table>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        <tr>
+          <td style="padding:0;vertical-align:top;width:50%;">
+            <div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:4px;">Dari</div>
+            <div style="font-weight:600;color:var(--color-text-primary);">${partner.partner_name}</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);">${partner.company_name || ''}</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);">${partner.address || ''}</div>
+          </td>
+          <td style="padding:0;vertical-align:top;width:50%;">
+            <div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:4px;">Kepada</div>
+            <div style="font-weight:600;color:var(--color-text-primary);">${customer.customer_name}</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);">PPPoE: ${customer.pppoe_secret}</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);">Paket: ${pkg ? pkg.package_name + ' (' + pkg.bandwidth + ')' : '-'}</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);">Periode: ${invoice.billing_period}</div>
+          </td>
+        </tr>
+      </table>
+      <div style="background:var(--color-background-muted);border:1px solid var(--color-border);border-radius:8px;padding:16px;margin-bottom:20px;">
+        <div style="font-size:12px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:8px;font-weight:600;">Rincian Tagihan</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <tr><td style="padding:6px 8px;border-bottom:1px solid var(--color-border);font-weight:600;">Paket Internet</td><td style="padding:6px 8px;border-bottom:1px solid var(--color-border);text-align:right;font-weight:600;">${Fmt.rupiah(billingAmt)}</td></tr>
+          ${potonganRows}
+        </table>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr style="border-top:2px solid var(--color-border);">
+          <td style="padding:10px 8px;font-weight:700;font-size:14px;">Total yang Dibayar Customer</td>
+          <td style="padding:10px 8px;text-align:right;font-weight:700;font-size:16px;color:var(--color-accent);">${Fmt.rupiah(billingAmt)}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;font-size:12px;color:var(--color-text-secondary);">Total Potongan</td>
+          <td style="padding:6px 8px;text-align:right;font-size:12px;color:var(--badge-red-fg);">- ${Fmt.rupiah(totalPotongan)}</td>
+        </tr>
+        <tr style="border-top:1px solid var(--color-border);">
+          <td style="padding:10px 8px;font-weight:700;font-size:14px;">Total yang Diterima Mitra</td>
+          <td style="padding:10px 8px;text-align:right;font-weight:700;font-size:16px;color:var(--badge-green-fg);">${Fmt.rupiah(netToMitra)}</td>
+        </tr>
+      </table>
+      <div style="margin-top:16px;padding:10px;background:var(--color-background-muted);border-radius:6px;font-size:11px;color:var(--color-text-secondary);">
+        <strong>Metode Pembayaran:</strong> Tunai / Kasir &nbsp;|&nbsp; <strong>Saldo Deposit Mitra:</strong> ${Fmt.rupiah(partner.deposit_balance)}
+      </div>
+    `};
+  }
+
   function openPaymentModal(customer, invoice, pkg, extraCharge, totalPayable){
-    const breakdownHTML = extraCharge > 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;color:var(--color-text-secondary);">
-          <span>Biaya Tambahan</span>
-          <span>+ ${Fmt.rupiah(extraCharge)}</span>
-        </div>` : '';
+    const inv = buildPaymentInvoiceHTML(customer, invoice, pkg, partner);
     Modal.open({
-      title:'Konfirmasi Pembayaran Tunai', subtitle:customer.customer_name,
-      bodyHTML:`<div class="detail-grid">
-        <div class="detail-item"><span class="dl">Nomor Tagihan</span><span class="dv cell-mono font-bold">${invoice.invoice_number}</span></div>
-        <div class="detail-item"><span class="dl">Paket Layanan</span><span class="dv">${pkg ? pkg.package_name + ' (' + pkg.bandwidth + ')' : '-'}</span></div>
-        <div class="detail-item"><span class="dl">Periode Billing</span><span class="dv">${invoice.billing_period}</span></div>
-        <div class="detail-item"><span class="dl">Nominal Paket</span><span class="dv">${Fmt.rupiah(invoice.billing_amount)}</span></div>
-        ${breakdownHTML}
-        <div class="detail-item" style="display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--color-border);font-weight:700;font-size:15px;color:var(--color-text-primary);">
-          <span>Total yang Harus Dibayar</span>
-          <span style="color:var(--color-accent);">${Fmt.rupiah(totalPayable)}</span>
-        </div>
-        <div class="detail-item" style="font-size:12px;color:var(--color-text-secondary);margin-top:8px;">Saldo deposit mitra saat ini: ${Fmt.rupiah(partner.deposit_balance)}</div>
-      </div>`,
-      footHTML:`<button class="btn btn-secondary" id="mClosePay">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmPay">${ic('check')} Konfirmasi Bayar</button>`,
+      title:'', subtitle:'',
+      size:'lg',
+      bodyHTML:`<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#555;line-height:24px;font-size:14px;">${inv.html}</div>`,
+      footHTML:`<button class="btn btn-secondary" id="mClosePay">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmPay">${ic('check')} Ajukan Verifikasi</button>`,
       onOpen(b, f){
         f.querySelector('#mClosePay').addEventListener('click', Modal.close);
         f.querySelector('#mConfirmPay').addEventListener('click', () => {
-          if(partner.deposit_balance < totalPayable) {
-            toast('Saldo deposit tidak mencukupi untuk melakukan pembayaran ini.');
-            return;
-          }
-          const oldBalance = partner.deposit_balance;
-          partner.deposit_balance -= totalPayable;
-          invoice.billing_status = 'Lunas';
+          invoice.billing_status = 'Menunggu Verifikasi';
           invoice.extra_charge = extraCharge;
-          invoice.total_paid = totalPayable;
+          invoice.total_paid = inv.billingAmt;
           invoice.settled = false;
-          const depId = nextId('DEP');
-          DB.depositHistory.push({
-            id: depId,
-            partner_id: partner.id,
-            ref: 'DEP/2026/07/' + String(DB.depositHistory.length+1).padStart(4,'0'),
-            type: 'Deposit Keluar',
-            date: new Date().toISOString().slice(0,10),
-            amount: -totalPayable,
-            balance_before: oldBalance,
-            balance_after: partner.deposit_balance,
-            note: `Pembayaran tunai ${customer.customer_name} (${invoice.invoice_number})`,
-            status: 'Berhasil'
-          });
           DB.payments.push({
             id: nextId('PAY'),
             invoice_id: invoice.id,
             payment_reference: 'CSH-' + Date.now(),
             virtual_account: 'TUNAI/KASIR',
-            billing_amount: totalPayable,
+            billing_amount: inv.billingAmt,
             payment_date: new Date().toISOString(),
-            payment_status: 'Berhasil'
+            payment_status: 'Menunggu Verifikasi'
           });
-          pushActivity(CURRENT_USER.name, `menerima pembayaran tunai ${customer.customer_name} sebesar ${Fmt.rupiah(totalPayable)}`);
-          toast('Pembayaran berhasil dikonfirmasi & saldo deposit diperbarui!');
-          kpis();
-          showHistoryTab();
+          pushActivity(CURRENT_USER.name, `mengajukan verifikasi pembayaran ${customer.customer_name} sebesar ${Fmt.rupiah(inv.billingAmt)}`);
+          toast('Pembayaran diajukan untuk verifikasi Super User!');
+          window.dispatchEvent(new CustomEvent('keuangan-refresh'));
           Modal.close();
         });
       }
@@ -2505,132 +2641,125 @@ Views['settlement.dashboard'] = function(root){
   }
 
 function openSettlementModal(unsettledInvoices, partner){
-  // Calculate totals
   const gross = unsettledInvoices.reduce((s, i) => s + (i.total_paid || i.billing_amount), 0);
-  let kso = 0;
-  if(partner.kso_type === 'percentage'){
-    kso = Math.round(gross * (partner.kso_value / 100));
-  } else {
-    kso = unsettledInvoices.length * (partner.kso_value || 0);
-  }
-  let pg_fee = 0;
-  unsettledInvoices.forEach(inv => {
-    const pay = DB.payments.find(p => p.invoice_id === inv.id && p.payment_status === 'Berhasil');
-    if (pay && pay.virtual_account !== 'TUNAI/KASIR') pg_fee += 3000;
-  });
-  let other_deductions_val = 0;
-  if(partner.other_deductions && partner.other_deductions.length > 0){
-    partner.other_deductions.forEach(d => {
-      if(d.type === 'percentage') other_deductions_val += Math.round(gross * (d.value / 100));
-      else other_deductions_val += d.value * unsettledInvoices.length;
-    });
-  }
-  const total_potongan = kso + pg_fee + other_deductions_val;
-  const net = gross - total_potongan;
-
-  // Build invoice rows with detailed breakdown
-  let invoiceRows = '';
   let totalKSO = 0, totalPgFee = 0, totalAdmin = 0;
+
+  let invoiceCards = '';
   unsettledInvoices.forEach((inv, idx) => {
+    const pkg = DB.packages.find(p => p.id === inv.package_id);
+    const cust = DB.customers.find(c => c.id === inv.customer_id);
+    const custName = cust ? cust.customer_name : 'Customer';
     const packagePrice = inv.billing_amount;
-    let ksoAmt = 0, pgFee = 0, adminFee = 0, otherDed = 0;
+    let ksoAmt = 0, pgFee = 0, adminFee = 0;
     if(partner.kso_type === 'percentage'){
       ksoAmt = Math.round(packagePrice * (partner.kso_value / 100));
     } else {
       ksoAmt = partner.kso_value || 0;
     }
     const pay = DB.payments.find(p => p.invoice_id === inv.id && p.payment_status === 'Berhasil');
-    if (pay && pay.virtual_account !== 'TUNAI/KASIR') pgFee = 3000;
+    if(pay && pay.virtual_account !== 'TUNAI/KASIR') pgFee = 3000;
     if(partner.other_deductions && partner.other_deductions.length > 0){
       partner.other_deductions.forEach(d => {
-        if(d.type === 'percentage'){
-          adminFee += Math.round(packagePrice * (d.value / 100));
-        } else {
-          adminFee += d.value;
-        }
+        if(d.type === 'percentage') adminFee += Math.round(packagePrice * (d.value / 100));
+        else adminFee += d.value;
       });
-    } else if(inv.extra_charge > 0) {
-      adminFee = inv.extra_charge;
     }
+    totalKSO += ksoAmt;
+    totalPgFee += pgFee;
+    totalAdmin += adminFee;
+    const netInv = packagePrice - ksoAmt - pgFee - adminFee;
 
-    const netInv = packagePrice + inv.extra_charge - (ksoAmt + pgFee + adminFee);
-
-invoiceRows += `
-      <div style="border:1px solid var(--color-border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--color-background-muted);">
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-weight:600;">
-          <span>${idx+1}. ${inv.customer_name || 'Customer'}</span>
-          <span class="cell-mono">${inv.invoice_number}</span>
+    invoiceCards += `
+      <div style="border:1px solid var(--color-border);border-radius:8px;padding:16px;margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--color-border);">
+          <div style="font-weight:700;font-size:14px;color:var(--color-text-primary);">${idx+1}. ${custName}</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);">${inv.invoice_number}</div>
         </div>
-        <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:8px;">
-          Paket: ${inv.package_name || 'Paket'} | Periode: ${inv.billing_period}
+        <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px;">
+          Paket: ${pkg ? pkg.package_name + ' (' + pkg.bandwidth + ')' : '-'} &nbsp;|&nbsp; Periode: ${inv.billing_period}
         </div>
-        <table style="width:100%;font-size:12px;border-collapse:collapse;">
-          <tr><td style="padding:4px 0;color:var(--color-text-secondary);">Harga Paket (Termasuk Potongan)</td><td style="padding:4px 0;text-align:right;font-weight:600;">${Fmt.rupiah(packagePrice)}</td></tr>
-          <tr><td style="padding:4px 0;color:var(--color-text-secondary);">Biaya Tambahan</td><td style="padding:4px 0;text-align:right;">${Fmt.rupiah(inv.extra_charge || 0)}</td></tr>
-          <tr style="border-top:1px solid var(--color-border);"><td style="padding:4px 0;font-weight:600;">Total Bayar</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--color-accent);">${Fmt.rupiah(inv.total_paid || packagePrice + inv.extra_charge)}</td></tr>
+        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+          <tr><td style="padding:6px 8px;border-bottom:1px solid var(--color-border);font-weight:600;">Harga Paket</td><td style="padding:6px 8px;border-bottom:1px solid var(--color-border);text-align:right;font-weight:600;">${Fmt.rupiah(packagePrice)}</td></tr>
+          <tr><td style="padding:6px 8px;color:var(--badge-red-fg);">KSO${partner.kso_type==='percentage'?' ('+partner.kso_value+'%)':''}</td><td style="padding:6px 8px;text-align:right;color:var(--badge-red-fg);">- ${Fmt.rupiah(ksoAmt)}</td></tr>
+          ${pgFee > 0 ? `<tr><td style="padding:6px 8px;color:var(--badge-red-fg);">PG Fee</td><td style="padding:6px 8px;text-align:right;color:var(--badge-red-fg);">- ${Fmt.rupiah(pgFee)}</td></tr>` : ''}
+          ${adminFee > 0 ? `<tr><td style="padding:6px 8px;color:var(--badge-red-fg);">Admin / Lainnya</td><td style="padding:6px 8px;text-align:right;color:var(--badge-red-fg);">- ${Fmt.rupiah(adminFee)}</td></tr>` : ''}
+          <tr style="border-top:2px solid var(--color-border);">
+            <td style="padding:8px;font-weight:700;">Laba Bersih (Net)</td>
+            <td style="padding:8px;text-align:right;font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(netInv)}</td>
+          </tr>
         </table>
-        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--color-border);font-size:12px;color:var(--color-text-secondary);">
-          <strong>Rincian Potongan (Konseptual):</strong><br>
-          KSO: ${Fmt.rupiah(ksoAmt)} | PG Fee: ${Fmt.rupiah(pgFee)} | Admin: ${Fmt.rupiah(adminFee)} | Lainnya: ${Fmt.rupiah(otherDed)}<br>
-          <em>Catatan: Harga paket di atas sudah termasuk potongan yang disepakati. Rincian di atas untuk referensi perhitungan laba bersih.</em>
-        </div>
       </div>
     `;
   });
-  let pgFeeSum = 0;
-  unsettledInvoices.forEach(inv => {
-    const pay = DB.payments.find(p => p.invoice_id === inv.id && p.payment_status === 'Berhasil');
-    if (pay && pay.virtual_account !== 'TUNAI/KASIR') pgFeeSum += 3000;
-});
-  let adminSum = 0;
-  if(partner.other_deductions && partner.other_deductions.length > 0){
-    partner.other_deductions.forEach(d => {
-      if(d.type === 'percentage') adminSum += Math.round(gross * (d.value / 100));
-      else adminSum += d.value * unsettledInvoices.length;
-    });
-  }
-  const settlementTotalPotongan = totalKSO + pgFeeSum + adminSum;
-  const settlementNetAmount = gross - settlementTotalPotongan;
+
+  const totalPotongan = totalKSO + totalPgFee + totalAdmin;
+  const netAmount = gross - totalPotongan;
+  const now = new Date();
 
   Modal.open({
-    title:'Ajukan Pencairan Settlement', subtitle:`Saldo tersedia: ${Fmt.rupiah(settlementNetAmount)} (Laba Bersih ${unsettledInvoices.length} transaksi)`,
-    bodyHTML:`<div style="max-height:70vh;overflow-y:auto;">
-      <div class="detail-grid" style="margin-bottom:16px;">
-        <div class="detail-item"><span class="dl">Jumlah Transaksi</span><span class="dv">${unsettledInvoices.length} transaksi</span></div>
-        <div class="detail-item"><span class="dl">Gross Revenue (Total Harga Paket)</span><span class="dv">${Fmt.rupiah(gross)}</span></div>
-        <div class="detail-item"><span class="dl">Total Potongan</span><span class="dv" style="color:var(--badge-red-fg);">-${Fmt.rupiah(settlementTotalPotongan)}</span></div>
-        <div class="detail-item" style="font-weight:700;font-size:15px;color:var(--badge-green-fg);"><span class="dl">Laba Bersih (Net)</span><span class="dv">${Fmt.rupiah(settlementNetAmount)}</span></div>
+    title:'', subtitle:'',
+    size:'lg',
+    bodyHTML:`<div style="max-height:55vh;overflow-y:auto;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#555;line-height:24px;font-size:14px;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:22px;font-weight:700;color:var(--color-accent);letter-spacing:1px;">SETTLEMENT INVOICE</div>
+        <div style="font-size:13px;color:var(--color-text-secondary);margin-top:4px;">${partner.partner_name} &nbsp;|&nbsp; ${Fmt.date(now.toISOString().slice(0,10))}</div>
       </div>
-      <div style="border-top:1px solid var(--color-border);padding-top:12px;margin-bottom:12px;">
-        <strong style="font-size:13px;">Rincian Potongan:</strong>
-        <div style="margin-top:8px;font-size:13px;color:var(--color-text-secondary);">
-          KSO: ${Fmt.rupiah(totalKSO)} | PG Fee: ${Fmt.rupiah(pgFeeSum)} | Admin/Lainnya: ${Fmt.rupiah(adminSum)}
-        </div>
-        <div style="margin-top:12px;font-size:12px;color:var(--color-text-secondary);"><em>Catatan: Harga paket di atas sudah termasuk potongan. Rincian di atas untuk referensi perhitungan laba bersih.</em></div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        <tr><td style="padding:0;vertical-align:top;width:50%;">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:4px;">Dari</div>
+          <div style="font-weight:600;color:var(--color-text-primary);">${partner.partner_name}</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);">${partner.company_name || ''}</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);">${partner.address || ''}</div>
+        </td><td style="padding:0;vertical-align:top;width:50%;text-align:right;">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:4px;">Rekening Tujuan</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);">${partner.bank_name}</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);">${partner.bank_account_no}</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);">a.n. ${partner.bank_account_name}</div>
+        </td></tr>
+      </table>
+      <div style="background:var(--color-background-muted);border:1px solid var(--color-border);border-radius:8px;padding:16px;margin-bottom:20px;">
+        <div style="font-size:12px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:8px;font-weight:600;">Ringkasan</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <tr><td style="padding:6px 8px;border-bottom:1px solid var(--color-border);">Jumlah Transaksi</td><td style="padding:6px 8px;border-bottom:1px solid var(--color-border);text-align:right;font-weight:600;">${unsettledInvoices.length} transaksi</td></tr>
+          <tr><td style="padding:6px 8px;border-bottom:1px solid var(--color-border);font-weight:600;">Gross Revenue (Total Harga Paket)</td><td style="padding:6px 8px;border-bottom:1px solid var(--color-border);text-align:right;font-weight:600;">${Fmt.rupiah(gross)}</td></tr>
+          <tr><td style="padding:6px 8px;color:var(--badge-red-fg);">KSO${partner.kso_type==='percentage'?' ('+partner.kso_value+'%)':''}</td><td style="padding:6px 8px;text-align:right;color:var(--badge-red-fg);">- ${Fmt.rupiah(totalKSO)}</td></tr>
+          <tr><td style="padding:6px 8px;color:var(--badge-red-fg);">Payment Gateway Fee</td><td style="padding:6px 8px;text-align:right;color:var(--badge-red-fg);">- ${Fmt.rupiah(totalPgFee)}</td></tr>
+          <tr><td style="padding:6px 8px;color:var(--badge-red-fg);">Admin / Lainnya</td><td style="padding:6px 8px;text-align:right;color:var(--badge-red-fg);">- ${Fmt.rupiah(totalAdmin)}</td></tr>
+        </table>
       </div>
-      <div style="border-top:1px solid var(--color-border);padding-top:12px;margin-bottom:12px;">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        <tr style="border-top:2px solid var(--color-border);">
+          <td style="padding:10px 8px;font-weight:700;font-size:14px;">Gross Revenue</td>
+          <td style="padding:10px 8px;text-align:right;font-weight:700;font-size:16px;color:var(--color-accent);">${Fmt.rupiah(gross)}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;font-size:12px;color:var(--color-text-secondary);">Total Potongan</td>
+          <td style="padding:6px 8px;text-align:right;font-size:12px;color:var(--badge-red-fg);">- ${Fmt.rupiah(totalPotongan)}</td>
+        </tr>
+        <tr style="border-top:1px solid var(--color-border);">
+          <td style="padding:10px 8px;font-weight:700;font-size:14px;">Laba Bersih (Net)</td>
+          <td style="padding:10px 8px;text-align:right;font-weight:700;font-size:16px;color:var(--badge-green-fg);">${Fmt.rupiah(netAmount)}</td>
+        </tr>
+      </table>
+      <div style="margin-bottom:16px;">
         <strong style="font-size:13px;">Rincian Per Transaksi:</strong>
-        <div style="margin-top:8px;">${invoiceRows}</div>
+        <div style="margin-top:8px;">${invoiceCards}</div>
       </div>
-      <div style="border-top:1px solid var(--color-border);padding-top:12px;margin-bottom:12px;">
-        <div class="detail-grid">
-          <div class="detail-item"><span class="dl">Nominal Pencairan (Rp)</span><span class="dv">
-            <input type="number" id="settleAmount" class="input" style="width:100%;font-size:14px;" value="${netAmount}" min="1000" max="${netAmount}" step="1000">
-            <div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px;">Minimal Rp 1.000. Maksimal ${Fmt.rupiah(netAmount)}</div>
-          </span></div>
-          <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--color-text-secondary);">
-            Rekening tujuan: ${partner.bank_name} - ${partner.bank_account_no} a.n. ${partner.bank_account_name}
-          </div>
+      <div style="border-top:1px solid var(--color-border);padding-top:16px;margin-top:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <label style="font-weight:600;font-size:13px;">Nominal Pencairan</label>
         </div>
+        <input type="number" id="settleAmount" class="input" style="width:100%;font-size:16px;padding:12px;font-weight:700;" value="${netAmount}" min="1000" max="${netAmount}" step="1000">
+        <div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px;">Minimal Rp 1.000. Maksimal ${Fmt.rupiah(netAmount)}</div>
       </div>
     </div>`,
-    footHTML:`<button class="btn btn-secondary" id="mCloseSettle">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmSettle">${ic('check')} Ajukan Pencairan</button>`,
+    footHTML:`<button class="btn btn-secondary" id="mCloseSettle">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmSettle">${ic('check')} Ajukan Verifikasi</button>`,
     onOpen(b, f){
       f.querySelector('#mCloseSettle').addEventListener('click', Modal.close);
       f.querySelector('#mConfirmSettle').addEventListener('click', () => {
         const amount = parseFloat(f.querySelector('#settleAmount').value) || 0;
-        if(amount <= 0 || amount > settlementNetAmount) {
-          toast('Nominal tidak valid. Minimal Rp 1.000, maksimal ' + Fmt.rupiah(settlementNetAmount));
+        if(amount <= 0 || amount > netAmount) {
+          toast('Nominal tidak valid. Minimal Rp 1.000, maksimal ' + Fmt.rupiah(netAmount));
           return;
         }
         const setRef = 'SET/2026/07/' + String(DB.settlements.length+1).padStart(4,'0');
@@ -2641,18 +2770,15 @@ invoiceRows += `
           period: 'Juli 2026',
           tx_count: unsettledInvoices.length,
           gross_revenue: gross,
-          total_deduction: settlementTotalPotongan,
+          total_deduction: totalPotongan,
           net_revenue: amount,
           bank_account: `${partner.bank_name} - ${partner.bank_account_no}`,
-          status: 'Selesai',
+          status: 'Menunggu Verifikasi',
           date: new Date().toISOString().slice(0,10)
         });
-        if(amount === settlementNetAmount) {
-          unsettledInvoices.forEach(inv => { inv.settled = true; });
-        }
-        pushActivity(CURRENT_USER.name, `mengajukan pencairan settlement ${setRef} sebesar ${Fmt.rupiah(amount)}`);
-        toast('Pencairan settlement berhasil diajukan!');
-        renderSettlement();
+        pushActivity(CURRENT_USER.name, `mengajukan verifikasi settlement ${setRef} sebesar ${Fmt.rupiah(amount)}`);
+        toast('Settlement diajukan untuk verifikasi Super User!');
+        window.dispatchEvent(new CustomEvent('keuangan-refresh'));
         Modal.close();
       });
     }
