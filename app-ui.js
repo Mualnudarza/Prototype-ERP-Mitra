@@ -54,7 +54,7 @@ const STATUS_VARIANT = {
   'Nonaktif':'gray', 'Offline':'gray',
   'Isolir':'orange', 'Jatuh Tempo':'orange', 'Pending':'yellow',
   'Terminate':'red', 'Gagal':'red',
-  'Belum Dibayar':'blue', 'Penuh':'red',
+  'Belum Dibayar':'blue', 'Menunggu Verifikasi':'yellow', 'Penuh':'red',
   'Reguler':'blue', 'Fasum':'purple',
   'Unregistered':'yellow',
 };

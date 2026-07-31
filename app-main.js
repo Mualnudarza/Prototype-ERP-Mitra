@@ -36,6 +36,7 @@ const NAV_CONFIG = [
 
 const ALL_ITEMS = NAV_CONFIG.flatMap(g=>g.items);
 const PARTNERSHIP_KEYS = NAV_CONFIG[0].items.map(i=>i.key);
+const SUPER_USER_KEYS = [...PARTNERSHIP_KEYS, 'keuangan.mitra'];
 const DEFAULT_ROUTE_SUPER = 'partnership.mitra';
 const DEFAULT_ROUTE_MITRA = 'customer.pelanggan';
 
@@ -45,18 +46,19 @@ function currentRoute(){
   const hash = window.location.hash.replace('#','');
   const routeKey = hash.split('?')[0];
   if(isSuperUser()){
-    return PARTNERSHIP_KEYS.some(i=>i===routeKey) ? routeKey : DEFAULT_ROUTE_SUPER;
+    return SUPER_USER_KEYS.some(i=>i===routeKey) ? routeKey : DEFAULT_ROUTE_SUPER;
   }
   return !PARTNERSHIP_KEYS.includes(routeKey) ? routeKey : DEFAULT_ROUTE_MITRA;
 }
 
 function navWithBadges(){
   if(isSuperUser()){
-    const group = NAV_CONFIG[0];
-    return [{
-      group: group.group,
-      items: group.items.map(item => ({...item, badge: item.badgeFn ? item.badgeFn() : undefined}))
-    }];
+    return NAV_CONFIG
+      .filter(g => g.group === 'Kemitraan' || g.group === 'Keuangan')
+      .map(g => ({
+        group: g.group,
+        items: g.items.map(item => ({...item, badge: item.badgeFn ? item.badgeFn() : undefined}))
+      }));
   }
   return NAV_CONFIG
     .filter(g => g.group !== 'Kemitraan')

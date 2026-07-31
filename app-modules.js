@@ -107,56 +107,38 @@ function openBulkPaymentModal(selectedRows, partner){
         <div class="detail-item"><span class="dl">Total Biaya Tambahan</span><span class="dv">${Fmt.rupiah(selectedRows.reduce((s,r)=>s+r.extraCharge,0))}</span></div>
         <div class="detail-item" style="font-weight:700;font-size:15px;color:var(--color-accent);"><span class="dl">Total Bayar</span><span class="dv">${Fmt.rupiah(selectedRows.reduce((s,r)=>s+r.totalPayable,0))}</span></div>
         <div class="detail-item" style="font-size:12px;color:var(--color-text-secondary);"><span class="dl">Saldo Deposit Saat Ini</span><span class="dv">${Fmt.rupiah(partner.deposit_balance)}</span></div>
+        <div class="detail-item" style="font-size:12px;color:var(--badge-orange-fg);"><strong>Catatan: Pembayaran akan dikirim untuk verifikasi Super User sebelum saldo deposit terpotong.</strong></div>
       </div>
       <div style="border-top:1px solid var(--color-border);padding-top:12px;margin-bottom:12px;">
         <strong style="font-size:13px;">Rincian Per Customer:</strong>
         <div style="margin-top:8px;">${detailRows}</div>
       </div>
     </div>`,
-    footHTML:`<button class="btn btn-secondary" id="mCloseBulk">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmBulk">${ic('check')} Konfirmasi Bayar Bulk</button>`,
+    footHTML:`<button class="btn btn-secondary" id="mCloseBulk">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmBulk">${ic('check')} Ajukan Verifikasi Bulk</button>`,
     onOpen(b, f){
       f.querySelector('#mCloseBulk').addEventListener('click', Modal.close);
       f.querySelector('#mConfirmBulk').addEventListener('click', () => {
         const totalAmount = selectedRows.reduce((s, r) => s + r.totalPayable, 0);
-        if(partner.deposit_balance < totalAmount) {
-          toast('Saldo deposit tidak mencukupi untuk pembayaran bulk ini.');
-          return;
-        }
-        const oldBalance = partner.deposit_balance;
-        partner.deposit_balance -= totalAmount;
         let successCount = 0;
         selectedRows.forEach(r => {
           const inv = r.invoice;
-          inv.billing_status = 'Lunas';
+          inv.billing_status = 'Menunggu Verifikasi';
           inv.extra_charge = r.extraCharge;
           inv.total_paid = r.totalPayable;
           inv.settled = false;
-          const depId = nextId('DEP');
-          DB.depositHistory.push({
-            id: depId,
-            partner_id: partner.id,
-            ref: 'DEP/2026/07/' + String(DB.depositHistory.length+1).padStart(4,'0'),
-            type: 'Deposit Keluar',
-            date: new Date().toISOString().slice(0,10),
-            amount: -r.totalPayable,
-            balance_before: oldBalance,
-            balance_after: partner.deposit_balance,
-            note: `Pembayaran bulk ${r.customer.customer_name} (${inv.invoice_number})`,
-            status: 'Berhasil'
-          });
           DB.payments.push({
             id: nextId('PAY'),
             invoice_id: inv.id,
-            payment_reference: 'CSH-BULK-' + Date.now() + '-' + successCount,
+            payment_reference: 'VER-BULK-' + Date.now() + '-' + successCount,
             virtual_account: 'TUNAI/KASIR',
             billing_amount: r.totalPayable,
             payment_date: new Date().toISOString(),
-            payment_status: 'Berhasil'
+            payment_status: 'Menunggu Verifikasi'
           });
           successCount++;
         });
-        pushActivity(CURRENT_USER.name, `menerima pembayaran bulk ${selectedRows.length} customer sebesar ${Fmt.rupiah(totalAmount)}`);
-        toast(`Pembayaran bulk ${selectedRows.length} customer berhasil dikonfirmasi!`);
+        pushActivity(CURRENT_USER.name, `mengajukan verifikasi pembayaran bulk ${selectedRows.length} customer sebesar ${Fmt.rupiah(totalAmount)}`);
+        toast(`Pembayaran bulk ${selectedRows.length} customer diajukan untuk verifikasi!`);
         window.dispatchEvent(new CustomEvent('keuangan-refresh'));
         Modal.close();
       });
@@ -182,45 +164,27 @@ function openPaymentModal(customer, invoice, pkg, extraCharge, totalPayable, par
         <span style="color:var(--color-accent);">${Fmt.rupiah(totalPayable)}</span>
       </div>
       <div class="detail-item" style="font-size:12px;color:var(--color-text-secondary);margin-top:8px;">Saldo deposit mitra saat ini: ${Fmt.rupiah(partner.deposit_balance)}</div>
+      <div class="detail-item" style="font-size:12px;color:var(--badge-orange-fg);margin-top:8px;"><strong>Catatan: Pembayaran akan dikirim untuk verifikasi Super User sebelum saldo deposit terpotong.</strong></div>
     </div>`,
-    footHTML:`<button class="btn btn-secondary" id="mClosePay">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmPay">${ic('check')} Konfirmasi Bayar</button>`,
+    footHTML:`<button class="btn btn-secondary" id="mClosePay">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmPay">${ic('check')} Ajukan Verifikasi</button>`,
     onOpen(b, f){
       f.querySelector('#mClosePay').addEventListener('click', Modal.close);
       f.querySelector('#mConfirmPay').addEventListener('click', () => {
-        if(partner.deposit_balance < totalPayable) {
-          toast('Saldo deposit tidak mencukupi untuk melakukan pembayaran ini.');
-          return;
-        }
-        const oldBalance = partner.deposit_balance;
-        partner.deposit_balance -= totalPayable;
-        invoice.billing_status = 'Lunas';
+        invoice.billing_status = 'Menunggu Verifikasi';
         invoice.extra_charge = extraCharge;
         invoice.total_paid = totalPayable;
         invoice.settled = false;
-        const depId = nextId('DEP');
-        DB.depositHistory.push({
-          id: depId,
-          partner_id: partner.id,
-          ref: 'DEP/2026/07/' + String(DB.depositHistory.length+1).padStart(4,'0'),
-          type: 'Deposit Keluar',
-          date: new Date().toISOString().slice(0,10),
-          amount: -totalPayable,
-          balance_before: oldBalance,
-          balance_after: partner.deposit_balance,
-          note: `Pembayaran tunai ${customer.customer_name} (${invoice.invoice_number})`,
-          status: 'Berhasil'
-        });
         DB.payments.push({
           id: nextId('PAY'),
           invoice_id: invoice.id,
-          payment_reference: 'CSH-' + Date.now(),
+          payment_reference: 'VER-' + Date.now(),
           virtual_account: 'TUNAI/KASIR',
           billing_amount: totalPayable,
           payment_date: new Date().toISOString(),
-          payment_status: 'Berhasil'
+          payment_status: 'Menunggu Verifikasi'
         });
-        pushActivity(CURRENT_USER.name, `menerima pembayaran tunai ${customer.customer_name} sebesar ${Fmt.rupiah(totalPayable)}`);
-        toast('Pembayaran berhasil dikonfirmasi & saldo deposit diperbarui!');
+        pushActivity(CURRENT_USER.name, `mengajukan verifikasi pembayaran ${customer.customer_name} sebesar ${Fmt.rupiah(totalPayable)}`);
+        toast('Pembayaran diajukan untuk verifikasi Super User!');
         window.dispatchEvent(new CustomEvent('keuangan-refresh'));
         Modal.close();
       });
@@ -1438,7 +1402,233 @@ function buildFilterPanel(cfg){
   };
 }
 
+
+function renderSuperUserKuangan(root){
+  const allPartners = DB.partners;
+  const allInvoices = DB.invoices;
+  const allPayments = DB.payments;
+  const allCustomers = DB.customers;
+
+  root.innerHTML = `
+    ${pageIntro('Dashboard Keuangan Mitra — Monitoring & Verifikasi Pembayaran seluruh mitra.')}
+    <div id="superKuanganContent"></div>
+  `;
+
+  const content = root.querySelector('#superKuanganContent');
+  let activeTab = 'mitra';
+
+  function getMitraForPayment(p){
+    const inv = allInvoices.find(i => i.id === p.invoice_id);
+    const cust = inv ? allCustomers.find(c => c.id === inv.customer_id) : null;
+    return cust ? allPartners.find(pt => pt.id === cust.partner_id) : null;
+  }
+
+  function renderDashboard(){
+    const pendingPayments = allPayments.filter(p => p.payment_status === 'Menunggu Verifikasi');
+    const verifiedPayments = allPayments.filter(p => p.payment_status === 'Berhasil');
+    const totalDepositAll = allPartners.reduce((s, p) => s + (p.deposit_balance || 0), 0);
+
+    let html = `<div id="kpiSlot">${renderKPIs([
+      {label:'Total Mitra', value:allPartners.length, icon:'users', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
+      {label:'Menunggu Verifikasi', value:pendingPayments.length, icon:'inbox', bg:'var(--badge-yellow-bg)', fg:'var(--badge-yellow-fg)'},
+      {label:'Deposit Seluruh Mitra', value:Fmt.rupiah(totalDepositAll), icon:'wallet', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'},
+      {label:'Total Sudah Diverifikasi', value:verifiedPayments.length, icon:'checkCircle', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
+    ])}</div>`;
+
+    html += `
+      <div class="subtabs" id="suKuanganTabs">
+        <button class="subtab ${activeTab==='mitra'?'active':''}" data-tab="mitra">${ic('users')}Ringkasan Per Mitra</button>
+        <button class="subtab ${activeTab==='queue'?'active':''}" data-tab="queue">${ic('inbox')}Antrian Verifikasi${pendingPayments.length > 0 ? ` <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">${pendingPayments.length}</span>` : ''}</button>
+      </div>
+      <div id="suKuanganTabContent"></div>
+    `;
+    content.innerHTML = html;
+
+    const tabContent = content.querySelector('#suKuanganTabContent');
+    const tabs = content.querySelectorAll('#suKuanganTabs .subtab');
+
+    tabs.forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        activeTab = btn.dataset.tab;
+        renderDashboard();
+      });
+    });
+
+    if(activeTab === 'mitra'){
+      renderMitraOverview(tabContent, pendingPayments);
+    } else {
+      renderVerificationQueue(tabContent, pendingPayments);
+    }
+  }
+
+  function renderMitraOverview(container, pendingPayments){
+    container.innerHTML = `
+      <div class="section-head"><h3>Ringkasan Per Mitra</h3></div>
+      <div id="mitraOverviewSlot"></div>
+    `;
+    const mitraSlot = container.querySelector('#mitraOverviewSlot');
+    const mitraTable = DataTable({
+      rows: () => allPartners,
+      rowKey: 'id',
+      searchPlaceholder: 'Cari nama mitra...',
+      searchFields: ['partner_name', 'partner_code'],
+      columns: [
+        {key:'partner_code', header:'Kode', sortable:true, render:r=>`<span class="cell-mono">${r.partner_code}</span>`},
+        {key:'partner_name', header:'Nama Mitra', sortable:true, render:r=>`<span class="cell-strong">${r.partner_name}</span>`},
+        {key:'deposit_balance', header:'Saldo Deposit', sortable:true, align:'right', render:r=>`<span class="cell-num" style="color:${r.deposit_balance < 0 ? 'var(--badge-red-fg)' : 'var(--badge-green-fg)'}">${Fmt.rupiah(r.deposit_balance)}</span>`},
+        {key:'pendingCount', header:'Antrian', sortable:true, align:'center', render:r=>{
+          const cnt = pendingPayments.filter(p => {
+            const mp = getMitraForPayment(p);
+            return mp && mp.id === r.id;
+          }).length;
+          return cnt > 0
+            ? `<span style="font-weight:700;color:var(--badge-yellow-fg);cursor:pointer;" class="act-goto-queue" data-partner="${r.id}">${cnt} &raquo;</span>`
+            : `<span style="color:var(--color-text-secondary);">0</span>`;
+        }},
+      ],
+      afterRender(wrap){
+        wrap.querySelectorAll('.act-goto-queue').forEach(el=>{
+          el.addEventListener('click', ()=>{
+            activeTab = 'queue';
+            renderDashboard();
+          });
+        });
+      }
+    });
+    const mitraCard = document.createElement('div'); mitraCard.className='card';
+    mitraCard.appendChild(mitraTable);
+    mitraSlot.appendChild(mitraCard);
+  }
+
+  function renderVerificationQueue(container, pendingPayments){
+    container.innerHTML = `
+      <div class="section-head"><h3>Antrian Verifikasi Pembayaran</h3></div>
+      <div id="verificationQueueSlot"></div>
+    `;
+    const queueSlot = container.querySelector('#verificationQueueSlot');
+
+    if(pendingPayments.length === 0){
+      queueSlot.innerHTML = `<div class="empty-state">
+        ${ic('checkCircle')}
+        <div class="es-title">Tidak ada pembayaran yang menunggu verifikasi.</div>
+      </div>`;
+      return;
+    }
+
+    const queueTable = DataTable({
+      rows: () => pendingPayments,
+      rowKey: 'id',
+      searchPlaceholder: 'Cari referensi, nama customer, atau mitra...',
+      searchFields: ['payment_reference'],
+      columns: [
+        {key:'payment_reference', header:'No. Referensi', sortable:true, render:r=>`<span class="cell-mono">${r.payment_reference}</span>`},
+        {key:'mitra', header:'Mitra', sortable:true, render:r=>{
+          const p = getMitraForPayment(r);
+          return p ? `<span class="cell-strong">${p.partner_name}</span>` : '-';
+        }},
+        {key:'customer', header:'Customer', sortable:true, render:r=>{
+          const inv = allInvoices.find(i => i.id === r.invoice_id);
+          const cust = inv ? allCustomers.find(c => c.id === inv.customer_id) : null;
+          return cust ? cust.customer_name : '-';
+        }},
+        {key:'invoice_number', header:'Tagihan', sortable:true, render:r=>{
+          const inv = allInvoices.find(i => i.id === r.invoice_id);
+          return inv ? `<span class="cell-mono">${inv.invoice_number}</span>` : '-';
+        }},
+        {key:'billing_amount', header:'Nominal', sortable:true, align:'right', render:r=>`<span class="cell-num" style="font-weight:700;color:var(--color-accent);">${Fmt.rupiah(r.billing_amount)}</span>`},
+        {key:'payment_date', header:'Tanggal', sortable:true, sortValue:r=>r.payment_date, render:r=>Fmt.datetime(r.payment_date)},
+        {key:'deposit_balance', header:'Saldo Mitra', align:'right', render:r=>{
+          const p = getMitraForPayment(r);
+          const balance = p ? p.deposit_balance : 0;
+          const sufficient = balance >= r.billing_amount;
+          return `<span class="cell-num" style="color:${sufficient ? 'var(--badge-green-fg)' : 'var(--badge-red-fg)'}">${Fmt.rupiah(balance)}</span>${sufficient ? '' : ' <span style="font-size:11px;color:var(--badge-red-fg);">(Kurang)</span>'}`;
+        }},
+        {key:'actions', header:'', align:'right', render:r=>{
+          const p = getMitraForPayment(r);
+          const balance = p ? p.deposit_balance : 0;
+          const sufficient = balance >= r.billing_amount;
+          return sufficient
+            ? `<button class="btn btn-primary btn-sm act-verify" data-payment="${r.id}">${ic('check')} Verifikasi</button>`
+            : `<span class="cell-secondary" style="color:var(--badge-red-fg);font-size:12px;">Saldo Kurang</span>`;
+        }},
+      ],
+      afterRender(wrap, rows){
+        wrap.querySelectorAll('.act-verify').forEach(btn=>{
+          btn.addEventListener('click', ()=>{
+            const paymentId = btn.dataset.payment;
+            const payment = rows.find(r=>r.id===paymentId);
+            if(!payment) return;
+            const p = getMitraForPayment(payment);
+            const inv = allInvoices.find(i => i.id === payment.invoice_id);
+            const cust = inv ? allCustomers.find(c => c.id === inv.customer_id) : null;
+            openVerificationModal(payment, inv, cust, p);
+          });
+        });
+      }
+    });
+    const queueCard = document.createElement('div'); queueCard.className='card';
+    queueCard.appendChild(queueTable);
+    queueSlot.appendChild(queueCard);
+  }
+
+  function openVerificationModal(payment, invoice, customer, partner){
+    const balance = partner.deposit_balance;
+    const sufficient = balance >= payment.billing_amount;
+    Modal.open({
+      title:'Verifikasi Pembayaran',
+      subtitle:`${customer ? customer.customer_name : '-'} — ${invoice ? invoice.invoice_number : '-'}`,
+      bodyHTML:`<div class="detail-grid">
+        <div class="detail-item"><span class="dl">Mitra</span><span class="dv">${partner ? partner.partner_name : '-'}</span></div>
+        <div class="detail-item"><span class="dl">Customer</span><span class="dv">${customer ? customer.customer_name : '-'}</span></div>
+        <div class="detail-item"><span class="dl">Nomor Tagihan</span><span class="dv cell-mono">${invoice ? invoice.invoice_number : '-'}</span></div>
+        <div class="detail-item"><span class="dl">Nominal Bayar</span><span class="dv" style="font-weight:700;color:var(--color-accent);">${Fmt.rupiah(payment.billing_amount)}</span></div>
+        <div class="detail-item"><span class="dl">Saldo Deposit Mitra</span><span class="dv" style="color:${sufficient ? 'var(--badge-green-fg)' : 'var(--badge-red-fg)'};font-weight:700;">${Fmt.rupiah(balance)}</span></div>
+        ${!sufficient ? `<div class="detail-item" style="grid-column:1/-1;color:var(--badge-red-fg);font-size:12px;"><strong>Saldo deposit mitra tidak cukup untuk verifikasi ini.</strong></div>` : ''}
+      </div>`,
+      footHTML: sufficient
+        ? `<button class="btn btn-secondary" id="mCloseVerif">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmVerif">${ic('check')} Verifikasi & Potong Deposit</button>`
+        : `<button class="btn btn-secondary" id="mCloseVerif">${ic('x')} Tutup</button>`,
+      onOpen(b, f){
+        f.querySelector('#mCloseVerif')?.addEventListener('click', Modal.close);
+        f.querySelector('#mConfirmVerif')?.addEventListener('click', () => {
+          const prevBalance = partner.deposit_balance;
+          partner.deposit_balance -= payment.billing_amount;
+          invoice.billing_status = 'Lunas';
+          invoice.settled = false;
+          payment.payment_status = 'Berhasil';
+          payment.verified_at = new Date().toISOString();
+          payment.verified_by = CURRENT_USER.id;
+          DB.depositHistory.push({
+            id: nextId('DEP'),
+            partner_id: partner.id,
+            ref: 'DEP-VER/' + Date.now(),
+            type: 'Deposit Keluar',
+            amount: -payment.billing_amount,
+            balance_before: prevBalance,
+            balance_after: partner.deposit_balance,
+            date: new Date().toISOString().slice(0,10),
+            note: `Verifikasi pembayaran ${invoice.invoice_number} - ${customer ? customer.customer_name : ''}`,
+            status: 'Berhasil',
+          });
+          pushActivity(CURRENT_USER.name, `memverifikasi pembayaran ${invoice.invoice_number} sebesar ${Fmt.rupiah(payment.billing_amount)} dari mitra ${partner.partner_name}`);
+          toast('Pembayaran diverifikasi! Deposit mitra telah dipotong.');
+          Modal.close();
+          renderDashboard();
+        });
+      }
+    });
+  }
+
+  renderDashboard();
+}
+
+
 Views['keuangan.mitra'] = function(root){
+  if(isSuperUser()){
+    renderSuperUserKuangan(root);
+    return;
+  }
+
   const partnerId = CURRENT_USER.partner_id || 'PTR-0001';
   const partner = DB.partners.find(p => p.id === partnerId) || DB.partners[0];
  
@@ -1532,7 +1722,7 @@ function showPaymentTab(){
             extraCharge = 5000;
           }
           const totalPayable = invoice.billing_amount + extraCharge;
-          return { customer: c, invoice, pkg, extraCharge, totalPayable, status: invoice.billing_status === 'Lunas' ? 'Lunas' : 'Belum Dibayar' };
+          return { customer: c, invoice, pkg, extraCharge, totalPayable, status: invoice.billing_status };
         })
         .filter(x => x !== null);
 
@@ -1558,7 +1748,7 @@ function showPaymentTab(){
         searchPlaceholder: 'Cari nama customer, PPPoE, atau paket…',
         searchFields: ['customer.customer_name', 'customer.pppoe_secret', 'pkg.package_name'],
         columns: [
-          {key:'select', header:'<input type="checkbox" id="chkAll">', sortable:false, align:'center', render:r=> r.status === 'Lunas' ? '' : `<input type="checkbox" class="row-chk" data-invoice="${r.invoice.id}" data-customer="${r.customer.id}">`},
+          {key:'select', header:'<input type="checkbox" id="chkAll">', sortable:false, align:'center', render:r=> (r.status === 'Lunas' || r.status === 'Menunggu Verifikasi') ? '' : `<input type="checkbox" class="row-chk" data-invoice="${r.invoice.id}" data-customer="${r.customer.id}">`},
           {key:'customer.customer_name', header:'Nama Customer', sortable:true, render:r=>`<span class="cell-strong">${r.customer.customer_name}</span>`},
           {key:'customer.pppoe_secret', header:'PPPoE Secret', sortable:true, render:r=>`<span class="cell-mono">${r.customer.pppoe_secret}</span>`},
           {key:'pkg.package_name', header:'Paket', sortable:true, render:r=>r.pkg ? `${r.pkg.package_name} (${r.pkg.bandwidth})` : '-'},
@@ -1569,6 +1759,8 @@ function showPaymentTab(){
           {key:'status', header:'Status', sortable:true, render:r=>statusBadge(r.status)},
           {key:'actions', header:'', align:'right', render:r=> r.status === 'Lunas'
             ? `<span class="cell-secondary">Sudah bayar</span>`
+            : r.status === 'Menunggu Verifikasi'
+            ? `<span class="cell-secondary" style="color:var(--badge-yellow-fg);">Menunggu Verifikasi</span>`
             : `<button class="btn btn-primary btn-sm act-pay" data-invoice="${r.invoice.id}" data-customer="${r.customer.id}">${ic('check')} Bayar</button>`}
         ],
         afterRender(wrap, rows){
@@ -1636,6 +1828,7 @@ function showPaymentTab(){
         ],
         statusOptions: [
           {value: 'Berhasil', label: 'Berhasil'},
+          {value: 'Menunggu Verifikasi', label: 'Menunggu Verifikasi'},
           {value: 'Pending', label: 'Pending'},
           {value: 'Gagal', label: 'Gagal'},
         ],
@@ -1888,7 +2081,7 @@ root.addEventListener('click', function handleSettlementClick(e){
       searchPlaceholder:'Cari referensi, tagihan, atau nama pelanggan…',
       searchFields:['payment_reference'],
       filters:[
-        {key:'status', label:'Semua Status', options:[{value:'Berhasil',label:'Berhasil'},{value:'Pending',label:'Pending'},{value:'Gagal',label:'Gagal'}], match:(r,v)=>r.payment_status===v},
+        {key:'status', label:'Semua Status', options:[{value:'Berhasil',label:'Berhasil'},{value:'Menunggu Verifikasi',label:'Menunggu Verifikasi'},{value:'Pending',label:'Pending'},{value:'Gagal',label:'Gagal'}], match:(r,v)=>r.payment_status===v},
       ],
       columns:[
         {key:'payment_reference', header:'Nomor Referensi', sortable:true, render:r=>`<span class="cell-mono">${r.payment_reference}</span>`},
