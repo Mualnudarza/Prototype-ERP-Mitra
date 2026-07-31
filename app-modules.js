@@ -1343,6 +1343,101 @@ btnTabHistory.addEventListener('click', showHistoryTab);
    KEUANGAN MITRA — Unified View
    ======================================================================== */
 
+function matchFilter(f, st){
+  if(st.jenis && f.jenis !== st.jenis) return false;
+  if(st.status && f.status !== st.status) return false;
+  if(st.periode === 'tanggal' && st.tanggal && f.date !== st.tanggal) return false;
+  if(st.periode === 'bulan' && st.bulan && f.date.slice(0,7) !== st.bulan) return false;
+  if(st.periode === 'tahun' && st.tahun && f.date.slice(0,4) !== st.tahun) return false;
+  return true;
+}
+
+function buildFilterPanel(cfg){
+  const st = {jenis:'', periode:'tanggal', tanggal:'', bulan:'', tahun:'', status:''};
+  const years = [...new Set(cfg.baseRows.map(r => cfg.getDate(r).slice(0,4)))].sort().reverse();
+
+  const el = document.createElement('div');
+  el.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-bottom:1px solid var(--color-border);';
+  el.innerHTML = `
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:12.5px;font-weight:600;color:var(--color-text-secondary);">${cfg.jenisLabel}:</span>
+      ${cfg.jenisOptions.map(o=>`<button type="button" class="btn btn-secondary btn-sm f-jenis" data-value="${o.value}">${o.label}</button>`).join('')}
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:12.5px;font-weight:600;color:var(--color-text-secondary);">Periode:</span>
+      <select class="input f-periode" style="min-width:130px;">
+        <option value="tanggal">Per Tanggal</option>
+        <option value="bulan">Per Bulan</option>
+        <option value="tahun">Per Tahun</option>
+      </select>
+      <input type="date" class="input f-tanggal" style="width:150px;">
+      <input type="month" class="input f-bulan" style="width:150px;display:none;">
+      <select class="input f-tahun" style="min-width:130px;display:none;">
+        <option value="">Semua Tahun</option>
+        ${years.map(y=>`<option value="${y}">${y}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:12.5px;font-weight:600;color:var(--color-text-secondary);">Status:</span>
+      <select class="input f-status" style="min-width:140px;">
+        <option value="">Semua Status</option>
+        ${cfg.statusOptions.map(o=>`<option value="${o.value}">${o.label}</option>`).join('')}
+      </select>
+    </div>`;
+
+  const btnList = [...el.querySelectorAll('.f-jenis')];
+  const selPeriode = el.querySelector('.f-periode');
+  const fTanggal = el.querySelector('.f-tanggal');
+  const fBulan = el.querySelector('.f-bulan');
+  const fTahun = el.querySelector('.f-tahun');
+  const selStatus = el.querySelector('.f-status');
+
+  function renderButtons(){
+    btnList.forEach(b=>{
+      const active = b.dataset.value === st.jenis;
+      b.classList.toggle('btn-primary', active);
+      b.classList.toggle('btn-secondary', !active);
+    });
+  }
+
+  function togglePeriode(){
+    fTanggal.style.display = selPeriode.value === 'tanggal' ? '' : 'none';
+    fBulan.style.display = selPeriode.value === 'bulan' ? '' : 'none';
+    fTahun.style.display = selPeriode.value === 'tahun' ? '' : 'none';
+  }
+
+  function collect(){
+    st.periode = selPeriode.value;
+    st.tanggal = fTanggal.value;
+    st.bulan = fBulan.value;
+    st.tahun = fTahun.value;
+    st.status = selStatus.value;
+  }
+  function apply(){
+    collect();
+    cfg.onApply();
+  }
+
+  btnList.forEach(b=>{
+    b.addEventListener('click', ()=>{
+      if(st.jenis === b.dataset.value) st.jenis = '';
+      else st.jenis = b.dataset.value;
+      renderButtons();
+      cfg.onApply();
+    });
+  });
+  selPeriode.addEventListener('change', ()=>{ togglePeriode(); apply(); });
+  fTanggal.addEventListener('change', apply);
+  fBulan.addEventListener('change', apply);
+  fTahun.addEventListener('change', apply);
+  selStatus.addEventListener('change', apply);
+
+  return {
+    el,
+    getState: ()=>st,
+  };
+}
+
 Views['keuangan.mitra'] = function(root){
   const partnerId = CURRENT_USER.partner_id || 'PTR-0001';
   const partner = DB.partners.find(p => p.id === partnerId) || DB.partners[0];
@@ -1360,16 +1455,8 @@ Views['keuangan.mitra'] = function(root){
   const tabs = root.querySelectorAll('#keuanganTabs .subtab');
  
   function renderDeposit(){
-    // KPIs
-    const history = DB.depositHistory.filter(d => d.partner_id === partner.id);
-    const masuk = history.filter(d => d.type === 'Deposit Masuk' && d.status === 'Berhasil').reduce((s,d)=>s+d.amount, 0);
-    const keluar = history.filter(d => d.type === 'Deposit Keluar' && d.status === 'Berhasil').reduce((s,d)=>s+Math.abs(d.amount), 0);
- 
     let kpiHTML = `<div id="kpiSlot">${renderKPIs([
-      {label:'Saldo Deposit Saat Ini', value:Fmt.rupiah(partner.deposit_balance), icon:'wallet', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
-      {label:'Total Deposit Masuk', value:Fmt.rupiah(masuk), icon:'plus', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
-      {label:'Total Deposit Keluar', value:Fmt.rupiah(keluar), icon:'minus', bg:'var(--badge-orange-bg)', fg:'var(--badge-orange-fg)'},
-      {label:'Total Pembayaran Customer', value:Fmt.rupiah(keluar), icon:'users', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'}
+      {label:'Saldo Deposit Saat Ini', value:Fmt.rupiah(partner.deposit_balance), icon:'wallet', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'}
     ])}</div>`;
  
     // Sub-tabs for deposit
@@ -1390,8 +1477,23 @@ Views['keuangan.mitra'] = function(root){
     function showDepositHistory(){
       subTabs.forEach(b=>b.classList.toggle('active', b.dataset.subtab==='history'));
       subContent.innerHTML = '';
-      const table = DataTable({
-        rows: () => DB.depositHistory.filter(d => d.partner_id === partner.id),
+
+      const fpanel = buildFilterPanel({
+        jenisLabel: 'Jenis Transaksi',
+        jenisOptions: [
+          {value: 'Deposit Masuk', label: 'Deposit Masuk'},
+          {value: 'Deposit Keluar', label: 'Deposit Keluar'},
+        ],
+        statusOptions: [
+          {value: 'Berhasil', label: 'Berhasil'},
+        ],
+        baseRows: DB.depositHistory.filter(d => d.partner_id === partner.id),
+        getDate: r => r.date,
+        onApply: () => { if(table) table.refresh(); },
+      });
+
+      let table = DataTable({
+        rows: () => DB.depositHistory.filter(d => d.partner_id === partner.id && matchFilter({jenis: d.type, status: d.status, date: d.date}, fpanel.getState())),
         rowKey: 'id',
         searchPlaceholder: 'Cari nomor transaksi / keterangan…',
         searchFields: ['ref', 'note'],
@@ -1406,7 +1508,9 @@ Views['keuangan.mitra'] = function(root){
           {key:'status', header:'Status', render:r=>statusBadge(r.status)}
         ]
       });
-      const card = document.createElement('div'); card.className = 'card'; card.appendChild(table);
+      const card = document.createElement('div'); card.className = 'card';
+      card.appendChild(fpanel.el);
+      card.appendChild(table);
       subContent.appendChild(card);
     }
  
@@ -1522,16 +1626,29 @@ function showPaymentTab(){
  
     function showGatewayTab(){
       subTabs.forEach(b=>b.classList.toggle('active', b.dataset.subtab==='gateway'));
-      subContent.innerHTML = `<div id="gatewayTableSlot"></div>`;
-      const tableSlot = subContent.querySelector('#gatewayTableSlot');
-      const table = DataTable({
-        rows:()=>DB.payments,
+      subContent.innerHTML = '';
+
+      const fpanel = buildFilterPanel({
+        jenisLabel: 'Jenis Transaksi',
+        jenisOptions: [
+          {value: 'Tunai/Kasir', label: 'Tunai/Kasir'},
+          {value: 'Payment Gateway', label: 'Payment Gateway'},
+        ],
+        statusOptions: [
+          {value: 'Berhasil', label: 'Berhasil'},
+          {value: 'Pending', label: 'Pending'},
+          {value: 'Gagal', label: 'Gagal'},
+        ],
+        baseRows: DB.payments,
+        getDate: r => r.payment_date.slice(0,10),
+        onApply: () => { if(table) table.refresh(); },
+      });
+
+      let table = DataTable({
+        rows:()=>DB.payments.filter(p => matchFilter({jenis: p.virtual_account === 'TUNAI/KASIR' ? 'Tunai/Kasir' : 'Payment Gateway', status: p.payment_status, date: p.payment_date.slice(0,10)}, fpanel.getState())),
         rowKey:'id',
         searchPlaceholder:'Cari referensi, tagihan, atau nama pelanggan…',
         searchFields:['payment_reference'],
-        filters:[
-          {key:'status', label:'Semua Status', options:[{value:'Berhasil',label:'Berhasil'},{value:'Pending',label:'Pending'},{value:'Gagal',label:'Gagal'}], match:(r,v)=>r.payment_status===v},
-        ],
         columns:[
           {key:'payment_reference', header:'Nomor Referensi', sortable:true, render:r=>`<span class="cell-mono">${r.payment_reference}</span>`},
           {key:'invoice_id', header:'Nomor Tagihan', sortable:true, render:r=>{ const inv=DB.invoices.find(i=>i.id===r.invoice_id); return `<span class="cell-mono">${inv?inv.invoice_number:'-'}</span>`; }},
@@ -1570,8 +1687,10 @@ function showPaymentTab(){
           });
         }
       });
-      const cardEl = document.createElement('div'); cardEl.className='card'; cardEl.appendChild(table);
-      tableSlot.appendChild(cardEl);
+      const cardEl = document.createElement('div'); cardEl.className='card';
+      cardEl.appendChild(fpanel.el);
+      cardEl.appendChild(table);
+      subContent.appendChild(cardEl);
     }
  
     subTabs.forEach(btn=>{

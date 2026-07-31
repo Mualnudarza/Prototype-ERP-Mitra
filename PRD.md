@@ -101,14 +101,14 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-28 — Initial prototype, 6 paket dummy
 
 #### Dashboard Deposit (`deposit.dashboard`)
-- **Fungsi**: Mengelola saldo deposit kasir mitra, histori transaksi deposit, penerimaan pembayaran tunai dari customer, dan histori pembayaran via payment gateway. Menampilkan KPI saldo, total deposit masuk/keluar, total pembayaran customer. Terdapat tiga submenu tab: Riwayat Deposit, Pembayaran Customer, dan Histori Pembayaran.
+- **Fungsi**: Mengelola saldo deposit kasir mitra, histori transaksi deposit, penerimaan pembayaran tunai dari customer, dan histori pembayaran via payment gateway. Terdapat tiga submenu tab: Riwayat Deposit, Pembayaran Customer, dan Histori Pembayaran.
 - **Lokasi file**: Di-render dari `Views['keuangan.mitra']` → tab "Dashboard Deposit". Data di `app-data.js` (`DB.partners`, `DB.depositHistory`, `DB.invoices`, `DB.customers`, `DB.packages`, `DB.payments`)
 - **Data yang dibutuhkan**:
   - Input: partner_id (FK), ref, type (Deposit Masuk/Deposit Keluar), date, amount, balance_before, balance_after, note, status
-  - Tampil (KPI): Saldo Deposit, Total Deposit Masuk, Total Deposit Keluar, Total Pembayaran Customer
-  - Tampil (Riwayat Deposit): DataTable dengan kolom nomor transaksi, jenis transaksi, tanggal, nominal, saldo sebelum/sesudah, keterangan, status
+  - Tampil (KPI): Hanya card "Saldo Deposit Saat Ini" (Total Deposit Masuk/Keluar dan Total Pembayaran Customer dihapus)
+  - Tampil (Riwayat Deposit): Filter bar di atas tabel — tombol toggle "Deposit Masuk"/"Deposit Keluar" (Jenis Transaksi), filter periode Per Tanggal/Per Bulan/Per Tahun, dan dropdown Status — auto-apply tanpa tombol Terapkan. DataTable dengan kolom nomor transaksi, jenis transaksi, tanggal, nominal, saldo sebelum/sesudah, keterangan, status
   - Tampil (Pembayaran Customer): DataTable daftar semua customer mitra dengan kolom Nama Customer, PPPoE Secret, Paket, Periode, Nominal Paket, Biaya Tambahan, Total Bayar, Status (Lunas/Belum Dibayar), Aksi (tombol Bayar untuk status Belum Dibayar). Klik Bayar membuka modal konfirmasi detail nominal paket, biaya tambahan, total bayar, dan saldo deposit. Konfirmasi: update invoice Lunas, potong deposit, catat depositHistory & payments.
-  - Tampil (Histori Pembayaran): DataTable histori pembayaran via payment gateway dengan kolom Nomor Referensi, Nomor Tagihan, Nama Pelanggan, Virtual Account, Nominal Pembayaran, Tanggal Pembayaran, Status. Modal detail dengan timeline callback.
+  - Tampil (Histori Pembayaran): Filter bar yang sama dengan Riwayat Deposit (tombol toggle "Tunai/Kasir"/"Payment Gateway" sebagai Jenis Transaksi, filter periode, dan dropdown Status — auto-apply). DataTable histori pembayaran via payment gateway dengan kolom Nomor Referensi, Nomor Tagihan, Nama Pelanggan, Virtual Account, Nominal Pembayaran, Tanggal Pembayaran, Status. Modal detail dengan timeline callback.
 - **Ketergantungan**: `DataTable`, `renderKPIs`, `badge`, `statusBadge`, `Modal`, `toast`, `pushActivity`, `nextId`
 - **Status**: Selesai
 - **Catatan Perubahan**:
@@ -116,6 +116,7 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-29 — Payment Gateway dipindah ke sub-tab Histori Pembayaran di Dashboard Deposit. Main menu Keuangan hanya berisi Dashboard Deposit & Dashboard Settlement.
   - 2026-07-29 — Menambahkan submenu Histori Pembayaran (sebelumnya modul Payment Gateway terpisah). KPI Pembayaran Gateway dipindah ke sub-tab Histori Pembayaran di Dashboard Deposit. Modul Payment Gateway dihapus dari menu utama.
   - 2026-07-30 — Pembayaran Customer: dari dropdown pilih customer (single) ke DataTable daftar lengkap customer mitra dengan kolom status & tombol Bayar per baris.
+  - 2026-07-31 — Dashboard Deposit: KPI dikurangi jadi hanya "Saldo Deposit Saat Ini". Riwayat Deposit & Histori Pembayaran mendapat filter bar di atas tabel (Jenis Transaksi berupa tombol toggle, filter periode Per Tanggal/Per Bulan/Per Tahun, dan filter Status) dengan auto-apply tanpa tombol Terapkan.
 
 #### Dashboard Settlement (`settlement.dashboard`)
 - **Fungsi**: Menampilkan rekap hasil transaksi customer dalam satu periode settlement: Pendapatan Kotor (Gross), Total Potongan (KSO, Payment Gateway Fee, Biaya Admin/Lainnya), Pendapatan Bersih (Net), dan Saldo Siap Settlement. Terdapat tombol Ajukan Pencairan Settlement dan tabel Riwayat Settlement di bawahnya.
@@ -275,4 +276,5 @@ keuangan.mitra ──→ deposit.dashboard (tab: Riwayat Deposit, Pembayaran Cus
 | 2026-07-30 | Dashboard Settlement: hapus submenu Riwayat Settlement (tabel tampil langsung di halaman), hapus KPI "Jadwal Settlement Berikutnya", ubah Ajukan Pencairan ke modal input nominal. | `app-modules.js`, `PRD.md` |
 | 2026-07-30 | Pembayaran Customer: konversi dari dropdown single-customer ke DataTable daftar lengkap customer mitra dengan status & tombol Bayar per baris. | `app-modules.js`, `PRD.md` |
 | 2026-07-31 | Perbaikan logika pencairan settlement parsial (FIFO): field `settled_amount` per invoice, partial withdraw settle invoice berurutan hingga amount habis, sisa tetap unsettled untuk pencairan berikutnya. KPI Saldo Siap Settlement akurat. | `app-modules.js`, `PRD.md` |
+| 2026-07-31 | Dashboard Deposit: KPI dikurangi jadi hanya "Saldo Deposit Saat Ini". Riwayat Deposit & Histori Pembayaran diberi filter bar di atas tabel — Jenis Transaksi sebagai tombol toggle (Deposit Masuk/Deposit Keluar; Tunai/Kasir/Payment Gateway), filter periode Per Tanggal/Per Bulan/Per Tahun, dan filter Status — auto-apply tanpa tombol Terapkan. | `app-modules.js`, `PRD.md` |
 
