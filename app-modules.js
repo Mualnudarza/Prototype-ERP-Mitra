@@ -1403,18 +1403,21 @@ function buildFilterPanel(cfg){
 }
 
 
+
 function renderSuperUserKuangan(root){
   const allPartners = DB.partners;
   const allInvoices = DB.invoices;
   const allPayments = DB.payments;
   const allCustomers = DB.customers;
+  const allSettlements = DB.settlements;
 
   root.innerHTML = `
-    ${pageIntro('Dashboard Keuangan Mitra — Monitoring & Verifikasi Pembayaran seluruh mitra.')}
+    ${pageIntro('Dashboard Keuangan Mitra — Monitoring & Verifikasi seluruh mitra.')}
     <div id="superKuanganContent"></div>
   `;
 
   const content = root.querySelector('#superKuanganContent');
+  let activeMode = 'payment';
   let activeTab = 'mitra';
 
   function getMitraForPayment(p){
@@ -1423,8 +1426,42 @@ function renderSuperUserKuangan(root){
     return cust ? allPartners.find(pt => pt.id === cust.partner_id) : null;
   }
 
-  function renderDashboard(){
+  function getMitraForSettlement(s){
+    return allPartners.find(pt => pt.id === s.partner_id) || null;
+  }
+
+  function renderRoot(){
     const pendingPayments = allPayments.filter(p => p.payment_status === 'Menunggu Verifikasi');
+    const pendingSettlements = allSettlements.filter(s => s.status === 'Menunggu Verifikasi');
+
+    let html = `
+      <div class="subtabs" id="suModeTabs">
+        <button class="subtab ${activeMode==='payment'?'active':''}" data-mode="payment">${ic('wallet')}Monitoring Saldo & Verifikasi</button>
+        <button class="subtab ${activeMode==='settlement'?'active':''}" data-mode="settlement">${ic('history')}Monitoring Settlement${pendingSettlements.length > 0 ? ` <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">${pendingSettlements.length}</span>` : ''}</button>
+      </div>
+      <div id="suModeContent"></div>
+    `;
+    content.innerHTML = html;
+
+    const modeContent = content.querySelector('#suModeContent');
+    const modeTabs = content.querySelectorAll('#suModeTabs .subtab');
+
+    modeTabs.forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        activeMode = btn.dataset.mode;
+        activeTab = 'mitra';
+        renderRoot();
+      });
+    });
+
+    if(activeMode === 'payment'){
+      renderPaymentMode(modeContent, pendingPayments);
+    } else {
+      renderSettlementMode(modeContent, pendingSettlements);
+    }
+  }
+
+  function renderPaymentMode(container, pendingPayments){
     const verifiedPayments = allPayments.filter(p => p.payment_status === 'Berhasil');
     const totalDepositAll = allPartners.reduce((s, p) => s + (p.deposit_balance || 0), 0);
 
@@ -1442,26 +1479,26 @@ function renderSuperUserKuangan(root){
       </div>
       <div id="suKuanganTabContent"></div>
     `;
-    content.innerHTML = html;
+    container.innerHTML = html;
 
-    const tabContent = content.querySelector('#suKuanganTabContent');
-    const tabs = content.querySelectorAll('#suKuanganTabs .subtab');
+    const tabContent = container.querySelector('#suKuanganTabContent');
+    const tabs = container.querySelectorAll('#suKuanganTabs .subtab');
 
     tabs.forEach(btn=>{
       btn.addEventListener('click', ()=>{
         activeTab = btn.dataset.tab;
-        renderDashboard();
+        renderRoot();
       });
     });
 
     if(activeTab === 'mitra'){
-      renderMitraOverview(tabContent, pendingPayments);
+      renderPaymentMitraOverview(tabContent, pendingPayments);
     } else {
-      renderVerificationQueue(tabContent, pendingPayments);
+      renderPaymentQueue(tabContent, pendingPayments);
     }
   }
 
-  function renderMitraOverview(container, pendingPayments){
+  function renderPaymentMitraOverview(container, pendingPayments){
     container.innerHTML = `
       <div class="section-head"><h3>Ringkasan Per Mitra</h3></div>
       <div id="mitraOverviewSlot"></div>
@@ -1490,7 +1527,7 @@ function renderSuperUserKuangan(root){
         wrap.querySelectorAll('.act-goto-queue').forEach(el=>{
           el.addEventListener('click', ()=>{
             activeTab = 'queue';
-            renderDashboard();
+            renderRoot();
           });
         });
       }
@@ -1500,7 +1537,7 @@ function renderSuperUserKuangan(root){
     mitraSlot.appendChild(mitraCard);
   }
 
-  function renderVerificationQueue(container, pendingPayments){
+  function renderPaymentQueue(container, pendingPayments){
     container.innerHTML = `
       <div class="section-head"><h3>Antrian Verifikasi Pembayaran</h3></div>
       <div id="verificationQueueSlot"></div>
@@ -1561,7 +1598,7 @@ function renderSuperUserKuangan(root){
             const p = getMitraForPayment(payment);
             const inv = allInvoices.find(i => i.id === payment.invoice_id);
             const cust = inv ? allCustomers.find(c => c.id === inv.customer_id) : null;
-            openVerificationModal(payment, inv, cust, p);
+            openPaymentVerificationModal(payment, inv, cust, p);
           });
         });
       }
@@ -1571,7 +1608,7 @@ function renderSuperUserKuangan(root){
     queueSlot.appendChild(queueCard);
   }
 
-  function openVerificationModal(payment, invoice, customer, partner){
+  function openPaymentVerificationModal(payment, invoice, customer, partner){
     const balance = partner.deposit_balance;
     const sufficient = balance >= payment.billing_amount;
     Modal.open({
@@ -1613,13 +1650,190 @@ function renderSuperUserKuangan(root){
           pushActivity(CURRENT_USER.name, `memverifikasi pembayaran ${invoice.invoice_number} sebesar ${Fmt.rupiah(payment.billing_amount)} dari mitra ${partner.partner_name}`);
           toast('Pembayaran diverifikasi! Deposit mitra telah dipotong.');
           Modal.close();
-          renderDashboard();
+          renderRoot();
         });
       }
     });
   }
 
-  renderDashboard();
+  /* ========== SETTLEMENT MODE ========== */
+
+  function renderSettlementMode(container, pendingSettlements){
+    const completedSettlements = allSettlements.filter(s => s.status === 'Selesai');
+    const totalSettledAll = completedSettlements.reduce((s, x) => s + (x.net_revenue || 0), 0);
+
+    let html = `<div id="kpiSlot">${renderKPIs([
+      {label:'Total Mitra', value:allPartners.length, icon:'users', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
+      {label:'Menunggu Proses', value:pendingSettlements.length, icon:'inbox', bg:'var(--badge-yellow-bg)', fg:'var(--badge-yellow-fg)'},
+      {label:'Total Sudah Diselesaikan', value:completedSettlements.length, icon:'checkCircle', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
+      {label:'Total Nilai Settlement', value:Fmt.rupiah(totalSettledAll), icon:'wallet', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'},
+    ])}</div>`;
+
+    html += `
+      <div class="subtabs" id="suSettleTabs">
+        <button class="subtab ${activeTab==='settle_mitra'?'active':''}" data-tab="settle_mitra">${ic('users')}Ringkasan Per Mitra</button>
+        <button class="subtab ${activeTab==='settle_queue'?'active':''}" data-tab="settle_queue">${ic('inbox')}Antrian Settlement${pendingSettlements.length > 0 ? ` <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">${pendingSettlements.length}</span>` : ''}</button>
+      </div>
+      <div id="suSettleTabContent"></div>
+    `;
+    container.innerHTML = html;
+
+    const tabContent = container.querySelector('#suSettleTabContent');
+    const tabs = container.querySelectorAll('#suSettleTabs .subtab');
+
+    tabs.forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        activeTab = btn.dataset.tab;
+        renderRoot();
+      });
+    });
+
+    if(activeTab === 'settle_mitra'){
+      renderSettlementMitraOverview(tabContent, pendingSettlements);
+    } else {
+      renderSettlementQueue(tabContent, pendingSettlements);
+    }
+  }
+
+  function renderSettlementMitraOverview(container, pendingSettlements){
+    container.innerHTML = `
+      <div class="section-head"><h3>Ringkasan Per Mitra</h3></div>
+      <div id="settleMitraSlot"></div>
+    `;
+    const mitraSlot = container.querySelector('#settleMitraSlot');
+    const mitraTable = DataTable({
+      rows: () => allPartners,
+      rowKey: 'id',
+      searchPlaceholder: 'Cari nama mitra...',
+      searchFields: ['partner_name', 'partner_code'],
+      columns: [
+        {key:'partner_code', header:'Kode', sortable:true, render:r=>`<span class="cell-mono">${r.partner_code}</span>`},
+        {key:'partner_name', header:'Nama Mitra', sortable:true, render:r=>`<span class="cell-strong">${r.partner_name}</span>`},
+        {key:'deposit_balance', header:'Saldo Deposit', sortable:true, align:'right', render:r=>`<span class="cell-num" style="color:${r.deposit_balance < 0 ? 'var(--badge-red-fg)' : 'var(--badge-green-fg)'}">${Fmt.rupiah(r.deposit_balance)}</span>`},
+        {key:'pendingCount', header:'Antrian', sortable:true, align:'center', render:r=>{
+          const cnt = pendingSettlements.filter(s => s.partner_id === r.id).length;
+          return cnt > 0
+            ? `<span style="font-weight:700;color:var(--badge-yellow-fg);cursor:pointer;" class="act-goto-settle-queue">${cnt} &raquo;</span>`
+            : `<span style="color:var(--color-text-secondary);">0</span>`;
+        }},
+      ],
+      afterRender(wrap){
+        wrap.querySelectorAll('.act-goto-settle-queue').forEach(el=>{
+          el.addEventListener('click', ()=>{
+            activeTab = 'settle_queue';
+            renderRoot();
+          });
+        });
+      }
+    });
+    const mitraCard = document.createElement('div'); mitraCard.className='card';
+    mitraCard.appendChild(mitraTable);
+    mitraSlot.appendChild(mitraCard);
+  }
+
+  function renderSettlementQueue(container, pendingSettlements){
+    container.innerHTML = `
+      <div class="section-head"><h3>Antrian Settlement</h3></div>
+      <div id="settleQueueSlot"></div>
+    `;
+    const queueSlot = container.querySelector('#settleQueueSlot');
+
+    if(pendingSettlements.length === 0){
+      queueSlot.innerHTML = `<div class="empty-state">
+        ${ic('checkCircle')}
+        <div class="es-title">Tidak ada settlement yang menunggu proses.</div>
+      </div>`;
+      return;
+    }
+
+    const queueTable = DataTable({
+      rows: () => pendingSettlements,
+      rowKey: 'id',
+      searchPlaceholder: 'Cari nomor settlement atau mitra...',
+      searchFields: ['ref'],
+      columns: [
+        {key:'ref', header:'No. Settlement', sortable:true, render:r=>`<span class="cell-mono">${r.ref}</span>`},
+        {key:'mitra', header:'Mitra', sortable:true, render:r=>{
+          const p = getMitraForSettlement(r);
+          return p ? `<span class="cell-strong">${p.partner_name}</span>` : '-';
+        }},
+        {key:'period', header:'Periode', sortable:true},
+        {key:'tx_count', header:'Jumlah Transaksi', sortable:true, align:'right'},
+        {key:'gross_revenue', header:'Gross', sortable:true, align:'right', render:r=>Fmt.rupiah(r.gross_revenue)},
+        {key:'total_deduction', header:'Potongan', sortable:true, align:'right', render:r=>`<span style="color:var(--badge-red-fg);">${Fmt.rupiah(r.total_deduction)}</span>`},
+        {key:'net_revenue', header:'Net', sortable:true, align:'right', render:r=>`<span class="cell-num" style="font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(r.net_revenue)}</span>`},
+        {key:'bank_account', header:'Rekening', render:r=>`<span class="cell-secondary" style="font-size:12px;">${r.bank_account}</span>`},
+        {key:'status', header:'Status', render:r=>statusBadge(r.status)},
+        {key:'actions', header:'', align:'right', render:r=>
+          `<button class="btn btn-primary btn-sm act-process-settle" data-settle="${r.id}">${ic('check')} Proses</button>`
+        },
+      ],
+      afterRender(wrap, rows){
+        wrap.querySelectorAll('.act-process-settle').forEach(btn=>{
+          btn.addEventListener('click', ()=>{
+            const settleId = btn.dataset.settle;
+            const settlement = rows.find(r=>r.id===settleId);
+            if(!settlement) return;
+            const p = getMitraForSettlement(settlement);
+            openSettlementVerifyModal(settlement, p);
+          });
+        });
+      }
+    });
+    const queueCard = document.createElement('div'); queueCard.className='card';
+    queueCard.appendChild(queueTable);
+    queueSlot.appendChild(queueCard);
+  }
+
+  function openSettlementVerifyModal(settlement, partner){
+    const custIds = allCustomers.filter(c => c.partner_id === partner.id).map(c => c.id);
+    const unsettledInvoices = allInvoices.filter(i => custIds.includes(i.customer_id) && i.billing_status === 'Lunas' && i.settled === false);
+
+    Modal.open({
+      title:'Proses Settlement',
+      subtitle:`${settlement.ref} — ${partner ? partner.partner_name : '-'}`,
+      bodyHTML:`<div class="detail-grid">
+        <div class="detail-item"><span class="dl">Mitra</span><span class="dv">${partner ? partner.partner_name : '-'}</span></div>
+        <div class="detail-item"><span class="dl">Rekening Tujuan</span><span class="dv">${settlement.bank_account}</span></div>
+        <div class="detail-item"><span class="dl">Periode</span><span class="dv">${settlement.period}</span></div>
+        <div class="detail-item"><span class="dl">Jumlah Transaksi</span><span class="dv">${settlement.tx_count}</span></div>
+        <div class="detail-item"><span class="dl">Gross Revenue</span><span class="dv">${Fmt.rupiah(settlement.gross_revenue)}</span></div>
+        <div class="detail-item"><span class="dl">Total Potongan</span><span class="dv" style="color:var(--badge-red-fg);">-${Fmt.rupiah(settlement.total_deduction)}</span></div>
+        <div class="detail-item" style="font-weight:700;font-size:15px;color:var(--badge-green-fg);"><span class="dl">Net Revenue (Withdraw)</span><span class="dv">${Fmt.rupiah(settlement.net_revenue)}</span></div>
+      </div>`,
+      footHTML:`<button class="btn btn-secondary" id="mCloseSettle">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmSettle">${ic('check')} Proses & Selesaikan</button>`,
+      onOpen(b, f){
+        f.querySelector('#mCloseSettle')?.addEventListener('click', Modal.close);
+        f.querySelector('#mConfirmSettle')?.addEventListener('click', () => {
+          const target = DB.settlements.find(s => s.id === settlement.id);
+          if(target){
+            target.status = 'Selesai';
+            target.verified_at = new Date().toISOString();
+            target.verified_by = CURRENT_USER.id;
+          }
+          let remaining = settlement.net_revenue;
+          for(const inv of unsettledInvoices) {
+            const invoiceTotal = (inv.total_paid || inv.billing_amount) + (inv.extra_charge || 0);
+            const alreadySettled = inv.settled_amount || 0;
+            const canSettle = Math.min(invoiceTotal - alreadySettled, remaining);
+            if(canSettle > 0) {
+              inv.settled_amount = alreadySettled + canSettle;
+              remaining -= canSettle;
+              if(inv.settled_amount >= invoiceTotal) inv.settled = true;
+            }
+            if(remaining <= 0) break;
+          }
+          pushActivity(CURRENT_USER.name, `memproses settlement ${settlement.ref} sebesar ${Fmt.rupiah(settlement.net_revenue)} dari mitra ${partner.partner_name}`);
+          toast('Settlement berhasil diproses!');
+          Modal.close();
+          renderRoot();
+          setTimeout(()=> openSettlementInvoiceModal(unsettledInvoices, partner, settlement.gross_revenue, settlement.total_deduction, settlement.net_revenue, settlement.ref), 100);
+        });
+      }
+    });
+  }
+
+  renderRoot();
 }
 
 
@@ -1922,12 +2136,38 @@ function showPaymentTab(){
     const total_potongan = kso + pg_fee + other_deductions_val;
     const net = gross - total_potongan;
  
-    let html = `<div id="kpiSlot">${renderKPIs([
-      {label:'Pendapatan Kotor (Gross)', value:Fmt.rupiah(gross), icon:'wallet', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
-      {label:'Total Potongan', value:Fmt.rupiah(total_potongan), icon:'minus', bg:'var(--badge-orange-bg)', fg:'var(--badge-orange-fg)', sub:`KSO + PG + Admin`},
-      {label:'Pendapatan Bersih (Net)', value:Fmt.rupiah(net), icon:'checkCircle', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
-      {label:'Saldo Siap Settlement', value:Fmt.rupiah(net), icon:'wallet', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)', sub:`${unsettledInvoices.length} transaksi`}
-    ])}</div>`;
+    let html = `<div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label"><span>Pendapatan Kotor (Gross)</span><span class="kpi-ico" style="background:var(--badge-blue-bg);color:var(--badge-blue-fg)">${ic('wallet')}</span></div>
+        <div class="kpi-value">${Fmt.rupiah(gross)}</div>
+        <div class="kpi-sub">${unsettledInvoices.length} transaksi</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label"><span>Saldo Siap Settlement</span><span class="kpi-ico" style="background:var(--badge-green-bg);color:var(--badge-green-fg)">${ic('checkCircle')}</span></div>
+        <div class="kpi-value" style="color:var(--badge-green-fg)">${Fmt.rupiah(net)}</div>
+        <div class="kpi-sub">Pendapatan Bersih (Net)</div>
+      </div>
+      <div class="kpi-card" style="position:relative;" id="kpiPotongan">
+        <div class="kpi-label"><span>Total Potongan</span><span class="kpi-ico" style="background:var(--badge-orange-bg);color:var(--badge-orange-fg)">${ic('minus')}</span></div>
+        <div class="kpi-value" style="color:var(--badge-orange-fg)">${Fmt.rupiah(total_potongan)}</div>
+        <div class="kpi-sub" style="display:flex;align-items:center;gap:6px;">
+          <span>KSO + PG + Admin</span>
+          <button class="btn btn-ghost btn-sm" id="btnDetailPotongan" style="padding:2px 6px;font-size:11px;line-height:1;">${ic('eye')} Detail</button>
+        </div>
+        <div id="potonganPopup" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;margin-top:4px;">
+          <div style="background:var(--color-background);border:1px solid var(--color-border);border-radius:8px;padding:12px;box-shadow:0 4px 12px rgba(0,0,0,.15);">
+            <div style="font-size:12px;font-weight:700;margin-bottom:8px;">Rincian Potongan</div>
+            <table style="width:100%;font-size:12px;border-collapse:collapse;">
+              <tr><td style="padding:4px 0;color:var(--color-text-secondary);">KSO ${partner.kso_type==='percentage' ? `(${partner.kso_value}%)` : '(Nominal)'}</td><td style="padding:4px 0;text-align:right;font-weight:600;">${Fmt.rupiah(kso)}</td></tr>
+              <tr><td style="padding:4px 0;color:var(--color-text-secondary);">PG Fee (Rp 3.000/transaksi)</td><td style="padding:4px 0;text-align:right;font-weight:600;">${Fmt.rupiah(pg_fee)}</td></tr>
+              ${(partner.other_deductions||[]).map((d,i)=>`<tr><td style="padding:4px 0;color:var(--color-text-secondary);">Admin: ${d.name||'Potongan '+(i+1)} ${d.type==='percentage' ? `(${d.value}%)` : '(Nominal)'}</td><td style="padding:4px 0;text-align:right;font-weight:600;">${Fmt.rupiah(d.type==='percentage' ? Math.round(gross*(d.value/100)) : d.value*unsettledInvoices.length)}</td></tr>`).join('')}
+              ${(partner.other_deductions||[]).length===0 ? `<tr><td style="padding:4px 0;color:var(--color-text-secondary);">Admin / Lainnya</td><td style="padding:4px 0;text-align:right;font-weight:600;">${Fmt.rupiah(other_deductions_val)}</td></tr>` : ''}
+              <tr style="border-top:1px solid var(--color-border);"><td style="padding:6px 0 0 0;font-weight:700;">Total</td><td style="padding:6px 0 0 0;text-align:right;font-weight:700;color:var(--badge-orange-fg);">${Fmt.rupiah(total_potongan)}</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>`;
  
     html += `
       <div style="display:flex;justify-content:flex-end;margin:16px 0;">
@@ -1940,7 +2180,22 @@ function showPaymentTab(){
       <div id="settlementTableSlot"></div>`;
  
     content.innerHTML = html;
- 
+
+    const btnDetail = content.querySelector('#btnDetailPotongan');
+    const popup = content.querySelector('#potonganPopup');
+    if(btnDetail && popup){
+      btnDetail.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const isVisible = popup.style.display !== 'none';
+        popup.style.display = isVisible ? 'none' : 'block';
+      });
+      document.addEventListener('click', function closePotonganPopup(e){
+        if(!content.contains(e.target)){
+          popup.style.display = 'none';
+        }
+      });
+    }
+
     const tableSlot = content.querySelector('#settlementTableSlot');
     const table = DataTable({
       rows: () => DB.settlements.filter(s => s.partner_id === partner.id),
@@ -2009,8 +2264,9 @@ root.addEventListener('click', function handleSettlementClick(e){
             <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--color-text-secondary);">
               Rekening: ${partner.bank_name} - ${partner.bank_account_no} a.n. ${partner.bank_account_name}
             </div>
+            <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--badge-orange-fg);"><strong>Catatan: Settlement akan dikirim untuk verifikasi Super User sebelum diproses.</strong></div>
           </div>`,
-          footHTML:`<button class="btn btn-secondary" id="mCloseWithdraw">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmWithdraw">${ic('check')} Withdraw</button>`,
+          footHTML:`<button class="btn btn-secondary" id="mCloseWithdraw">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmWithdraw">${ic('check')} Ajukan Verifikasi</button>`,
           onOpen(b, f){
             f.querySelector('#mCloseWithdraw').addEventListener('click', Modal.close);
             f.querySelector('#mConfirmWithdraw').addEventListener('click', () => {
@@ -2019,7 +2275,6 @@ root.addEventListener('click', function handleSettlementClick(e){
                 toast('Nominal tidak valid. Min Rp 1.000, maks ' + Fmt.rupiah(net));
                 return;
               }
-              // Process settlement
               const setRef = 'SET/2026/07/' + String(DB.settlements.length+1).padStart(4,'0');
               DB.settlements.push({
                 id: nextId('SET'),
@@ -2031,26 +2286,13 @@ root.addEventListener('click', function handleSettlementClick(e){
                 total_deduction: total_potongan,
                 net_revenue: amount,
                 bank_account: `${partner.bank_name} - ${partner.bank_account_no}`,
-                status: 'Selesai',
+                status: 'Menunggu Verifikasi',
                 date: new Date().toISOString().slice(0,10)
               });
-              // Settle invoices FIFO
-              let remaining = amount;
-              for(const inv of unsettledInvoices) {
-                const invoiceTotal = (inv.total_paid || inv.billing_amount) + (inv.extra_charge || 0);
-                const alreadySettled = inv.settled_amount || 0;
-                const canSettle = Math.min(invoiceTotal - alreadySettled, remaining);
-                if(canSettle > 0) {
-                  inv.settled_amount = alreadySettled + canSettle;
-                  remaining -= canSettle;
-                  if(inv.settled_amount >= invoiceTotal) inv.settled = true;
-                }
-                if(remaining <= 0) break;
-              }
               pushActivity(CURRENT_USER.name, `mengajukan pencairan settlement ${setRef} sebesar ${Fmt.rupiah(amount)}`);
+              toast('Settlement diajukan untuk verifikasi Super User!');
               Modal.close();
-              // Step 2: show invoice modal
-              openSettlementInvoiceModal(unsettledInvoices, partner, gross, total_potongan, amount, setRef);
+              window.dispatchEvent(new CustomEvent('keuangan-refresh'));
             });
           }
         });
@@ -2133,12 +2375,14 @@ root.addEventListener('click', function handleSettlementClick(e){
     else renderPayment();
   }
 
-  // Listen for payment confirmation to refresh
+  // Listen for payment/settlement confirmation to refresh
   window.addEventListener('keuangan-refresh', () => {
     if(document.getElementById('keuanganTabs')) {
       const activeTab = root.querySelector('#keuanganTabs .subtab.active');
       if(activeTab && activeTab.dataset.tab === 'deposit') {
         renderDeposit();
+      } else if(activeTab && activeTab.dataset.tab === 'settlement') {
+        renderSettlement();
       }
     }
   });

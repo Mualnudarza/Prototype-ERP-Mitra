@@ -22,18 +22,26 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
 ### Super User — Grup Kemitraan
 
 #### Keuangan Mitra — Super User View (`keuangan.mitra`)
-- **Fungsi**: Dashboard cross-mitra untuk monitoring dan verifikasi pembayaran dari seluruh mitra. Super User melihat ringkasan semua mitra dan bisa memverifikasi pembayaran yang diajukan Admin Mitra (proses: Admin submit → Super User verifikasi → deposit mitra terpotong).
+- **Fungsi**: Dashboard cross-mitra untuk monitoring dan verifikasi pembayaran & settlement dari seluruh mitra. Super User melihat ringkasan semua mitra dan bisa memverifikasi pembayaran atau memproses settlement yang diajukan Admin Mitra.
 - **Lokasi file**: `renderSuperUserKuangan()` di `app-modules.js`. Super User mengakses via menu **Keuangan → Keuangan Mitra** (NAV_CONFIG `keuangan.mitra`).
+- **Struktur**: Top-level mode switcher dengan dua tombol: **"Monitoring Saldo & Verifikasi"** (default) dan **"Monitoring Settlement"**. Setiap mode memiliki KPI cards sendiri + dua subtab.
 - **Data yang dibutuhkan**:
-  - Input: Semua `DB.partners`, `DB.customers`, `DB.invoices`, `DB.payments` (cross-mitra)
-  - Tampil (KPI): Total Mitra, Menunggu Verifikasi, Deposit Seluruh Mitra, Total Sudah Diverifikasi
-  - Tampil (Ringkasan Per Mitra — tab default): DataTable mitra dengan kolom Kode, Nama Mitra, Saldo Deposit, Jumlah Antrian verifikasi. Klik angka antrian → switch ke tab Antrian Verifikasi.
-  - Tampil (Antrian Verifikasi — tab kedua): DataTable semua payment dengan `payment_status: 'Menunggu Verifikasi'` dari seluruh mitra. Kolom: No. Referensi, Mitra, Customer, Tagihan, Nominal, Tanggal, Saldo Mitra (hijau/merah), Status, tombol "Verifikasi". Tombol disable (tampilkan "Saldo Kurang") jika saldo deposit mitra tidak cukup. Empty state jika tidak ada antrian.
-  - Aksi Verifikasi: Modal konfirmasi detail (mitra, customer, tagihan, nominal, saldo mitra). Tombol "Verifikasi & Potong Deposit" → potong `deposit_balance` mitra, update invoice ke `'Lunas'`, payment ke `'Berhasil'`, buat entry `depositHistory` tipe `'Deposit Keluar'`, catat activity log.
-- **Ketergantungan**: `DataTable`, `renderKPIs`, `Modal`, `statusBadge`, `pushActivity`, `nextId`, `Fmt`
+  - Input: Semua `DB.partners`, `DB.customers`, `DB.invoices`, `DB.payments`, `DB.settlements` (cross-mitra)
+  - **Mode Monitoring Saldo & Verifikasi**:
+    - KPI: Total Mitra, Menunggu Verifikasi Pembayaran, Deposit Seluruh Mitra, Total Sudah Diverifikasi
+    - Subtab Ringkasan Per Mitra: DataTable mitra dengan kolom Kode, Nama Mitra, Saldo Deposit, Jumlah Antrian verifikasi. Klik angka antrian → switch ke tab Antrian Verifikasi.
+    - Subtab Antrian Verifikasi Pembayaran: DataTable semua payment dengan `payment_status: 'Menunggu Verifikasi'`. Kolom: No. Referensi, Mitra, Customer, Tagihan, Nominal, Tanggal, Saldo Mitra, Status, tombol "Verifikasi". Tombol disable jika saldo tidak cukup. Empty state jika tidak ada antrian.
+    - Aksi Verifikasi Pembayaran: Modal konfirmasi → potong deposit, invoice → Lunas, payment → Berhasil, buat depositHistory.
+  - **Mode Monitoring Settlement**:
+    - KPI: Total Mitra, Menunggu Verifikasi Settlement, Total Saldo Bersih (seluruh mitra)
+    - Subtab Ringkasan Per Mitra: DataTable mitra dengan kolom Kode, Nama Mitra, Saldo Bersih (Net), Jumlah Antrian Settlement. Klik angka antrian → switch ke tab Antrian Settlement.
+    - Subtab Antrian Settlement: DataTable semua settlement dengan `status: 'Menunggu Verifikasi'`. Kolom: No. Settlement, Mitra, Periode, Total Tagihan, Saldo Bersih, Status, tanggal, tombol "Proses". Empty state jika tidak ada antrian.
+    - Aksi Proses Settlement: `openSettlementVerifyModal()` → modal konfirmasi dengan detail (mitra, periode, jumlah tagihan, nominal pencairan). Tombol "Settle & Distribute" → status settlement → Selesai, FIFO settle invoices sesuai nominal. Jika semua invoice settled, update status ke 'Selesai'. Jika sebagian, status tetap 'Menunggu Verifikasi' dengan catatan partial. Notifikasi toast sukses + refresh.
+- **Ketergantungan**: `DataTable`, `Modal`, `statusBadge`, `pushActivity`, `nextId`, `Fmt`, `openSettlementInvoiceModal`, `openSettlementVerifyModal`
 - **Status**: Selesai
 - **Catatan Perubahan**:
-  - 2026-07-31 — Super User view baru untuk keuangan mitra: KPI cross-mitra, ringkasan per mitra (tabel), antrian verifikasi pembayaran (tabel dengan tombol Verifikasi). Flow: Admin submit → status "Menunggu Verifikasi" → Super User verifikasi → potong deposit. Dua tab terpisah dengan tombol switcher di bawah KPI cards.
+  - 2026-07-31 — Super User view baru untuk keuangan mitra: KPI cross-mitra, ringkasan per mitra (tabel), antrian verifikasi pembayaran. Dua tab terpisah dengan tombol switcher di bawah KPI cards.
+  - 2026-07-31 — Ditambahkan mode switcher top-level (Monitoring Saldo & Verifikasi / Monitoring Settlement). Mode Settlement memiliki KPI, ringkasan per mitra, dan antrian settlement dengan aksi proses. Menggantikan subtab switcher sebelumnya.
 
 #### Data Mitra (`partnership.mitra`)
 - **Fungsi**: Mengelola data mitra — menampilkan daftar mitra dengan KPI dan filter, serta form tambah/edit mitra (halaman penuh via hash `#partnership.mitra?id=add` atau `#partnership.mitra?id={partner_id}`).
@@ -134,19 +142,20 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-31 — Pembayaran Customer: alur berubah dari "Bayar → langsung potong deposit" menjadi "Bayar → Menunggu Verifikasi → Super User verifikasi → potong deposit". Invoice & payment status `'Menunggu Verifikasi'`. Checkbox & tombol Bayar disable untuk status ini. Filter Histori Pembayaran tambah opsi "Menunggu Verifikasi".
 
 #### Dashboard Settlement (`settlement.dashboard`)
-- **Fungsi**: Menampilkan rekap hasil transaksi customer dalam satu periode settlement: Pendapatan Kotor (Gross), Total Potongan (KSO, Payment Gateway Fee, Biaya Admin/Lainnya), Pendapatan Bersih (Net), dan Saldo Siap Settlement. Terdapat tombol Ajukan Pencairan Settlement dan tabel Riwayat Settlement di bawahnya.
+- **Fungsi**: Menampilkan rekap hasil transaksi customer dalam satu periode settlement: Pendapatan Kotor (Gross), Saldo Siap Settlement/Pendapatan Bersih (Net), dan Total Potongan (dengan detail rincian). Settlement diajukan oleh Admin Mitra → diverifikasi/diproses oleh Super User.
 - **Lokasi file**: Di-render dari `Views['keuangan.mitra']` → tab "Dashboard Settlement". Data di `app-data.js` (`DB.settlements`, `DB.invoices`, `DB.payments`, `DB.partners`)
 - **Data yang dibutuhkan**:
   - Input: partner_id, ref, period, tx_count, gross_revenue, total_deduction, net_revenue, bank_account, status, date
-  - Tampil (KPI): Gross Revenue, Total Potongan, Net Revenue, Saldo Siap Settlement (termasuk jumlah transaksi tidak settled)
+  - Tampil (KPI — 3 kartu manual, bukan `renderKPIs`): (1) Pendapatan Kotor (Gross) — biru, sub jumlah transaksi. (2) Saldo Siap Settlement — hijau, sub "Pendapatan Bersih (Net)". (3) Total Potongan — oranye, sub "KSO + PG + Admin" + tombol "Detail" kecil. Klik tombol Detail → popup dropdown rincian potongan (KSO persentase/nominal, PG Fee Rp 3.000/transaksi, Admin/Lainnya per potongan). Klik di luar popup → tertutup.
   - Tampil (Riwayat Settlement): DataTable dengan kolom nomor settlement, periode, jumlah transaksi, pendapatan kotor, total potongan, pendapatan bersih, rekening tujuan, status, tanggal (tampil langsung di halaman, bukan sebagai sub-tab)
-  - Aksi: Ajukan Pencairan Settlement → modal input nominal pencairan (default = saldo maksimal, minimal Rp 1.000, step Rp 1.000). Validasi nominal tidak melebihi saldo tersedia. Konfirmasi: membuat record `DB.settlements`, jika nominal penuh tandai invoice `settled=true`. Tampilkan rekening tujuan dari data mitra.
-- **Ketergantungan**: `DataTable`, `renderKPIs`, `badge`, `statusBadge`, `Modal`, `toast`, `pushActivity`, `nextId`
+  - Aksi: Ajukan Pencairan Settlement → modal input nominal pencairan (default = saldo maksimal, minimal Rp 1.000, step Rp 1.000). Validasi nominal tidak melebihi saldo tersedia. Konfirmasi: membuat record `DB.settlements` dengan status `'Menunggu Verifikasi'` (belum settle invoices). Tampilkan rekening tujuan dari data mitra. Catatan: "Settlement akan dikirim untuk verifikasi Super User sebelum diproses."
+- **Ketergantungan**: `DataTable`, `badge`, `statusBadge`, `Modal`, `toast`, `pushActivity`, `nextId`
 - **Status**: Selesai
 - **Catatan Perubahan**:
   - 2026-07-29 — Modul baru menggantikan Riwayat Settlement: Dashboard Settlement dengan kalkulasi potongan dinamis (KSO %, PG Fee Rp 3.000/transaksi non-cash, other_deductions %) dan pencairan otomatis.
   - 2026-07-30 — Hapus submenu Riwayat Settlement (tabel riwayat tampil langsung di halaman utama). Hapus KPI "Jadwal Settlement Berikutnya". Ubah pencairan dari `confirm()` ke modal input nominal (min Rp 1.000, max = saldo tersedia, step Rp 1.000).
-  - 2026-07-31 — Perbaikan logika pencairan settlement parsial: implementasi FIFO settlement tracking via field `settled_amount` pada invoice. Partial withdraw sekarang menyelesaikan invoice berurutan hingga amount habis, sisa invoice tetap unsettled untuk pencairan selanjutnya. KPI "Saldo Siap Settlement" kini akurat hanya menghitung invoice yang belum fully settled.
+  - 2026-07-31 — Perbaikan logika pencairan settlement parsial (FIFO): field `settled_amount` per invoice, partial withdraw settle invoice berurutan hingga amount habis, sisa tetap unsettled untuk pencairan berikutnya. KPI "Saldo Siap Settlement" kini akurat hanya menghitung invoice yang belum fully settled.
+  - 2026-07-31 — KPI direvisi: dari 4 kartu jadi 3 kartu (Pendapatan Kotor, Saldo Siap Settlement, Total Potongan). Total Potongan mendapat tombol "Detail" dengan popup dropdown rincian potongan (KSO, PG Fee, Admin). Alur settlement berubah dari langsung proses menjadi "Ajukan → Menunggu Verifikasi → Super User proses".
 
 #### Payment Gateway (`payment.gateway`) — **Dihapus / Diankir ke Histori Pembayaran**
 - **Fungsi**: Modul terpisah dihapus. Fungsionalitas monitoring payment gateway (Paspe) dipindah ke Dashboard Deposit → sub-tab **Histori Pembayaran**. Data tetap tersedia di `DB.payments` dan diakses melalui Dashboard Deposit → sub-tab Histori Pembayaran.
@@ -214,7 +223,7 @@ infra.topologi ──→ customer.registrasi (ODP nodes untuk registrasi)
 
 keuangan.mitra ──→ deposit.dashboard (tab: Riwayat Deposit, Pembayaran Customer, Histori Pembayaran)
                ──→ settlement.dashboard (tab: Gross→Potongan→Net, Ajukan Pencairan, Riwayat Settlement)
-               ──→ Super User: renderSuperUserKuangan (KPI cross-mitra, Ringkasan Per Mitra, Antrian Verifikasi)
+               ──→ Super User: renderSuperUserKuangan (mode switcher: Monitoring Saldo & Verifikasi | Monitoring Settlement, masing-masing dengan KPI + Ringkasan Per Mitra + Antrian)
 ```
 
 ---
@@ -231,7 +240,7 @@ keuangan.mitra ──→ deposit.dashboard (tab: Riwayat Deposit, Pembayaran Cus
 | Payment | id, invoice_id, payment_reference, virtual_account, billing_amount, payment_status (Berhasil/Pending/Gagal/Menunggu Verifikasi), verified_at, verified_by | Payment Gateway, Dashboard Deposit, Keuangan Mitra (Super User) |
 | Settlement | id, partner_id, ref, type, amount, balance_before, balance_after | Dashboard Pendapatan, Riwayat Settlement |
 | DepositHistory | id, partner_id, ref, type (Deposit Masuk/Deposit Keluar), date, amount, balance_before, balance_after, note, status | Dashboard Deposit, Keuangan Mitra (Super User verifikasi) |
-| SettlementRecord | id, partner_id, ref, period, tx_count, gross_revenue, total_deduction, net_revenue, bank_account, status, date | Dashboard Settlement |
+| SettlementRecord | id, partner_id, ref, period, tx_count, gross_revenue, total_deduction, net_revenue, withdraw_amount, bank_account, status (Menunggu Verifikasi/Selesai), date, settled_amount | Dashboard Settlement, Keuangan Mitra (Super User verifikasi) |
 | Infrastructure | id, type, label, partner_id, isOdp, children (tree: OLT → Input Splitter → Output Splitter) | Topologi Infrastruktur, Registrasi (ODP nodes) |
 | Radius | id, customer_id, customer_name, pppoe_secret, onu_number, bandwidth, customer_status, radius_status, isolation_date, activation_date, last_update, olt_rx_now, olt_status | Radius & Control Gateway |
 | ActivityLog | actor, action, time | Shared (semua modul via `pushActivity()`) |
@@ -295,4 +304,6 @@ keuangan.mitra ──→ deposit.dashboard (tab: Riwayat Deposit, Pembayaran Cus
 | 2026-07-31 | Dashboard Deposit: KPI dikurangi jadi hanya "Saldo Deposit Saat Ini". Riwayat Deposit & Histori Pembayaran diberi filter bar di atas tabel — Jenis Transaksi sebagai tombol toggle (Deposit Masuk/Deposit Keluar; Tunai/Kasir/Payment Gateway), filter periode Per Tanggal/Per Bulan/Per Tahun, dan filter Status — auto-apply tanpa tombol Terapkan. | `app-modules.js`, `PRD.md` |
 | 2026-07-31 | Pembayaran Customer: alur berubah dari "Bayar → langsung potong deposit" menjadi "Bayar → Menunggu Verifikasi → Super User verifikasi → potong deposit". Invoice & payment status `'Menunggu Verifikasi'`. Checkbox & tombol Bayar disable untuk status ini. Filter Histori Pembayaran & Dashboard Pembayaran tambah opsi "Menunggu Verifikasi". | `app-modules.js`, `app-ui.js`, `PRD.md` |
 | 2026-07-31 | Super User Keuangan Mitra: view cross-mitra baru — KPI (Total Mitra, Menunggu Verifikasi, Deposit Seluruh Mitra, Total Diverifikasi), Ringkasan Per Mitra (tabel), Antrian Verifikasi (tabel + tombol Verifikasi). Dua tab terpisah. Status badge 'Menunggu Verifikasi' → yellow. Verifikasi: potong deposit, invoice → Lunas, payment → Berhasil, buat depositHistory. | `app-modules.js`, `app-ui.js`, `app-main.js`, `PRD.md` |
+| 2026-07-31 | Super User view: top-level mode switcher (Monitoring Saldo & Verifikasi / Monitoring Settlement) menggantikan tab switcher. Mode Settlement baru — KPI 3 kartu, Ringkasan Per Mitra (tabel saldo bersih + antrian), Antrian Settlement (tabel + tombol Proses). Verifikasi settlement via `openSettlementVerifyModal()` → status → Selesai + FIFO settle invoices. | `app-modules.js`, `PRD.md` |
+| 2026-07-31 | Dashboard Settlement: alur berubah dari "Ajukan → langsung proses" menjadi "Ajukan → Menunggu Verifikasi → Super User proses". KPI direvisi dari 4 kartu menjadi 3 kartu (Pendapatan Kotor, Saldo Siap Settlement, Total Potongan). Total Potongan mendapat tombol "Detail" dengan popup dropdown rincian potongan (KSO, PG Fee, Admin). | `app-modules.js`, `PRD.md` |
 
