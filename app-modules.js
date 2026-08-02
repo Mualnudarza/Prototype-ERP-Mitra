@@ -1788,19 +1788,28 @@ function renderSuperUserKuangan(root){
   }
 
   function openPaymentDetailModal(payment, invoice, customer, partner){
-    const depHistory = DB.depositHistory.find(d => d.ref && d.ref.includes(payment.payment_reference));
+    if(!invoice || !partner){
+      Modal.open({
+        title:'Detail Pembayaran', subtitle: payment.payment_reference,
+        bodyHTML:`<div class="empty-state">${ic('info')}<div class="es-title">Data invoice atau mitra tidak ditemukan</div></div>`,
+        footHTML:`<button class="btn btn-primary" id="mClosePayDetail">${ic('check')} Tutup</button>`,
+        onOpen(b, f){ f.querySelector('#mClosePayDetail').addEventListener('click', Modal.close); }
+      });
+      return;
+    }
+    const pkg = DB.packages.find(p => p.id === invoice.package_id) || null;
+    const invData = buildPaymentInvoiceHTML(customer, invoice, pkg, partner);
     Modal.open({
-      title:'Detail Pembayaran',
-      subtitle:`${payment.payment_reference}`,
-      bodyHTML:`<div class="detail-grid">
-        <div class="detail-item"><span class="dl">Mitra</span><span class="dv">${partner ? partner.partner_name : '-'}</span></div>
-        <div class="detail-item"><span class="dl">Customer</span><span class="dv">${customer ? customer.customer_name : '-'}</span></div>
-        <div class="detail-item"><span class="dl">Nomor Tagihan</span><span class="dv cell-mono">${invoice ? invoice.invoice_number : '-'}</span></div>
-        <div class="detail-item"><span class="dl">Nominal Bayar</span><span class="dv" style="font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(payment.billing_amount)}</span></div>
-        <div class="detail-item"><span class="dl">Tanggal Pembayaran</span><span class="dv">${Fmt.datetime(payment.payment_date)}</span></div>
-        <div class="detail-item"><span class="dl">Status</span><span class="dv">${statusBadge(payment.payment_status)}</span></div>
-        ${partner ? `<div class="detail-item"><span class="dl">Saldo Deposit Mitra</span><span class="dv">${Fmt.rupiah(partner.deposit_balance)}</span></div>` : ''}
-        ${depHistory ? `<div class="detail-item"><span class="dl">Ref Deposit History</span><span class="dv cell-mono">${depHistory.ref}</span></div>` : ''}
+      title:'', subtitle:'',
+      size:'lg',
+      bodyHTML:`<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#555;line-height:24px;font-size:14px;">
+        <div style="margin-bottom:12px;padding:8px 12px;background:var(--color-background-muted);border-radius:6px;font-size:12px;color:var(--color-text-secondary);display:flex;gap:16px;flex-wrap:wrap;">
+          <span><strong>Ref:</strong> ${payment.payment_reference}</span>
+          <span><strong>Tanggal Bayar:</strong> ${Fmt.datetime(payment.payment_date)}</span>
+          <span><strong>Status:</strong> ${statusBadge(payment.payment_status)}</span>
+          <span><strong>Metode:</strong> ${payment.virtual_account}</span>
+        </div>
+        ${invData.html}
       </div>`,
       footHTML:`<button class="btn btn-primary" id="mClosePayDetail">${ic('check')} Tutup</button>`,
       onOpen(b, f){
@@ -2221,23 +2230,32 @@ function showPaymentTab(){
             const p = rows.find(r=>r.id===tr.dataset.id);
             tr.querySelector('.act-detail')?.addEventListener('click', ()=>{
               const inv = DB.invoices.find(i=>i.id===p.invoice_id);
+              if(!inv){
+                Modal.open({
+                  title:'Detail Transaksi Pembayaran', subtitle:p.payment_reference,
+                  bodyHTML:`<div class="empty-state">${ic('info')}<div class="es-title">Data invoice tidak ditemukan</div></div>`,
+                  footHTML:`<button class="btn btn-primary" id="mClose7">Tutup</button>`,
+                  onOpen(b,f){ f.querySelector('#mClose7').addEventListener('click', Modal.close); }
+                });
+                return;
+              }
+              const cust = DB.customers.find(c => c.id === inv.customer_id) || null;
+              const partner = DB.partners.find(p => p.id === cust?.partner_id) || null;
+              const pkg = DB.packages.find(pk => pk.id === inv.package_id) || null;
+              const invData = buildPaymentInvoiceHTML(cust, inv, pkg, partner);
               Modal.open({
-                title:'Detail Transaksi Pembayaran', subtitle:p.payment_reference,
-                bodyHTML:`<div class="detail-grid">
-                  <div class="detail-item"><span class="dl">Pelanggan</span><span class="dv">${inv?custName(inv.customer_id):'-'}</span></div>
-                  <div class="detail-item"><span class="dl">Nomor Tagihan</span><span class="dv">${inv?inv.invoice_number:'-'}</span></div>
-                  <div class="detail-item"><span class="dl">Virtual Account</span><span class="dv" style="font-family:var(--font-family-mono);">${p.virtual_account}</span></div>
-                  <div class="detail-item"><span class="dl">Nominal</span><span class="dv">${Fmt.rupiah(p.billing_amount)}</span></div>
-                  <div class="detail-item"><span class="dl">Waktu Pembayaran</span><span class="dv">${Fmt.datetime(p.payment_date)}</span></div>
-                  <div class="detail-item"><span class="dl">Status</span><span class="dv">${statusBadge(p.payment_status)}</span></div>
-                </div>
-                <div class="section-head" style="padding:16px 0 8px 0;"><h3>Riwayat Notifikasi (Callback)</h3></div>
-                ${activityTimeline([
-                  {actor:'Payment Gateway', action:`mengirim permintaan validasi untuk ${p.payment_reference}`, time:p.payment_date},
-                  {actor:'ERP Mitra', action:'memvalidasi tagihan terhadap data billing', time:p.payment_date},
-                  {actor:'Payment Gateway', action:`callback status "${p.payment_status}" diterima`, time:p.payment_date},
-                ])}`,
-                footHTML:`<button class="btn btn-primary" id="mClose7">Tutup</button>`,
+                title:'', subtitle:'',
+                size:'lg',
+                bodyHTML:`<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#555;line-height:24px;font-size:14px;">
+                  <div style="margin-bottom:12px;padding:8px 12px;background:var(--color-background-muted);border-radius:6px;font-size:12px;color:var(--color-text-secondary);display:flex;gap:16px;flex-wrap:wrap;">
+                    <span><strong>Ref:</strong> ${p.payment_reference}</span>
+                    <span><strong>Tanggal Bayar:</strong> ${Fmt.datetime(p.payment_date)}</span>
+                    <span><strong>Status:</strong> ${statusBadge(p.payment_status)}</span>
+                    <span><strong>Metode:</strong> ${p.virtual_account}</span>
+                  </div>
+                  ${invData.html}
+                </div>`,
+                footHTML:`<button class="btn btn-primary" id="mClose7">${ic('check')} Tutup</button>`,
                 onOpen(b,f){ f.querySelector('#mClose7').addEventListener('click', Modal.close); }
               });
             });
