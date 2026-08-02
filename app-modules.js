@@ -1621,10 +1621,12 @@ function renderSuperUserKuangan(root){
 
   function renderRoot(){
     const pendingSettlements = allSettlements.filter(s => s.status === 'Menunggu Verifikasi');
+    const pendingTopUps = DB.depositTopUp.filter(t => t.status === 'Menunggu Verifikasi');
 
     let html = `
       <div class="subtabs" id="suModeTabs">
         <button class="subtab ${activeMode==='payment'?'active':''}" data-mode="payment">${ic('wallet')}Historis Pembayaran</button>
+        <button class="subtab ${activeMode==='deposit'?'active':''}" data-mode="deposit">${ic('wallet')}Verifikasi Deposit${pendingTopUps.length > 0 ? ` <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">${pendingTopUps.length}</span>` : ''}</button>
         <button class="subtab ${activeMode==='settlement'?'active':''}" data-mode="settlement">${ic('history')}Monitoring Settlement${pendingSettlements.length > 0 ? ` <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">${pendingSettlements.length}</span>` : ''}</button>
       </div>
       <div id="suModeContent"></div>
@@ -1644,6 +1646,8 @@ function renderSuperUserKuangan(root){
 
     if(activeMode === 'payment'){
       renderPaymentMode(modeContent);
+    } else if(activeMode === 'deposit'){
+      renderDepositVerifyMode(modeContent, pendingTopUps);
     } else {
       renderSettlementMode(modeContent, pendingSettlements);
     }
@@ -1816,6 +1820,210 @@ function renderSuperUserKuangan(root){
         f.querySelector('#mClosePayDetail').addEventListener('click', Modal.close);
       }
     });
+  }
+
+  /* ========== DEPOSIT VERIFY MODE ========== */
+
+  function renderDepositVerifyMode(container, pendingTopUps){
+    const allTopUps = DB.depositTopUp.sort((a,b) => new Date(b.date) - new Date(a.date));
+    const completedTopUps = allTopUps.filter(t => t.status === 'Selesai');
+    const totalTopUpAll = completedTopUps.reduce((s, t) => s + t.amount, 0);
+
+    let html = `<div id="kpiSlot">${renderKPIs([
+      {label:'Total Mitra', value:allPartners.length, icon:'users', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
+      {label:'Menunggu Verifikasi', value:pendingTopUps.length, icon:'inbox', bg:'var(--badge-yellow-bg)', fg:'var(--badge-yellow-fg)'},
+      {label:'Total Sudah Diverifikasi', value:completedTopUps.length, icon:'checkCircle', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
+      {label:'Total Nilai Deposit Masuk', value:Fmt.rupiah(totalTopUpAll), icon:'wallet', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'},
+    ])}</div>`;
+
+    html += `
+      <div class="subtabs" id="suDepositTabs">
+        <button class="subtab ${activeTab==='deposit_queue'?'active':''}" data-tab="deposit_queue">${ic('inbox')}Antrian Verifikasi${pendingTopUps.length > 0 ? ` <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">${pendingTopUps.length}</span>` : ''}</button>
+        <button class="subtab ${activeTab==='deposit_history'?'active':''}" data-tab="deposit_history">${ic('history')}Riwayat Deposit Masuk</button>
+      </div>
+      <div id="suDepositTabContent"></div>
+    `;
+    container.innerHTML = html;
+
+    const tabContent = container.querySelector('#suDepositTabContent');
+    const tabs = container.querySelectorAll('#suDepositTabs .subtab');
+
+    tabs.forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        activeTab = btn.dataset.tab;
+        renderRoot();
+      });
+    });
+
+    if(activeTab === 'deposit_queue'){
+      renderDepositQueue(tabContent, pendingTopUps);
+    } else {
+      renderDepositHistoryAll(tabContent, completedTopUps);
+    }
+  }
+
+  function renderDepositQueue(container, pendingTopUps){
+    if(pendingTopUps.length === 0){
+      container.innerHTML = `<div class="empty-state">${ic('checkCircle')}<div class="es-title">Tidak ada pengajuan deposit yang menunggu verifikasi</div><div class="es-sub">Semua pengajuan sudah diproses.</div></div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="section-head"><h3>Antrian Verifikasi Deposit</h3></div>
+      <div id="depositQueueSlot"></div>
+    `;
+    const queueSlot = container.querySelector('#depositQueueSlot');
+
+    const queueTable = DataTable({
+      rows: () => pendingTopUps,
+      rowKey: 'id',
+      searchPlaceholder: 'Cari nama mitra atau referensi...',
+      searchFields: ['ref'],
+      columns: [
+        {key:'ref', header:'No. Referensi', sortable:true, render:r=>`<span class="cell-mono">${r.ref}</span>`},
+        {key:'mitra', header:'Mitra', sortable:true, render:r=>{
+          const p = allPartners.find(pt => pt.id === r.partner_id);
+          return p ? `<span class="cell-strong">${p.partner_name}</span>` : '-';
+        }},
+        {key:'amount', header:'Nominal', sortable:true, align:'right', render:r=>`<span class="cell-num" style="font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(r.amount)}</span>`},
+        {key:'bank', header:'Rekening Tujuan', render:r=>`<span class="cell-secondary">${r.bank_name} - ${r.bank_account}</span>`},
+        {key:'date', header:'Tanggal Pengajuan', sortable:true, sortValue:r=>r.date, render:r=>Fmt.datetime(r.date)},
+        {key:'actions', header:'', align:'right', render:r=>
+          `<button class="btn btn-primary btn-sm act-verify-topup" data-id="${r.id}">${ic('check')}Verifikasi</button>`
+        },
+      ],
+      afterRender(wrap, rows){
+        wrap.querySelectorAll('.act-verify-topup').forEach(btn=>{
+          btn.addEventListener('click', ()=>{
+            const topup = rows.find(r=>r.id===btn.dataset.id);
+            if(!topup) return;
+            const partner = allPartners.find(p => p.id === topup.partner_id);
+            openDepositVerifyModal(topup, partner);
+          });
+        });
+      }
+    });
+    const queueCard = document.createElement('div'); queueCard.className='card';
+    queueCard.appendChild(queueTable);
+    queueSlot.appendChild(queueCard);
+  }
+
+  function openDepositVerifyModal(topup, partner){
+    if(!partner){
+      toast('Data mitra tidak ditemukan');
+      return;
+    }
+    Modal.open({
+      title:'Verifikasi Penambahan Saldo', subtitle: topup.ref,
+      size:'lg',
+      bodyHTML:`<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#555;line-height:24px;font-size:14px;">
+        <div style="background:var(--color-background-muted);border-radius:8px;padding:16px;margin-bottom:16px;">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:8px;font-weight:600;">Detail Pengajuan</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Mitra</td><td style="padding:6px 8px;text-align:right;font-weight:600;">${partner.partner_name}</td></tr>
+            <tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Kode Mitra</td><td style="padding:6px 8px;text-align:right;">${partner.partner_code}</td></tr>
+            <tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Nominal Deposit</td><td style="padding:6px 8px;text-align:right;font-weight:700;font-size:16px;color:var(--badge-green-fg);">${Fmt.rupiah(topup.amount)}</td></tr>
+            <tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Saldo Saat Ini</td><td style="padding:6px 8px;text-align:right;">${Fmt.rupiah(partner.deposit_balance)}</td></tr>
+            <tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Saldo Setelah Diverifikasi</td><td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(partner.deposit_balance + topup.amount)}</td></tr>
+          </table>
+        </div>
+        <div style="background:var(--color-background-muted);border-radius:8px;padding:16px;margin-bottom:16px;">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:8px;font-weight:600;">Rekening Tujuan Transfer</div>
+          <div style="font-size:13px;"><strong>${topup.bank_name}</strong> &mdash; <span class="cell-mono">${topup.bank_account}</span></div>
+          <div style="font-size:12px;color:var(--color-text-secondary);">Atas Nama: ${topup.account_name}</div>
+        </div>
+        <div style="background:var(--color-background-muted);border-radius:8px;padding:16px;">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:8px;font-weight:600;">Bukti Transfer</div>
+          <div style="font-size:13px;color:var(--color-text-primary);">${topup.proof}</div>
+        </div>
+      </div>`,
+      footHTML:`<button class="btn btn-secondary" id="mCancelVerify">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmVerify">${ic('check')} Verifikasi & Tambah Saldo</button>`,
+      onOpen(b, f){
+        f.querySelector('#mCancelVerify').addEventListener('click', Modal.close);
+        f.querySelector('#mConfirmVerify').addEventListener('click', ()=>{
+          const prevBalance = partner.deposit_balance;
+          partner.deposit_balance += topup.amount;
+
+          topup.status = 'Selesai';
+          topup.verified_by = CURRENT_USER.name;
+          topup.verified_at = new Date().toISOString();
+
+          DB.depositHistory.push({
+            id: nextId('DEP'),
+            partner_id: partner.id,
+            ref: topup.ref,
+            type: 'Deposit Masuk',
+            date: new Date().toISOString().slice(0,10),
+            amount: topup.amount,
+            balance_before: prevBalance,
+            balance_after: partner.deposit_balance,
+            note: 'Penambahan saldo dari pengajuan ' + topup.ref,
+            status: 'Berhasil',
+          });
+
+          pushActivity(CURRENT_USER.name, `memverifikasi penambahan saldo deposit ${partner.partner_name} sebesar ${Fmt.rupiah(topup.amount)} — saldo bertambah otomatis`);
+          toast(`Saldo deposit ${partner.partner_name} berhasil ditambahkan sebesar ${Fmt.rupiah(topup.amount)}!`);
+          window.dispatchEvent(new CustomEvent('keuangan-refresh'));
+          Modal.close();
+        });
+      }
+    });
+  }
+
+  function renderDepositHistoryAll(container, completedTopUps){
+    container.innerHTML = `
+      <div class="section-head"><h3>Riwayat Deposit Masuk (Semua Mitra)</h3></div>
+      <div id="depositHistoryAllSlot"></div>
+    `;
+    const historySlot = container.querySelector('#depositHistoryAllSlot');
+
+    const historyTable = DataTable({
+      rows: () => completedTopUps,
+      rowKey: 'id',
+      searchPlaceholder: 'Cari nama mitra atau referensi...',
+      searchFields: ['ref'],
+      columns: [
+        {key:'ref', header:'No. Referensi', sortable:true, render:r=>`<span class="cell-mono">${r.ref}</span>`},
+        {key:'mitra', header:'Mitra', sortable:true, render:r=>{
+          const p = allPartners.find(pt => pt.id === r.partner_id);
+          return p ? `<span class="cell-strong">${p.partner_name}</span>` : '-';
+        }},
+        {key:'amount', header:'Nominal', sortable:true, align:'right', render:r=>`<span class="cell-num" style="font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(r.amount)}</span>`},
+        {key:'date', header:'Tanggal Pengajuan', sortable:true, sortValue:r=>r.date, render:r=>Fmt.datetime(r.date)},
+        {key:'verified_by', header:'Diverifikasi Oleh', render:r=>r.verified_by ? `<span class="cell-strong">${r.verified_by}</span>` : '-'},
+        {key:'verified_at', header:'Tanggal Verifikasi', render:r=>r.verified_at ? Fmt.datetime(r.verified_at) : '-'},
+        {key:'actions', header:'', align:'right', render:r=>
+          `<button class="btn btn-ghost btn-sm act-detail-topup" data-id="${r.id}">${ic('eye')}Detail</button>`
+        },
+      ],
+      afterRender(wrap, rows){
+        wrap.querySelectorAll('.act-detail-topup').forEach(btn=>{
+          btn.addEventListener('click', ()=>{
+            const topup = rows.find(r=>r.id===btn.dataset.id);
+            if(!topup) return;
+            const p = allPartners.find(pt => pt.id === topup.partner_id);
+            Modal.open({
+              detail:'Detail Deposit Masuk', subtitle: topup.ref,
+              bodyHTML:`<div class="detail-grid">
+                <div class="detail-item"><span class="dl">Mitra</span><span class="dv">${p ? p.partner_name : '-'}</span></div>
+                <div class="detail-item"><span class="dl">Nominal</span><span class="dv" style="font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(topup.amount)}</span></div>
+                <div class="detail-item"><span class="dl">Tanggal Pengajuan</span><span class="dv">${Fmt.datetime(topup.date)}</span></div>
+                <div class="detail-item"><span class="dl">Status</span><span class="dv">${statusBadge(topup.status)}</span></div>
+                <div class="detail-item"><span class="dl">Rekening Tujuan</span><span class="dv">${topup.bank_name} - ${topup.bank_account}</span></div>
+                <div class="detail-item"><span class="dl">Bukti Transfer</span><span class="dv">${topup.proof}</span></div>
+                ${topup.verified_by ? `<div class="detail-item"><span class="dl">Diverifikasi Oleh</span><span class="dv">${topup.verified_by}</span></div>` : ''}
+                ${topup.verified_at ? `<div class="detail-item"><span class="dl">Tanggal Verifikasi</span><span class="dv">${Fmt.datetime(topup.verified_at)}</span></div>` : ''}
+              </div>`,
+              footHTML:`<button class="btn btn-primary" id="mCloseDepHist">${ic('check')} Tutup</button>`,
+              onOpen(b, f){ f.querySelector('#mCloseDepHist').addEventListener('click', Modal.close); }
+            });
+          });
+        });
+      }
+    });
+    const histCard = document.createElement('div'); histCard.className='card';
+    histCard.appendChild(historyTable);
+    historySlot.appendChild(histCard);
   }
 
   /* ========== SETTLEMENT MODE ========== */
@@ -2029,6 +2237,7 @@ Views['keuangan.mitra'] = function(root){
     let html = kpiHTML + `
       <div class="subtabs" style="margin-top:12px;">
         <button class="subtab active" data-subtab="history">${ic('history')}Riwayat Deposit</button>
+        <button class="subtab" data-subtab="topup">${ic('plus')}Tambah Deposit</button>
         <button class="subtab" data-subtab="payment">${ic('check')}Pembayaran Customer</button>
         <button class="subtab" data-subtab="gateway">${ic('creditCard')}Histori Pembayaran</button>
       </div>
@@ -2267,10 +2476,127 @@ function showPaymentTab(){
       cardEl.appendChild(table);
       subContent.appendChild(cardEl);
     }
+
+    function openTopUpModal(){
+      Modal.open({
+        title:'Ajukan Penambahan Saldo',
+        subtitle:'Lakukan transfer ke rekening ISP, lalu lengkapi form di bawah ini',
+        size:'lg',
+        bodyHTML:`
+          <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#555;line-height:24px;font-size:14px;">
+            <div style="background:var(--color-background-muted);border-radius:8px;padding:16px;margin-bottom:16px;">
+              <div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:8px;font-weight:600;">Rekening Tujuan Transfer</div>
+              <div style="font-size:16px;font-weight:700;color:var(--color-text-primary);">PT Dasaria Indonesia</div>
+              <div style="font-size:14px;color:var(--color-text-secondary);margin-top:4px;">Bank BCA &mdash; <span class="cell-mono">1234 5678 90</span></div>
+            </div>
+            ${rowWrap(fieldsHTML([
+              {label:'Nominal Transfer (Rp)', id:'topup_amount', type:'number', placeholder:'Masukkan nominal transfer', hint:'Minimal Rp 100.000'},
+            ]))}
+            ${fieldsHTML([{label:'Keterangan / Bukti Transfer', id:'topup_proof', type:'textarea', placeholder:'Contoh: Transfer BCA ke BCA 1234567890, ref: TF-20260802-001 (di final berupa upload foto)', hint:'Di final berupa upload foto bukti transfer, prototype cukup teks saja'}])}
+          </div>
+        `,
+        footHTML:`<button class="btn btn-secondary" id="mCancelTopUp">${ic('x')} Batal</button> <button class="btn btn-primary" id="mSubmitTopUp">${ic('send')} Ajukan Penambahan Saldo</button>`,
+        onOpen(b, f){
+          f.querySelector('#mCancelTopUp').addEventListener('click', Modal.close);
+          f.querySelector('#mSubmitTopUp').addEventListener('click', ()=>{
+            const amount = parseFloat(document.getElementById('topup_amount').value);
+            const proof = document.getElementById('topup_proof').value.trim();
+            if(!amount || amount < 100000){ toast('Nominal transfer minimal Rp 100.000'); return; }
+            if(!proof){ toast('Keterangan / bukti transfer wajib diisi'); return; }
+
+            DB.depositTopUp.push({
+              id: nextId('TOPUP'),
+              partner_id: partner.id,
+              ref: 'TOPUP/' + new Date().toISOString().slice(0,4) + '/' + String(new Date().getMonth()+1).padStart(2,'0') + '/' + String(DB.depositTopUp.length+1).padStart(4,'0'),
+              amount: amount,
+              bank_name: partner.bank_name || '-',
+              bank_account: partner.bank_account_no || '-',
+              account_name: partner.bank_account_name || '-',
+              proof: proof,
+              status: 'Menunggu Verifikasi',
+              date: new Date().toISOString(),
+              verified_by: null,
+              verified_at: null
+            });
+
+            pushActivity(CURRENT_USER.name, `mengajukan penambahan saldo deposit sebesar ${Fmt.rupiah(amount)} — menunggu verifikasi Super User`);
+            toast('Pengajuan penambahan saldo berhasil diajukan! Menunggu verifikasi dari Super User.');
+            window.dispatchEvent(new CustomEvent('keuangan-refresh'));
+            Modal.close();
+            showTopUpTab();
+          });
+        }
+      });
+    }
+
+    function showTopUpTab(){
+      subTabs.forEach(b=>b.classList.toggle('active', b.dataset.subtab==='topup'));
+      subContent.innerHTML = '';
+
+      const pendingTopUps = DB.depositTopUp.filter(t => t.partner_id === partner.id && t.status === 'Menunggu Verifikasi');
+
+      subContent.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="margin:0;">Riwayat Pengajuan Deposit</h3>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="badge ${pendingTopUps.length > 0 ? 'badge-yellow' : 'badge-gray'}">${pendingTopUps.length} Menunggu Verifikasi</span>
+            <button class="btn btn-primary btn-sm" id="btnOpenTopUpModal">${ic('plus')} Ajukan Penambahan Saldo</button>
+          </div>
+        </div>
+        <div id="topUpHistorySlot"></div>
+      `;
+
+      subContent.querySelector('#btnOpenTopUpModal').addEventListener('click', openTopUpModal);
+
+      const historySlot = subContent.querySelector('#topUpHistorySlot');
+      const allTopUps = DB.depositTopUp.filter(t => t.partner_id === partner.id).sort((a,b) => new Date(b.date) - new Date(a.date));
+      const historyTable = DataTable({
+        rows: () => allTopUps,
+        rowKey: 'id',
+        searchPlaceholder: 'Cari nomor referensi...',
+        searchFields: ['ref'],
+        columns: [
+          {key:'ref', header:'Nomor Referensi', sortable:true, render:r=>`<span class="cell-mono">${r.ref}</span>`},
+          {key:'amount', header:'Nominal', sortable:true, align:'right', render:r=>`<span class="cell-num" style="font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(r.amount)}</span>`},
+          {key:'date', header:'Tanggal Pengajuan', sortable:true, sortValue:r=>r.date, render:r=>Fmt.datetime(r.date)},
+          {key:'status', header:'Status', sortable:true, render:r=>statusBadge(r.status)},
+          {key:'verified_by', header:'Diverifikasi Oleh', render:r=>r.verified_by ? `<span class="cell-strong">${r.verified_by}</span>` : '-'},
+          {key:'verified_at', header:'Tanggal Verifikasi', render:r=>r.verified_at ? Fmt.datetime(r.verified_at) : '-'},
+          {key:'actions', header:'', align:'right', render:r=>`<button class="btn btn-ghost btn-sm act-detail-topup" data-id="${r.id}">${ic('eye')}Detail</button>`},
+        ],
+        afterRender(wrap, rows){
+          wrap.querySelectorAll('.act-detail-topup').forEach(btn=>{
+            btn.addEventListener('click', ()=>{
+              const topup = rows.find(r=>r.id===btn.dataset.id);
+              if(!topup) return;
+              Modal.open({
+                title:'Detail Pengajuan Deposit', subtitle: topup.ref,
+                bodyHTML:`<div class="detail-grid">
+                  <div class="detail-item"><span class="dl">Nominal</span><span class="dv" style="font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(topup.amount)}</span></div>
+                  <div class="detail-item"><span class="dl">Tanggal Pengajuan</span><span class="dv">${Fmt.datetime(topup.date)}</span></div>
+                  <div class="detail-item"><span class="dl">Status</span><span class="dv">${statusBadge(topup.status)}</span></div>
+                  <div class="detail-item"><span class="dl">Rekening Tujuan</span><span class="dv">${topup.bank_name} - ${topup.bank_account}</span></div>
+                  <div class="detail-item"><span class="dl">Atas Nama</span><span class="dv">${topup.account_name}</span></div>
+                  <div class="detail-item"><span class="dl">Bukti Transfer</span><span class="dv">${topup.proof}</span></div>
+                  ${topup.verified_by ? `<div class="detail-item"><span class="dl">Diverifikasi Oleh</span><span class="dv">${topup.verified_by}</span></div>` : ''}
+                  ${topup.verified_at ? `<div class="detail-item"><span class="dl">Tanggal Verifikasi</span><span class="dv">${Fmt.datetime(topup.verified_at)}</span></div>` : ''}
+                </div>`,
+                footHTML:`<button class="btn btn-primary" id="mCloseTopUp">${ic('check')} Tutup</button>`,
+                onOpen(b, f){ f.querySelector('#mCloseTopUp').addEventListener('click', Modal.close); }
+              });
+            });
+          });
+        }
+      });
+      const histCard = document.createElement('div'); histCard.className='card';
+      histCard.appendChild(historyTable);
+      historySlot.appendChild(histCard);
+    }
  
     subTabs.forEach(btn=>{
       btn.addEventListener('click', ()=>{
         if(btn.dataset.subtab==='history') showDepositHistory();
+        else if(btn.dataset.subtab==='topup') showTopUpTab();
         else if(btn.dataset.subtab==='payment') showPaymentTab();
         else showGatewayTab();
       });

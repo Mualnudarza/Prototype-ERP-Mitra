@@ -77,6 +77,10 @@ DB.depositHistory = [
   {id:'DEP-0002', partner_id:'PTR-0001', ref:'DEP/2026/07/0002', type:'Deposit Keluar', date:'2026-07-29', amount:-299000, balance_before:5000000, balance_after:4701000, note:'Pembayaran tunai CUS-2001 (Andi Wijaya)', status:'Berhasil'}
 ];
 
+DB.depositTopUp = [
+  {id:'TOPUP-0001', partner_id:'PTR-0001', ref:'TOPUP/2026/07/0001', amount:5000000, bank_name:'Bank Mandiri', bank_account:'1230007890123', account_name:'PT Nusantara Net Indonesia', proof:'Transfer BCA a.n. PT Dasaria ke Mandiri 1230007890123, ref: TF-20260725-001', status:'Selesai', date:'2026-07-25T10:30:00', verified_by:'Super Admin', verified_at:'2026-07-25T11:00:00'}
+];
+
 DB.settlements = [
   {id:'SET-0001', partner_id:'PTR-0001', ref:'SET/2026/07/0001', period:'Juli 2026', tx_count:1, gross_revenue:299000, total_deduction:95680, net_revenue:203320, bank_account:'Bank Mandiri - 1230007890123', status:'Selesai', date:'2026-07-29'},
 ];
