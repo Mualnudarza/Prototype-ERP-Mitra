@@ -38,6 +38,8 @@ const ICONS = {
   home:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   copy:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   clipboardList:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v2h6V3M8 10h8M8 14h8M8 18h5" stroke-linecap="round"/></svg>`,
+  lock:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="13" rx="2"/><path d="M8 11V7a4 4 0 014-4h1a4 4 0 014 4v4" stroke-linecap="round"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg>`,
+  info:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-linecap="round"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg>`,
 };
 function ic(name, cls){ return (ICONS[name]||'').replace('<svg ', `<svg class="${cls||''}" `); }
 
@@ -339,22 +341,30 @@ function renderSidebar(navConfig, activeKey){
       switcher.classList.toggle('open');
     });
   }
-  sidebar.querySelectorAll('[data-user-id]').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      const uid = el.dataset.userId;
-      const user = USERS.find(u=>u.id===uid);
-      if(user && user.id !== CURRENT_USER.id){
-        CURRENT_USER = user;
-        const hash = window.location.hash.replace('#','');
-        const isPartnership = PARTNERSHIP_KEYS.includes(hash);
-        if(user.id==='mitra' && isPartnership){
-          window.location.hash = DEFAULT_ROUTE_MITRA;
-        } else {
-          renderRoute();
-        }
-        toast('Beralih ke: ' + user.name);
-      }
-      switcher.classList.remove('open');
-    });
-  });
+   sidebar.querySelectorAll('[data-user-id]').forEach(el=>{
+     el.addEventListener('click', ()=>{
+       const uid = el.dataset.userId;
+       const user = USERS.find(u=>u.id===uid);
+       if(user && user.id !== CURRENT_USER.id){
+         CURRENT_USER = user;
+         const hash = window.location.hash.replace('#','');
+         const routeKey = hash.split('?')[0];
+         let redirect = null;
+         if(user.id==='super' && !SUPER_USER_KEYS.includes(routeKey)){
+           redirect = DEFAULT_ROUTE_SUPER;
+         } else if(user.id==='fat' && !FAT_KEYS.includes(routeKey)){
+           redirect = DEFAULT_ROUTE_FAT;
+         } else if(user.id==='mitra' && (PARTNERSHIP_KEYS.includes(routeKey) || FAT_KEYS.includes(routeKey))){
+           redirect = DEFAULT_ROUTE_MITRA;
+         }
+         if(redirect){
+           window.location.hash = redirect;
+         } else {
+           renderRoute();
+         }
+         toast('Beralih ke: ' + user.name);
+       }
+       switcher.classList.remove('open');
+     });
+   });
 }

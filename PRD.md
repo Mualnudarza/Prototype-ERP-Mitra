@@ -11,34 +11,34 @@
 
 ## Ringkasan
 
-Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cakupan yang ada: **Super User** mengelola kemitraan (mitra — tambah/edit, pengguna, pendapatan). **Admin User** mengelola pelanggan (data, registrasi ONU, paket layanan), keuangan mitra (dashboard deposit, dashboard settlement), monitoring radius & control gateway, dan infrastruktur jaringan (topologi OLT/splitter). Semua data dummy/in-memory — reload browser menghapus semua perubahan. Tidak ada backend, autentikasi, atau integrasi API.
+Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cakupan yang ada: **Super User** mengelola kemitraan (mitra — tambah/edit, pengguna, pendapatan). **Admin User** mengelola pelanggan (data, registrasi ONU, paket layanan), keuangan mitra (dashboard deposit, dashboard settlement), monitoring radius & control gateway, dan infrastruktur jaringan (topologi OLT/splitter). **Tim FAT (Finance, Accounting & Tax)** — role internal Dasaria — mengelola seluruh menu Keuangan Mitra (cross-mitra view): historis pembayaran, verifikasi deposit, monitoring & proses settlement. Super User sudah tidak lagi memiliki akses ke data keuangan (termasuk read-only). Semua data dummy/in-memory — reload browser menghapus semua perubahan. Tidak ada backend, autentikasi, atau integrasi API.
 
 ---
 
 ## Daftar Modul
 
-> **Pemisahan Role**: Super User (Super Admin) mengakses grup **Kemitraan** dan **Keuangan Mitra** (cross-mitra view). Admin User (Admin Mitra) mengakses grup **Pelanggan**, **Keuangan** (single-mitra view), dan **Jaringan**. Grup Keuangan hanya menampilkan: **Dashboard Deposit** (sub-tab: Riwayat Deposit, Pembayaran Customer, Histori Pembayaran) dan **Dashboard Settlement**.
+> **Pemisahan Role**: Tiga role — **Super User** (`super`) mengakses grup **Kemitraan** saja (Data Mitra, Manajemen Pengguna, Dashboard Pendapatan agregat). **Tim FAT** (`fat`, role internal Dasaria) mengakses grup **Keuangan** (cross-mitra: historis pembayaran, verifikasi deposit, monitoring & proses settlement). **Admin User/Admin Mitra** (`mitra`) mengakses grup **Pelanggan**, **Keuangan** (single-mitra view), dan **Jaringan**. Super User **dilarang** mengakses data keuangan (termasuk read-only). Grup Keuangan hanya menampilkan: **Dashboard Deposit** (sub-tab: Riwayat Deposit, Pembayaran Customer, Histori Pembayaran, Tambah Deposit) dan **Dashboard Settlement**.
 
 ### Super User — Grup Kemitraan
 
-#### Keuangan Mitra — Super User View (`keuangan.mitra`)
-- **Fungsi**: Dashboard cross-mitra untuk monitoring historis pembayaran & verifikasi settlement dari seluruh mitra. Super User melihat ringkasan semua mitra, data historis pembayaran, dan bisa memproses settlement yang diajukan Admin Mitra. Pembayaran customer diproses langsung oleh Admin User (deposit terpotong otomatis) tanpa memerlukan verifikasi Super User.
-- **Lokasi file**: `renderSuperUserKuangan()` di `app-modules.js`. Super User mengakses via menu **Keuangan → Keuangan Mitra** (NAV_CONFIG `keuangan.mitra`).
-- **Struktur**: Top-level mode switcher dengan tiga tombol: **"Historis Pembayaran"** (default), **"Monitoring Settlement"**, dan **"Verifikasi Deposit"**. Setiap mode memiliki KPI cards sendiri + subtab terkait.
+#### Keuangan Mitra — FAT View (`keuangan.mitra`)
+- **Fungsi**: Dashboard cross-mitra milik **Tim FAT (Finance, Accounting & Tax)** — direktorat internal Dasaria yang murni menangani uang. Monitoring historis pembayaran, verifikasi deposit, dan proses settlement dari seluruh mitra. FAT melihat ringkasan semua mitra, data historis pembayaran (read-only), antrian verifikasi deposit, dan antrian settlement yang diajukan Admin Mitra. **Super User sudah tidak memiliki akses ke menu ini sama sekali** — jika mencoba mengakses via hash langsung, akan muncul halaman "Akses Ditolak".
+- **Lokasi file**: `renderFATKuangan()` di `app-modules.js` (sebelumnya `renderSuperUserKuangan()`). FAT mengakses via menu **Keuangan → Keuangan Mitra** (NAV_CONFIG `keuangan.mitra`).
+- **Struktur**: Top-level mode switcher dengan tiga tombol: **"Historis Pembayaran"** (default), **"Verifikasi Deposit"**, dan **"Monitoring Settlement"**. Setiap mode memiliki KPI cards sendiri + subtab terkait.
 - **Data yang dibutuhkan**:
   - Input: Semua `DB.partners`, `DB.customers`, `DB.invoices`, `DB.payments`, `DB.settlements` (cross-mitra)
   - **Mode Historis Pembayaran** (read-only, tidak ada aksi verifikasi):
     - KPI: Total Mitra, Deposit Seluruh Mitra, Total Pembayaran Berhasil, Total Nilai Pembayaran
     - Subtab Ringkasan Per Mitra: DataTable mitra dengan kolom Kode, Nama Mitra, Saldo Deposit, Total Pembayaran (jumlah transaksi + total nilai), tombol "Lihat Histori" → switch ke tab Historis Pembayaran.
-    - Subtab Historis Pembayaran: DataTable semua payment dengan `payment_status: 'Berhasil'`. Kolom: No. Referensi, Mitra, Customer, Tagihan, Nominal, Tanggal, Saldo Mitra Saat Ini, tombol "Detail". Modal detail menampilkan invoice-style (layout invoice cetak dengan header "INVOICE", info Dari/Kepada, rincian tagihan, summary) menggunakan `buildPaymentInvoiceHTML()`.
-  - **Mode Monitoring Settlement** (Super User bisa memverifikasi):
-    - KPI: Total Mitra, Menunggu Verifikasi Settlement, Total Sudah Diselesaikan, Total Nilai Settlement
+    - Subtab Historis Pembayaran: DataTable semua payment dengan `payment_status: 'Berhasil'`. Kolom: No. Referensi, Mitra, Customer, Tagihan, Nominal, Tanggal, Saldo Mitra Saat Ini, tombol "Detail". Modal detail menampilkan invoice-style (layout invoice cetak dengan header "INVOICE", info Dari/Kepada, rincian tagahan, summary) menggunakan `buildPaymentInvoiceHTML()`.
+  - **Mode Monitoring Settlement** (FAT mengeksekusi transfer & upload bukti):
+    - KPI: Total Mitra, Menunggu Proses, Total Sudah Diselesaikan, Total Nilai Settlement
     - Subtab Ringkasan Per Mitra: DataTable mitra dengan kolom Kode, Nama Mitra, Saldo Deposit, Jumlah Antrian Settlement. Klik angka antrian → switch ke tab Antrian Settlement.
     - Subtab Antrian Settlement: DataTable semua settlement dengan `status: 'Menunggu Verifikasi'`. Kolom: No. Settlement, Mitra, Periode, Jumlah Transaksi, Gross, Potongan, Net, Rekening, Status, tombol "Proses". Empty state jika tidak ada antrian.
-    - Aksi Proses Settlement: `openSettlementVerifyModal()` → modal konfirmasi dengan detail (mitra, periode, jumlah tagihan, nominal pencairan). Tombol "Proses & Selesaikan" → status settlement → Selesai, FIFO settle invoices sesuai nominal. Notifikasi toast sukses + refresh.
-  - **Mode Verifikasi Deposit** (Super User bisa memverifikasi pengajuan top-up deposit dari Admin Mitra):
+    - Aksi Proses Settlement: `openSettlementVerifyModal()` → modal konfirmasi dengan detail (mitra, periode, jumlah tagihan, nominal pencairan, input bukti transfer). Tombol "Proses & Selesaikan" → set `fat_proof_of_transfer`, `fat_processed_by`, `fat_processed_at`, status → Selesai, FIFO settle invoices sesuai nominal. Notifikasi toast sukses + refresh.
+  - **Mode Verifikasi Deposit** (FAT memverifikasi pengajuan top-up deposit dari Admin Mitra):
     - KPI: Total Mitra, Menunggu Verifikasi, Total Sudah Diverifikasi, Total Nilai Deposit Masuk
-    - Subtab Antrian Verifikasi: DataTable pengajuan top-up dengan `status: 'Menunggu Verifikasi'`. Kolom: No. Referensi, Mitra, Nominal, Rekening Tujuan, Tanggal Pengajuan, tombol "Verifikasi". Empty state jika tidak ada antrian.
+    - Subtab Antrian Verifikasi: DataTable pengajuan top-up dengan `status: 'Menunggu Verifikasi'`. Kolom: No. Referensi, Mitra, Nominal, Rekenking Tujuan, Tanggal Pengajuan, tombol "Verifikasi". Empty state jika tidak ada antrian.
     - Subtab Riwayat Deposit Masuk: DataTable semua pengajuan top-up yang sudah diverifikasi. Kolom: No. Referensi, Mitra, Nominal, Tanggal Pengajuan, Diverifikasi Oleh, Tanggal Verifikasi, tombol "Detail".
     - Aksi Verifikasi: `openDepositVerifyModal()` → modal konfirmasi dengan detail (mitra, nominal, rekening tujuan, bukti transfer, saldo saat ini, saldo setelah diverifikasi). Tombol "Verifikasi & Tambah Saldo" → deposit_balance mitra bertambah otomatis, status → Selesai, buat depositHistory. Notifikasi toast sukses + refresh.
 - **Ketergantungan**: `DataTable`, `Modal`, `statusBadge`, `pushActivity`, `nextId`, `Fmt`, `openSettlementInvoiceModal`, `openSettlementVerifyModal`, `openDepositVerifyModal`
@@ -47,6 +47,7 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-31 — Super User view baru untuk keuangan mitra: KPI cross-mitra, ringkasan per mitra (tabel), antrian verifikasi pembayaran. Dua tab terpisah dengan tombol switcher di bawah KPI cards.
   - 2026-07-31 — Ditambahkan mode switcher top-level (Monitoring Saldo & Verifikasi / Monitoring Settlement). Mode Settlement memiliki KPI, ringkasan per mitra, dan antrian settlement dengan aksi proses. Menggantikan subtab switcher sebelumnya.
   - 2026-08-02 — Alur pembayaran diubah: Admin User langsung memproses pembayaran (deposit terpotong otomatis) tanpa verifikasi Super User. Super User hanya melihat data historis pembayaran (read-only). Mode "Monitoring Saldo & Verifikasi" diganti menjadi "Historis Pembayaran". Settlement tetap memerlukan verifikasi Super User.
+  - 2026-08-02 — **Restrukturisasi Role FAT**: Fungsi `renderSuperUserKuangan()` direname menjadi `renderFATKuangan()`. View ini kini dimiliki oleh role FAT (Finance, Accounting & Tax) — role ketiga di `app-data.js`. Super User **dilarang** mengakses `keuangan.mitra` secara total; jika berhasil mencapai view ini via hash manual, tampilkan halaman "Akses Ditolak". Modal proses settlement ditambah input bukti transfer (`fat_proof_of_transfer`, `fat_processed_by`, `fat_processed_at`) sebelum status berubah ke "Selesai". Field baru ini juga ditambahkan ke entitas `DB.settlements`.
 
 #### Data Mitra (`partnership.mitra`)
 - **Fungsi**: Mengelola data mitra — menampilkan daftar mitra dengan KPI dan filter, serta form tambah/edit mitra (halaman penuh via hash `#partnership.mitra?id=add` atau `#partnership.mitra?id={partner_id}`).
@@ -74,15 +75,16 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-07-28 — Initial prototype, 8 pengguna dummy, 4 role
 
 #### Dashboard Pendapatan (`partnership.pendapatan`)
-- **Fungsi**: Menampilkan ringkasan pendapatan per mitra dengan filter periode, status, dan mitra. Termasuk grafik bar 6 bulan terakhir, progress bar status invoice, dan tabel riwayat settlement.
-- **Lokasi file**: `app-modules.js:324-442`, data di `app-data.js` (`DB.settlementHistory`)
+- **Fungsi**: Menampilkan ringkasan pendapatan & oversight kinerja mitra untuk Super User. Karena Super User tidak memiliki akses keuangan (termasuk read-only), modul ini hanya menampilkan data agregat — KPI ringkas, grafik tren bulanan, dan progress status invoice — tanpa breakdown nominal per transaksi settlement, referensi, atau saldo berjalan.
+- **Lokasi file**: `app-modules.js`, data di `app-data.js` (`DB.settlementHistory`)
 - **Data yang dibutuhkan**:
-  - Input: filter partner, periode (6 bulan terakhir), status pembayaran
-  - Tampil: KPI (total pendapatan, belum dibayar, pelanggan aktif, total settlement), bar chart pendapatan 6 bulan, progress bar invoice status, DataTable riwayat settlement (ref, tipe, nominal, saldo sebelum/sesudah, tanggal, catatan)
-- **Ketergantungan**: `barChart`, `DataTable`, `renderKPIs`, `DB.settlementHistory`
+  - Input: filter partner, periode (6 bulan terakhir), status settlement
+  - Tampil: KPI (pendapatan bulan berjalan, total tagihan belum dibayar, total pelanggan aktif, status settlement terakhir), bar chart pendapatan 6 bulan, progress bar status invoice, bar chart agregat aktivitas settlement per bulan + ringkasan agregat (jumlah transaksi, total nilai) — semua dalam bentuk aggregate, tanpa detail per-transaksi
+- **Ketergantungan**: `barChart`, `renderKPIs`, `DB.settlementHistory`
 - **Status**: Selesai
 - **Catatan Perubahan**:
   - 2026-07-28 — Initial prototype, 4 settlement records
+  - 2026-08-02 — **Revisi kebijakan akses (Opsi B)**: tabel rincian Riwayat Settlement (ref, nominal, saldo sebelum/sesudah, tombol Detail) diganti dengan bar chart agregat aktivitas settlement per bulan + ringkasan agregat KPI. Menghilangkan semua breakdown nominal per transaksi agar Super User tidak melihat data keuangan sensitif.
 
 ---
 
@@ -149,10 +151,11 @@ Prototype sistem informasi ERP untuk operator internet (ISP) berbasis mitra. Cak
   - 2026-08-02 — Pembayaran Customer: alur diubah kembali — Admin User langsung memproses pembayaran (deposit terpotong otomatis) tanpa memerlukan verifikasi Super User. Tombol "Ajukan Verifikasi" diganti "Konfirmasi Pembayaran" → status invoice Lunas, payment Berhasil, depositHistory dibuat. Status "Menunggu Verifikasi" dihapus dari filter & badge. Bulk payment langsung memotong deposit untuk seluruh invoice terpilih.
 
 #### Dashboard Settlement (`settlement.dashboard`)
-- **Fungsi**: Menampilkan rekap hasil transaksi customer dalam satu periode settlement: Pendapatan Kotor (Gross), Saldo Siap Settlement/Pendapatan Bersih (Net), dan Total Potongan (dengan detail rincian). Settlement diajukan oleh Admin Mitra → diverifikasi/diproses oleh Super User.
+- **Fungsi**: Menampilkan rekap hasil transaksi customer dalam satu periode settlement: Pendapatan Kotor (Gross), Saldo Siap Settlement/Pendapatan Bersih (Net), dan Total Potongan (dengan detail rincian). Settlement diajukan oleh Admin Mitra → diverifikasi/diproses oleh **Tim FAT** (dengan upload bukti transfer).
+- **Catatan**: Field `fat_proof_of_transfer`, `fat_processed_by`, `fat_processed_at` menyimpan sisi eksekusi FAT terpisah dari bukti pengajuan mitra.
 - **Lokasi file**: Di-render dari `Views['keuangan.mitra']` → tab "Dashboard Settlement". Data di `app-data.js` (`DB.settlements`, `DB.invoices`, `DB.payments`, `DB.partners`)
 - **Data yang dibutuhkan**:
-  - Input: partner_id, ref, period, tx_count, gross_revenue, total_deduction, net_revenue, bank_account, status, date
+  - Input: partner_id, ref, period, tx_count, gross_revenue, total_deduction, net_revenue, bank_account, status, date, fat_proof_of_transfer, fat_processed_by, fat_processed_at
   - Tampil (KPI — 3 kartu manual, bukan `renderKPIs`): (1) Pendapatan Kotor (Gross) — biru, sub jumlah transaksi. (2) Saldo Siap Settlement — hijau, sub "Pendapatan Bersih (Net)". (3) Total Potongan — oranye, sub "KSO + PG + Admin" + tombol "Detail" kecil. Klik tombol Detail → popup dropdown rincian potongan (KSO persentase/nominal, PG Fee Rp 3.000/transaksi, Admin/Lainnya per potongan). Klik di luar popup → tertutup.
   - Tampil (Riwayat Settlement): DataTable dengan kolom nomor settlement, periode, jumlah transaksi, pendapatan kotor, total potongan, pendapatan bersih, rekening tujuan, status, tanggal (tampil langsung di halaman, bukan sebagai sub-tab)
   - Aksi: Ajukan Pencairan Settlement → modal invoice-style "SETTLEMENT INVOICE" dengan header mitra + rekening tujuan, box ringkasan (jumlah transaksi, gross, KSO, PG Fee, Admin), summary (Gross Revenue, Total Potongan, Laba Bersih Net), rincian per transaksi (tiap invoice mendapat kartu invoice dengan rincian potongan per baris), input nominal pencairan (default = saldo maksimal, minimal Rp 1.000, step Rp 1.000). Tombol "Ajukan Verifikasi" → status `'Menunggu Verifikasi'` (belum settle invoices).
@@ -230,7 +233,7 @@ infra.topologi ──→ customer.registrasi (ODP nodes untuk registrasi)
 
 keuangan.mitra ──→ deposit.dashboard (tab: Riwayat Deposit, Pembayaran Customer, Histori Pembayaran)
                ──→ settlement.dashboard (tab: Gross→Potongan→Net, Ajukan Pencairan, Riwayat Settlement)
-               ──→ Super User: renderSuperUserKuangan (mode switcher: Monitoring Saldo & Verifikasi | Monitoring Settlement, masing-masing dengan KPI + Ringkasan Per Mitra + Antrian)
+                ──→ FAT: renderFATKuangan (mode switcher: Historis Pembayaran | Verifikasi Deposit | Monitoring Settlement, masing-masing dengan KPI + Ringkaman Per Mitra + Antrian)
 ```
 
 ---
@@ -244,11 +247,11 @@ keuangan.mitra ──→ deposit.dashboard (tab: Riwayat Deposit, Pembayaran Cus
 | Customer | id, partner_id, pppoe_secret, radius_username, customer_name, package_id, customer_status, olt_odp_id, olt_port, onu_number | Data Pelanggan, Registrasi, Billing, Payment Gateway, Radius Monitoring |
 | Package | id, partner_id, package_name, bandwidth, price, status | Paket Layanan, Data Pelanggan (lookup), Radius Monitoring (lookup) |
 | Invoice | id, customer_id, invoice_number, billing_period, billing_amount, billing_status (Lunas/Belum Dibayar), extra_charge, total_paid, settled | Dashboard Deposit, Dashboard Settlement, Payment Gateway |
-| Payment | id, invoice_id, payment_reference, virtual_account, billing_amount, payment_status (Berhasil/Pending/Gagal), verified_at, verified_by | Payment Gateway, Dashboard Deposit, Keuangan Mitra (Super User historis) |
+| Payment | id, invoice_id, payment_reference, virtual_account, billing_amount, payment_status (Berhasil/Pending/Gagal), verified_at, verified_by | Payment Gateway, Dashboard Deposit, Keuangan Mitra (FAT historis) |
 | Settlement | id, partner_id, ref, type, amount, balance_before, balance_after | Dashboard Pendapatan, Riwayat Settlement |
-| DepositHistory | id, partner_id, ref, type (Deposit Masuk/Deposit Keluar), date, amount, balance_before, balance_after, note, status | Dashboard Deposit, Keuangan Mitra (Super User verifikasi) |
-| DepositTopUp | id, partner_id, ref, amount, bank_name, bank_account, account_name, proof, status (Menunggu Verifikasi/Selesai), date, verified_by, verified_at | Dashboard Deposit (Tambah Deposit), Keuangan Mitra (Super User verifikasi) |
-| SettlementRecord | id, partner_id, ref, period, tx_count, gross_revenue, total_deduction, net_revenue, withdraw_amount, bank_account, status (Menunggu Verifikasi/Selesai), date, settled_amount | Dashboard Settlement, Keuangan Mitra (Super User verifikasi) |
+| DepositHistory | id, partner_id, ref, type (Deposit Masuk/Deposit Keluar), date, amount, balance_before, balance_after, note, status | Dashboard Deposit, Keuangan Mitra (FAT verifikasi) |
+| DepositTopUp | id, partner_id, ref, amount, bank_name, bank_account, account_name, proof, status (Menunggu Verifikasi/Selesai), date, verified_by, verified_at | Dashboard Deposit (Tambah Deposit), Keuangan Mitra (FAT verifikasi) |
+| SettlementRecord | id, partner_id, ref, period, tx_count, gross_revenue, total_deduction, net_revenue, withdraw_amount, bank_account, status (Menunggu Verifikasi/Selesai), date, settled_amount, **fat_proof_of_transfer**, **fat_processed_by**, **fat_processed_at** | Dashboard Settlement, Keuangan Mitra (FAT proses) |
 | Infrastructure | id, type, label, partner_id, isOdp, children (tree: OLT → Input Splitter → Output Splitter) | Topologi Infrastruktur, Registrasi (ODP nodes) |
 | Radius | id, customer_id, customer_name, pppoe_secret, onu_number, bandwidth, customer_status, radius_status, isolation_date, activation_date, last_update, olt_rx_now, olt_status | Radius & Control Gateway |
 | ActivityLog | actor, action, time | Shared (semua modul via `pushActivity()`) |
@@ -278,7 +281,7 @@ keuangan.mitra ──→ deposit.dashboard (tab: Riwayat Deposit, Pembayaran Cus
 
 - **Tidak ada persistensi**: Semua data in-memory di objek `DB` global. Reload browser = reset data. Tombol "Reset data" hanya `location.reload()`.
 - **Hanya 1 data mitra awal (PTR-0001)** beserta data terkait lainnya untuk menyederhanakan prototipe. Data baru terikat secara otomatis ke mitra yang baru dibuat (saat registrasi, otomatis dibuatkan 1 admin user).
-- **Tidak ada autentikasi**: User Super Admin dan Admin Mitra dipilih via dropdown switcher di sidebar. Role ditegakkan via `isSuperUser()` — Super User hanya mengakses grup menu **Kemitraan** dan **Keuangan Mitra** (cross-mitra view). Admin Mitra mengakses grup **Pelanggan**, **Keuangan** (single-mitra view), dan **Jaringan** — termasuk kelola infrastruktur (tambah Input/Output Splitter, edit/hapus semua tipe node). Pengecualian: tombol "Tambah OLT" di Topologi Infrastruktur hanya muncul untuk Super User.
+- **Tidak ada autentikasi**: User Super Admin, Admin Mitra, dan Tim FAT dipilih via dropdown switcher di sidebar. Role ditegakkan via `isSuperUser()` dan `isFAT()` — Super User hanya mengakses grup menu **Kemitraan**; Tim FAT mengakses grup **Keuangan** (cross-mitra view, hanya untuk FAT); Admin Mitra mengakses grup **Pelanggan**, **Keuangan** (single-mitra view), dan **Jaringan** — termasuk kelola infrastruktur (tambah Input/Output Splitter, edit/hapus semua tipe node). Super User **dilarang** mengakses data keuangan (termasuk read-only). Pengecualian: tombol "Tambah OLT" di Topologi Infrastruktur hanya muncul untuk Super User.
 - **Tidak ada API/backend**: Semua operasi murni client-side.
 - **Tidak ada test**: Tidak ada framework atau file test.
 - **Single-user view**: Tidak ada multi-tenancy atau scoped view per mitra — Super Admin melihat semua data.
@@ -318,4 +321,6 @@ keuangan.mitra ──→ deposit.dashboard (tab: Riwayat Deposit, Pembayaran Cus
 | 2026-08-02 | Revisi alur pembayaran: Admin User langsung memproses pembayaran (deposit terpotong otomatis) tanpa verifikasi Super User. Tombol "Ajukan Verifikasi" diganti "Konfirmasi Pembayaran" → invoice Lunas, payment Berhasil, depositHistory dibuat. Status "Menunggu Verifikasi" dihapus dari payment & invoice. Bulk payment langsung potong deposit. Super User Keuangan Mitra: mode "Monitoring Saldo & Verifikasi" → "Historis Pembayaran" (read-only) + mode "Verifikasi Deposit" untuk verifikasi pengajuan top-up deposit dari Admin Mitra. Settlement tetap memerlukan verifikasi Super User. | `app-modules.js`, `PRD.md` |
 | 2026-08-02 | Detail histori pembayaran diubah dari modal detail-grid sederhana menjadi modal invoice-style (layout invoice cetak) menggunakan `buildPaymentInvoiceHTML()` — berlaku untuk Admin User (sub-tab Histori Pembayaran) dan Super User (mode Historis Pembayaran). Header "INVOICE", info Dari/Kepada, rincian tagihan dengan potongan, summary (Total Dibayar, Total Potongan, Total Diterima Mitra). | `app-modules.js`, `PRD.md` |
 | 2026-08-03 | Fitur Pengajuan Penambahan Saldo Deposit: Admin User bisa mengajukan penambahan saldo deposit via sub-tab "Tambah Deposit" di Dashboard Deposit. Form modal berisi info rekening tujuan transfer (PT Dasaria Indonesia, Bank BCA), nominal transfer (minimal Rp 100.000), dan keterangan/bukti transfer. Pengajuan disimpan di `DB.depositTopUp` dengan status "Menunggu Verifikasi". Super User memverifikasi via mode "Verifikasi Deposit" di Keuangan Mitra — klik "Verifikasi" → modal konfirmasi → "Verifikasi & Tambah Saldo" → `deposit_balance` mitra bertambah otomatis, status → Selesai, buat `depositHistory`. | `app-data.js`, `app-modules.js`, `PRD.md` |
+| 2026-08-03 | **Restrukturisasi Role FAT & Pemisahan Akses Keuangan**: Role ketiga **FAT (Finance, Accounting & Tax)** ditambahkan sebagai direktorit internal Dasaria yang menangani seluruh menu Keuangan Mitra (cross-mitra). `renderSuperUserKuangan()` diganti namanya menjadi `renderFATKuangan()`. Super User **kehilangan seluruh akses keuangan** — `SUPER_USER_KEYS` tidak lagi termasuk `keuangan.mitra`, navigasi hanya menampilkan grup Kemitraan. `FAT_KEYS = ['keuangan.mitra']`, `DEFAULT_ROUTE_FAT = 'keuangan.mitra'`. `currentRoute()` dan `navWithBadges()` diperbarui untuk tiga role. Guard keamanan: Super User yang mencoba akses `keuangan.mitra` via hash langsung akan melihat halaman "Akses Ditolak". Modal proses settlement FAT ditambah input bukti transfer (`fat_proof_of_transfer`, `fat_processed_by`, `fat_processed_at`) sebelum status berubah ke "Selesai". Dashboard Pendapatan (Super User) — Opsi B: tabel rincian settlement diganti dengan grafik agregat per bulan (bar chart total settlement per bulan), tanpa breakdown nominal per transaksi. Toast & activity log di Admin Mitra view diupdate dari "Super User" ke "Tim FAT" untuk verifikasi settlement & deposit. | `app-data.js` (USERS + settlement fields), `app-main.js` (isFAT, routing, nav), `app-modules.js` (renderFATKuangan, Views guard, settlement modal, partnership.pendapatan), `app-ui.js` (lock & info icon, user switcher) |
+| 2026-08-03 | **Bugfix: Tombol "Proses & Selesaikan" settlement FAT tidak berfungsi** — Pada `openSettlementVerifyModal()`, `onOpen(b, f)` menerima `b` = `modalBody` dan `f` = `modalFoot`. Input bukti transfer (`#fatProofTransfer`) berada di `bodyHTML`, sehingga harus diakses via `b.querySelector()`. Kode sebelumnya salah mengakses via `f.querySelector()` (footer), menyebabkan `TypeError: Cannot read properties of null` saat tombol diklik. Perbaikan: `f.querySelector('#fatProofTransfer')` → `b.querySelector('#fatProofTransfer')`. | `app-modules.js` |
 

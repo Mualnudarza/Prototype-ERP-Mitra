@@ -36,11 +36,14 @@ const NAV_CONFIG = [
 
 const ALL_ITEMS = NAV_CONFIG.flatMap(g=>g.items);
 const PARTNERSHIP_KEYS = NAV_CONFIG[0].items.map(i=>i.key);
-const SUPER_USER_KEYS = [...PARTNERSHIP_KEYS, 'keuangan.mitra'];
+const SUPER_USER_KEYS = [...PARTNERSHIP_KEYS];
+const FAT_KEYS = ['keuangan.mitra'];
 const DEFAULT_ROUTE_SUPER = 'partnership.mitra';
+const DEFAULT_ROUTE_FAT = 'keuangan.mitra';
 const DEFAULT_ROUTE_MITRA = 'customer.pelanggan';
 
 function isSuperUser(){ return CURRENT_USER.id === 'super'; }
+function isFAT(){ return CURRENT_USER.id === 'fat'; }
 
 function currentRoute(){
   const hash = window.location.hash.replace('#','');
@@ -48,13 +51,24 @@ function currentRoute(){
   if(isSuperUser()){
     return SUPER_USER_KEYS.some(i=>i===routeKey) ? routeKey : DEFAULT_ROUTE_SUPER;
   }
+  if(isFAT()){
+    return FAT_KEYS.some(i=>i===routeKey) ? routeKey : DEFAULT_ROUTE_FAT;
+  }
   return !PARTNERSHIP_KEYS.includes(routeKey) ? routeKey : DEFAULT_ROUTE_MITRA;
 }
 
 function navWithBadges(){
   if(isSuperUser()){
     return NAV_CONFIG
-      .filter(g => g.group === 'Kemitraan' || g.group === 'Keuangan')
+      .filter(g => g.group === 'Kemitraan')
+      .map(g => ({
+        group: g.group,
+        items: g.items.map(item => ({...item, badge: item.badgeFn ? item.badgeFn() : undefined}))
+      }));
+  }
+  if(isFAT()){
+    return NAV_CONFIG
+      .filter(g => g.group === 'Keuangan')
       .map(g => ({
         group: g.group,
         items: g.items.map(item => ({...item, badge: item.badgeFn ? item.badgeFn() : undefined}))
@@ -95,7 +109,7 @@ function renderRoute(){
 window.addEventListener('hashchange', renderRoute);
 
 document.addEventListener('DOMContentLoaded', ()=>{
-  const initRoute = isSuperUser() ? DEFAULT_ROUTE_SUPER : DEFAULT_ROUTE_MITRA;
+  const initRoute = isSuperUser() ? DEFAULT_ROUTE_SUPER : isFAT() ? DEFAULT_ROUTE_FAT : DEFAULT_ROUTE_MITRA;
   if(!window.location.hash) window.location.hash = initRoute;
   renderRoute();
 

@@ -42,6 +42,7 @@ function nextId(prefix){ __uid += 1; return prefix + '-' + __uid; }
 const USERS = [
   { id:'super', name:'Super Admin', email:'admin@dasaria.id', initials:'SA', role:'Super User', partner_id:null },
   { id:'mitra', name:'Admin Mitra', email:'mitra@dasaria.id', initials:'AM', role:'Admin User', partner_id:'PTR-0001' },
+  { id:'fat', name:'Tim FAT', email:'fat@dasaria.id', initials:'FT', role:'Finance, Accounting & Tax', partner_id:null },
 ];
 let CURRENT_USER = USERS[0];
 
@@ -82,7 +83,7 @@ DB.depositTopUp = [
 ];
 
 DB.settlements = [
-  {id:'SET-0001', partner_id:'PTR-0001', ref:'SET/2026/07/0001', period:'Juli 2026', tx_count:1, gross_revenue:299000, total_deduction:95680, net_revenue:203320, bank_account:'Bank Mandiri - 1230007890123', status:'Selesai', date:'2026-07-29'},
+  {id:'SET-0001', partner_id:'PTR-0001', ref:'SET/2026/07/0001', period:'Juli 2026', tx_count:1, gross_revenue:299000, total_deduction:95680, net_revenue:203320, bank_account:'Bank Mandiri - 1230007890123', status:'Selesai', date:'2026-07-29', fat_proof_of_transfer:null, fat_processed_by:'Tim FAT', fat_processed_at:'2026-07-29T12:00:00'},
 ];
 
 DB.settlementHistory = [
