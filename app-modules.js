@@ -2438,35 +2438,38 @@ Views['keuangan.mitra'] = function(root){
   }
 
   /* ---- Render ---- */
+  let activeMitraTab = 'ringkasan';
+  let unpaidCount = 0;
+  DB.customers.filter(c => c.partner_id === partner.id).forEach(c => {
+    unpaidCount += DB.invoices.filter(i => i.customer_id === c.id && i.billing_status !== 'Lunas').length;
+  });
+
   root.innerHTML = `
-    ${pageIntro('Manajemen keuangan mitra — ringkasan saldo, mutasi, dan status pembayaran dalam satu layar.')}
-    <div class="balance-cards" style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:16px;">
-      <div class="card card-pad" style="position:relative;">
-        <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">Saldo Utama</div>
-        <div style="font-size:22px;font-weight:700;color:${partner.saldo_utama < (partner.cashier_deposit_min||0) ? 'var(--badge-red-fg)' : 'var(--badge-green-fg)'};">${Fmt.rupiah(partner.saldo_utama)}</div>
-        ${partner.saldo_utama < (partner.cashier_deposit_min||0) ? `<div style="font-size:11px;color:var(--badge-orange-fg);margin-top:2px;">Di bawah minimum (${Fmt.rupiah(partner.cashier_deposit_min||0)})</div>` : ''}
-        <div style="display:flex;gap:8px;margin-top:10px;">
-          <button class="btn btn-primary btn-sm" id="btnMitraTopUp">${ic('plus')}Top Up Saldo</button>
-          <button class="btn btn-secondary btn-sm" id="btnMitraWithdraw">${ic('send')}Tarik Saldo</button>
-        </div>
-      </div>
+    ${pageIntro('Manajemen keuangan mitra — ringkasan saldo, mutasi, dan pembayaran customer.')}
+    <div class="subtabs" id="mitraModeTabs">
+      <button class="subtab ${activeMitraTab==='ringkasan'?'active':''}" data-mtab="ringkasan">${ic('wallet')} Ringkasan</button>
+      <button class="subtab ${activeMitraTab==='pembayaran'?'active':''}" data-mtab="pembayaran">${ic('creditCard')} Pembayaran Pelanggan${unpaidCount > 0 ? ` <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">${unpaidCount}</span>` : ''}</button>
     </div>
-    <div class="filter-chips" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-      <button class="chip active" data-filter="all">${ic('list')} Semua</button>
-      <button class="chip" data-filter="deposit">${ic('wallet')} Top Up</button>
-      <button class="chip" data-filter="settlement">${ic('history')} Settlement</button>
-      <button class="chip" data-filter="payment">${ic('creditCard')} Pembayaran Pelanggan</button>
-    </div>
-    <div id="mitraMutationList"></div>
-    <details style="margin-top:16px;" open>
-      <summary style="cursor:pointer;font-weight:600;font-size:14px;padding:10px 0;">${ic('creditCard')} Konfirmasi Pembayaran Pelanggan</summary>
-      <div id="mitraPaymentStatus"></div>
-    </details>
+    <div id="mitraTabContent"></div>
   `;
 
-  /* ---- Event: Saldo cards ---- */
-  root.querySelector('#btnMitraTopUp')?.addEventListener('click', openMitraTopUpModal);
-  root.querySelector('#btnMitraWithdraw')?.addEventListener('click', openMitraWithdrawModal);
+  const modeTabs = root.querySelectorAll('#mitraModeTabs .subtab');
+  modeTabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeMitraTab = btn.dataset.mtab;
+      renderMitraTab();
+    });
+  });
+
+  function renderMitraTab(){
+    modeTabs.forEach(b => b.classList.toggle('active', b.dataset.mtab === activeMitraTab));
+    const container = root.querySelector('#mitraTabContent');
+    if(activeMitraTab === 'ringkasan'){
+      renderRingkasanTab(container);
+    } else {
+      renderPembayaranTab(container);
+    }
+  }
 
   /* ---- Build combined mutations ---- */
   let activeFilter = 'all';
@@ -2512,11 +2515,50 @@ Views['keuangan.mitra'] = function(root){
     });
   }
 
+  /* ========== TAB: RINGKASAN ========== */
+  function renderRingkasanTab(container){
+    container.innerHTML = `
+      <div class="balance-cards" style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:16px;">
+        <div class="card card-pad" style="position:relative;">
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">Saldo Utama</div>
+          <div style="font-size:22px;font-weight:700;color:${partner.saldo_utama < (partner.cashier_deposit_min||0) ? 'var(--badge-red-fg)' : 'var(--badge-green-fg)'};">${Fmt.rupiah(partner.saldo_utama)}</div>
+          ${partner.saldo_utama < (partner.cashier_deposit_min||0) ? `<div style="font-size:11px;color:var(--badge-orange-fg);margin-top:2px;">Di bawah minimum (${Fmt.rupiah(partner.cashier_deposit_min||0)})</div>` : ''}
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn btn-primary btn-sm" id="btnMitraTopUp">${ic('plus')}Top Up Saldo</button>
+            <button class="btn btn-secondary btn-sm" id="btnMitraWithdraw">${ic('send')}Tarik Saldo</button>
+          </div>
+        </div>
+      </div>
+      <div class="filter-chips" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="chip ${activeFilter==='all'?'active':''}" data-filter="all">${ic('list')} Semua</button>
+        <button class="chip ${activeFilter==='deposit'?'active':''}" data-filter="deposit">${ic('wallet')} Top Up</button>
+        <button class="chip ${activeFilter==='settlement'?'active':''}" data-filter="settlement">${ic('history')} Settlement</button>
+        <button class="chip ${activeFilter==='payment'?'active':''}" data-filter="payment">${ic('creditCard')} Pembayaran Pelanggan</button>
+      </div>
+      <div id="mitraMutationList"></div>
+    `;
+
+    container.querySelector('#btnMitraTopUp')?.addEventListener('click', openMitraTopUpModal);
+    container.querySelector('#btnMitraWithdraw')?.addEventListener('click', openMitraWithdrawModal);
+
+    container.querySelectorAll('.chip[data-filter]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        container.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        activeFilter = chip.dataset.filter;
+        renderMutations();
+      });
+    });
+
+    renderMutations();
+  }
+
   function renderMutations(){
     const allMuts = buildMutations();
     const typeFiltered = activeFilter === 'all' ? allMuts : allMuts.filter(m => m.type === activeFilter);
     const filtered = filterByDate(typeFiltered);
     const slot = root.querySelector('#mitraMutationList');
+    if(!slot) return;
 
     let dateFilterHTML = `
       <div class="card card-pad" style="margin-bottom:12px;">
@@ -2589,119 +2631,111 @@ Views['keuangan.mitra'] = function(root){
   }
 
   function wireDateFilters(){
-    const modeEl = root.querySelector('#dateFilterMode');
+    const el = root.querySelector('#mitraTabContent');
+    if(!el) return;
+    const modeEl = el.querySelector('#dateFilterMode');
     if(!modeEl) return;
     modeEl.addEventListener('change', () => {
       dateFilterMode = modeEl.value;
-      root.querySelector('#dfTanggalWrap').style.display = dateFilterMode==='tanggal'?'':'none';
-      root.querySelector('#dfBulanWrap').style.display = dateFilterMode==='bulan'?'':'none';
-      root.querySelector('#dfTahunWrap').style.display = dateFilterMode==='tahun'?'':'none';
-      root.querySelector('#dfRangeStartWrap').style.display = dateFilterMode==='rentang'?'':'none';
-      root.querySelector('#dfRangeEndWrap').style.display = dateFilterMode==='rentang'?'':'none';
+      el.querySelector('#dfTanggalWrap').style.display = dateFilterMode==='tanggal'?'':'none';
+      el.querySelector('#dfBulanWrap').style.display = dateFilterMode==='bulan'?'':'none';
+      el.querySelector('#dfTahunWrap').style.display = dateFilterMode==='tahun'?'':'none';
+      el.querySelector('#dfRangeStartWrap').style.display = dateFilterMode==='rentang'?'':'none';
+      el.querySelector('#dfRangeEndWrap').style.display = dateFilterMode==='rentang'?'':'none';
       renderMutations();
     });
-    root.querySelector('#dfTanggal')?.addEventListener('change', e => { dateFilterValue = e.target.value; renderMutations(); });
-    root.querySelector('#dfBulan')?.addEventListener('change', e => { dateFilterMonth = e.target.value; renderMutations(); });
-    root.querySelector('#dfTahun')?.addEventListener('change', e => { dateFilterYear = e.target.value; renderMutations(); });
-    root.querySelector('#dfRangeStart')?.addEventListener('change', e => { dateFilterStart = e.target.value; renderMutations(); });
-    root.querySelector('#dfRangeEnd')?.addEventListener('change', e => { dateFilterEnd = e.target.value; renderMutations(); });
+    el.querySelector('#dfTanggal')?.addEventListener('change', e => { dateFilterValue = e.target.value; renderMutations(); });
+    el.querySelector('#dfBulan')?.addEventListener('change', e => { dateFilterMonth = e.target.value; renderMutations(); });
+    el.querySelector('#dfTahun')?.addEventListener('change', e => { dateFilterYear = e.target.value; renderMutations(); });
+    el.querySelector('#dfRangeStart')?.addEventListener('change', e => { dateFilterStart = e.target.value; renderMutations(); });
+    el.querySelector('#dfRangeEnd')?.addEventListener('change', e => { dateFilterEnd = e.target.value; renderMutations(); });
   }
 
-  /* ---- Filter chips ---- */
-  root.querySelectorAll('.chip[data-filter]').forEach(chip => {
-    chip.addEventListener('click', () => {
-      root.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      activeFilter = chip.dataset.filter;
-      renderMutations();
-    });
-  });
-
-  /* ---- Payment status (collapsible) — DataTable dengan tombol konfirmasi ---- */
-  function renderPaymentStatus(){
+  /* ========== TAB: PEMBAYARAN PELANGGAN ========== */
+  function renderPembayaranTab(container){
     const custIdsPay = DB.customers.filter(c => c.partner_id === partner.id).map(c => c.id);
     const unpaidInvoices = DB.invoices.filter(i => custIdsPay.includes(i.customer_id) && i.billing_status !== 'Lunas');
     const paidInvoices = DB.invoices.filter(i => custIdsPay.includes(i.customer_id) && i.billing_status === 'Lunas');
-    const slot = root.querySelector('#mitraPaymentStatus');
+    const total = unpaidInvoices.length + paidInvoices.length;
 
-    let html = `
-      <div class="card card-pad" style="margin-top:8px;">
+    container.innerHTML = `
+      <div class="card card-pad" style="margin-bottom:16px;">
         <div class="donut-legend">
           <div class="li"><span class="dot" style="background:var(--badge-green-fg)"></span>Lunas<span class="val">${paidInvoices.length}</span></div>
           <div class="li"><span class="dot" style="background:var(--badge-orange-fg)"></span>Belum Dibayar<span class="val">${unpaidInvoices.length}</span></div>
         </div>
         <div style="margin-top:12px;height:8px;border-radius:99px;overflow:hidden;background:var(--color-background-muted);display:flex;">
-          <span style="width:${(paidInvoices.length+unpaidInvoices.length)?paidInvoices.length/(paidInvoices.length+unpaidInvoices.length)*100:0}%;background:var(--badge-green-fg);"></span>
-          <span style="width:${(paidInvoices.length+unpaidInvoices.length)?unpaidInvoices.length/(paidInvoices.length+unpaidInvoices.length)*100:0}%;background:var(--badge-orange-fg);"></span>
+          <span style="width:${total?paidInvoices.length/total*100:0}%;background:var(--badge-green-fg);"></span>
+          <span style="width:${total?unpaidInvoices.length/total*100:0}%;background:var(--badge-orange-fg);"></span>
         </div>
       </div>
-    `;
-
-    if(unpaidInvoices.length > 0){
-      html += `<div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
+      ${unpaidInvoices.length > 0 ? `
+      <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
         <div style="font-weight:600;font-size:13px;">Invoice Belum Dibayar</div>
         <button class="btn btn-primary btn-sm" id="btnBulkPayAll">${ic('creditCard')} Bayar Semua (${unpaidInvoices.length})</button>
-      </div>`;
-    }
+      </div>` : ''}
+    `;
 
-    slot.innerHTML = html;
+    if(unpaidInvoices.length === 0){
+      container.innerHTML += `<div class="card card-pad"><div class="empty-state">${ic('checkCircle')}<div class="es-title">Semua invoice sudah lunas</div><div class="es-sub">Tidak ada tagihan yang perlu dikonfirmasi saat ini.</div></div></div>`;
+      return;
+    }
 
     const payTableDiv = document.createElement('div');
-    payTableDiv.style.marginTop = '12px';
-    slot.appendChild(payTableDiv);
+    container.appendChild(payTableDiv);
 
-    if(unpaidInvoices.length > 0){
-      const payTable = DataTable({
-        rows: () => unpaidInvoices,
-        rowKey: 'id',
-        searchPlaceholder: 'Cari nama customer atau nomor invoice...',
-        searchFields: ['invoice_number'],
-        columns: [
-          {key:'customer_name', header:'Customer', sortable:true, render:r => {
-            const cust = DB.customers.find(c => c.id === r.customer_id);
-            return cust ? `<span class="cell-strong">${cust.customer_name}</span>` : '-';
-          }},
-          {key:'invoice_number', header:'No. Invoice', sortable:true, render:r => `<span class="cell-mono">${r.invoice_number}</span>`},
-          {key:'billing_period', header:'Periode', sortable:true},
-          {key:'billing_amount', header:'Tagihan', sortable:true, align:'right', render:r => `<span class="cell-num" style="font-weight:700;">${Fmt.rupiah(r.billing_amount)}</span>`},
-          {key:'actions', header:'', align:'right', render:r =>
-            `<button class="btn btn-primary btn-sm act-pay-invoice" data-inv="${r.id}">${ic('creditCard')} Bayar</button>`
-          },
-        ],
-        afterRender(wrap, rows){
-          wrap.querySelectorAll('.act-pay-invoice').forEach(btn => {
-            btn.addEventListener('click', () => {
-              const inv = rows.find(r => r.id === btn.dataset.inv);
-              if(!inv) return;
-              const cust = DB.customers.find(c => c.id === inv.customer_id);
-              const pkg = cust ? DB.packages.find(p => p.id === cust.package_id) : null;
-              if(cust && inv && pkg) openPaymentModal(cust, inv, pkg, 0, inv.billing_amount, partner);
-            });
+    const payTable = DataTable({
+      rows: () => unpaidInvoices,
+      rowKey: 'id',
+      searchPlaceholder: 'Cari nama customer atau nomor invoice...',
+      searchFields: ['invoice_number'],
+      columns: [
+        {key:'customer_name', header:'Customer', sortable:true, render:r => {
+          const cust = DB.customers.find(c => c.id === r.customer_id);
+          return cust ? `<span class="cell-strong">${cust.customer_name}</span>` : '-';
+        }},
+        {key:'invoice_number', header:'No. Invoice', sortable:true, render:r => `<span class="cell-mono">${r.invoice_number}</span>`},
+        {key:'billing_period', header:'Periode', sortable:true},
+        {key:'billing_amount', header:'Tagihan', sortable:true, align:'right', render:r => `<span class="cell-num" style="font-weight:700;">${Fmt.rupiah(r.billing_amount)}</span>`},
+        {key:'actions', header:'', align:'right', render:r =>
+          `<button class="btn btn-primary btn-sm act-pay-invoice" data-inv="${r.id}">${ic('creditCard')} Bayar</button>`
+        },
+      ],
+      afterRender(wrap, rows){
+        wrap.querySelectorAll('.act-pay-invoice').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const inv = rows.find(r => r.id === btn.dataset.inv);
+            if(!inv) return;
+            const cust = DB.customers.find(c => c.id === inv.customer_id);
+            const pkg = cust ? DB.packages.find(p => p.id === cust.package_id) : null;
+            if(cust && inv && pkg) openPaymentModal(cust, inv, pkg, 0, inv.billing_amount, partner);
           });
-        }
-      });
-      const payCard = document.createElement('div'); payCard.className = 'card';
-      payCard.appendChild(payTable);
-      payTableDiv.appendChild(payCard);
+        });
+      }
+    });
+    const payCard = document.createElement('div'); payCard.className = 'card';
+    payCard.appendChild(payTable);
+    payTableDiv.appendChild(payCard);
 
-      root.querySelector('#btnBulkPayAll')?.addEventListener('click', () => {
-        const selectedRows = unpaidInvoices.map(inv => {
-          const cust = DB.customers.find(c => c.id === inv.customer_id);
-          const pkg = cust ? DB.packages.find(p => p.id === cust.package_id) : null;
-          return { customer: cust, invoice: inv, pkg: pkg, extraCharge: 0 };
-        }).filter(r => r.customer && r.pkg);
-        if(selectedRows.length > 0) openBulkPaymentModal(selectedRows, partner);
-      });
-    }
+    container.querySelector('#btnBulkPayAll')?.addEventListener('click', () => {
+      const selectedRows = unpaidInvoices.map(inv => {
+        const cust = DB.customers.find(c => c.id === inv.customer_id);
+        const pkg = cust ? DB.packages.find(p => p.id === cust.package_id) : null;
+        return { customer: cust, invoice: inv, pkg: pkg, extraCharge: 0 };
+      }).filter(r => r.customer && r.pkg);
+      if(selectedRows.length > 0) openBulkPaymentModal(selectedRows, partner);
+    });
   }
 
-  renderMutations();
-  renderPaymentStatus();
+  renderMitraTab();
 
   window.addEventListener('keuangan-refresh', () => {
-    if(document.getElementById('mitraPaymentStatus') && !document.getElementById('suModeTabs')){
-      renderMutations();
-      renderPaymentStatus();
+    if(document.getElementById('mitraModeTabs') && !document.getElementById('suModeTabs')){
+      if(activeMitraTab === 'ringkasan'){
+        renderRingkasanTab(root.querySelector('#mitraTabContent'));
+      } else {
+        renderPembayaranTab(root.querySelector('#mitraTabContent'));
+      }
     }
   });
 };
