@@ -2258,9 +2258,23 @@ function renderFATKuangan(root){
              target.verified_by = CURRENT_USER.id;
              target.fat_proof_of_transfer = proof;
              target.fat_processed_by = CURRENT_USER.name;
-             target.fat_processed_at = new Date().toISOString();
-           }
-          let remaining = settlement.net_revenue;
+              target.fat_processed_at = new Date().toISOString();
+            }
+            const prevBalance = partner.saldo_utama;
+            partner.saldo_utama -= settlement.net_revenue;
+            DB.depositHistory.push({
+              id: nextId('DEP'),
+              partner_id: partner.id,
+              ref: 'WD-FAT/' + settlement.ref,
+              type: 'Withdraw Settlement',
+              amount: -settlement.net_revenue,
+              balance_before: prevBalance,
+              balance_after: partner.saldo_utama,
+              date: new Date().toISOString().slice(0,10),
+              note: 'Settlement disetujui FAT: ' + settlement.ref,
+              status: 'Berhasil',
+            });
+           let remaining = settlement.net_revenue;
           for(const inv of unsettledInvoices) {
             const invoiceTotal = (inv.total_paid || inv.billing_amount) + (inv.extra_charge || 0);
             const alreadySettled = inv.settled_amount || 0;
@@ -2273,9 +2287,10 @@ function renderFATKuangan(root){
             if(remaining <= 0) break;
           }
           pushActivity(CURRENT_USER.name, `memproses settlement ${settlement.ref} sebesar ${Fmt.rupiah(settlement.net_revenue)} dari mitra ${partner.partner_name}`);
-          toast('Settlement berhasil diproses!');
+          toast('Settlement berhasil diproses! Saldo utama mitra ' + partner.partner_name + ' berkurang ' + Fmt.rupiah(settlement.net_revenue));
           Modal.close();
           renderRoot();
+          window.dispatchEvent(new CustomEvent('keuangan-refresh'));
           setTimeout(()=> openSettlementInvoiceModal(unsettledInvoices, partner, settlement.gross_revenue, settlement.total_deduction, settlement.net_revenue, settlement.ref), 100);
         });
       }
@@ -2384,7 +2399,7 @@ Views['keuangan.mitra'] = function(root){
         <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--color-text-secondary);">
           Rekening: ${partner.bank_name} - ${partner.bank_account_no} a.n. ${partner.bank_account_name}
         </div>
-        <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--badge-orange-fg);"><strong>Catatan: Settlement akan dikirim untuk verifikasi Tim FAT sebelum diproses ke rekening mitra.</strong></div>
+        <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--badge-orange-fg);"><strong>Catatan: Saldo utama akan berkurang otomatis setelah Tim FAT menyetujui pencairan ini.</strong></div>
       </div>`,
       footHTML:`<button class="btn btn-secondary" id="mCloseWithdraw">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmWithdraw">${ic('check')} Ajukan Verifikasi</button>`,
       onOpen(b, f){
@@ -2395,22 +2410,6 @@ Views['keuangan.mitra'] = function(root){
             toast('Nominal tidak valid. Min Rp 1.000, maks ' + Fmt.rupiah(availableToWithdraw));
             return;
           }
-          const prevBalance = partner.saldo_utama;
-          partner.saldo_utama -= amount;
-
-          DB.depositHistory.push({
-            id: nextId('DEP'),
-            partner_id: partner.id,
-            ref: 'WD/' + new Date().toISOString().slice(0,4) + '/' + String(new Date().getMonth()+1).padStart(2,'0') + '/' + String(DB.depositHistory.length+1).padStart(4,'0'),
-            type: 'Withdraw Settlement',
-            amount: -amount,
-            balance_before: prevBalance,
-            balance_after: partner.saldo_utama,
-            date: new Date().toISOString().slice(0,10),
-            note: 'Pengajuan pencairan ke rekening ' + partner.bank_name + ' ' + partner.bank_account_no,
-            status: 'Berhasil',
-          });
-
           const setRef = 'SET/2026/07/' + String(DB.settlements.length+1).padStart(4,'0');
           DB.settlements.push({
             id: nextId('SET'),
@@ -2429,7 +2428,7 @@ Views['keuangan.mitra'] = function(root){
             fat_processed_at: null
           });
           pushActivity(CURRENT_USER.name, `mengajukan pencairan settlement ${setRef} sebesar ${Fmt.rupiah(amount)}`);
-          toast('Settlement diajukan untuk verifikasi FAT! Saldo utama telah dikurangi.');
+          toast('Settlement diajukan untuk verifikasi FAT!');
           Modal.close();
           window.dispatchEvent(new CustomEvent('keuangan-refresh'));
         });
