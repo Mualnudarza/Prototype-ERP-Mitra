@@ -37,7 +37,7 @@ const NAV_CONFIG = [
 const ALL_ITEMS = NAV_CONFIG.flatMap(g=>g.items);
 const PARTNERSHIP_KEYS = NAV_CONFIG[0].items.map(i=>i.key);
 const SUPER_USER_KEYS = [...PARTNERSHIP_KEYS];
-const FAT_KEYS = ['keuangan.mitra'];
+const FAT_KEYS = ['keuangan.mitra', 'partnership.pendapatan'];
 const DEFAULT_ROUTE_SUPER = 'partnership.mitra';
 const DEFAULT_ROUTE_FAT = 'keuangan.mitra';
 const DEFAULT_ROUTE_MITRA = 'customer.pelanggan';

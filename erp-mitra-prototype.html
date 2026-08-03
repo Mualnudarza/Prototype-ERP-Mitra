@@ -256,6 +256,11 @@ a{color:inherit;}
 .btn-icon-only{padding:8px;width:34px;}
 .btn:disabled{opacity:.45;cursor:not-allowed;}
 
+.chip{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;font-size:12.3px;font-weight:500;border-radius:20px;border:1px solid var(--color-border);background:var(--color-background-surface);color:var(--color-text-secondary);cursor:pointer;transition:all .15s;}
+.chip svg{width:13px;height:13px;flex-shrink:0;}
+.chip:hover{background:var(--color-background-hover);color:var(--color-text-primary);border-color:var(--color-border-strong);}
+.chip.active{background:var(--color-accent);color:var(--color-accent-contrast);border-color:var(--color-accent);}
+
 .card{
   background:var(--color-background-surface);
   border:1px solid var(--color-border);
@@ -347,6 +352,7 @@ table.dtable tbody tr:hover{background:var(--color-background-hover);}
 .cell-num{font-variant-numeric:tabular-nums;font-weight:600;}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
 .empty-state{padding:48px 16px;text-align:center;color:var(--color-text-secondary);}
+details summary svg{width:14px;height:14px;vertical-align:middle;margin-right:4px;}
 .empty-state svg{width:34px;height:34px;color:var(--color-text-tertiary);margin-bottom:8px;}
 .empty-state .es-title{font-weight:600;color:var(--color-text-primary);font-size:13.5px;}
 .empty-state .es-sub{font-size:12.5px;margin-top:3px;}
