@@ -130,6 +130,8 @@ function openBulkPaymentModal(selectedRows, partner){
         let successCount = 0;
         selectedRows.forEach(r => {
           const inv = r.invoice;
+          const prevBal = partner.saldo_utama;
+          partner.saldo_utama -= inv.billing_amount;
           inv.billing_status = 'Lunas';
           inv.extra_charge = r.extraCharge;
           inv.total_paid = r.invoice.billing_amount;
@@ -143,26 +145,26 @@ function openBulkPaymentModal(selectedRows, partner){
             payment_date: new Date().toISOString(),
             payment_status: 'Berhasil'
           });
+          DB.depositHistory.push({
+            id: nextId('DEP'),
+            partner_id: partner.id,
+            ref: 'DEP-BULK/' + Date.now() + '/' + successCount,
+            type: 'Deposit Keluar',
+            amount: -r.invoice.billing_amount,
+            balance_before: prevBal,
+            balance_after: partner.saldo_utama,
+            date: new Date().toISOString().slice(0,10),
+            note: 'Pembayaran ' + r.customer.customer_name + ' — ' + inv.invoice_number,
+            status: 'Berhasil',
+          });
           successCount++;
         });
         
-        DB.depositHistory.push({
-          id: nextId('DEP'),
-          partner_id: partner.id,
-          ref: 'DEP-BULK/' + Date.now(),
-          type: 'Deposit Keluar',
-          amount: -totalBilling,
-          balance_before: prevBalance,
-          balance_after: partner.saldo_utama,
-          date: new Date().toISOString().slice(0,10),
-          note: 'Pembayaran bulk ' + selectedRows.length + ' customer',
-          status: 'Berhasil',
-        });
-        
-        pushActivity(CURRENT_USER.name, `mencatat pembayaran bulk ${selectedRows.length} customer sebesar ${Fmt.rupiah(totalBilling)} (saldo utama terpotong)`);
-        toast(`Pembayaran bulk ${selectedRows.length} customer berhasil dicatat! Saldo utama telah terpotong.`);
+        pushActivity(CURRENT_USER.name, `mencatat pembayaran bulk ${successCount} customer sebesar ${Fmt.rupiah(totalBilling)} (saldo utama terpotong)`);
+        toast(`Pembayaran bulk ${successCount} customer berhasil dicatat! Saldo utama telah terpotong.`);
         window.dispatchEvent(new CustomEvent('keuangan-refresh'));
         Modal.close();
+        setTimeout(() => openCustomerInvoiceModal(selectedRows[0].customer, selectedRows[0].invoice, selectedRows[0].pkg, partner, 'Tunai / Kasir (Bulk)'), 300);
       });
     }
   });
@@ -257,6 +259,160 @@ function buildPaymentInvoiceHTML(customer, invoice, pkg, partner){
   };
 }
 
+function buildCustomerInvoiceHTML(customer, invoice, pkg, partner, paymentMethod){
+  const now = new Date();
+  const duePrev = new Date(now); duePrev.setDate(duePrev.getDate() - 1);
+  const dueNext = new Date(now); dueNext.setMonth(dueNext.getMonth() + 1);
+  const pppoe = (customer.pppoe_secret || '').toUpperCase();
+  const vaBCA = '1900' + (partner.bank_account_no||'').slice(-3) + pppoe.slice(-8);
+  const vaBRI = '142' + (partner.bank_account_no||'').slice(-3) + pppoe.slice(-8);
+  const alfamart = '352220' + (partner.bank_account_no||'').slice(-3) + pppoe.slice(-8);
+  const indomaret = '352221' + (partner.bank_account_no||'').slice(-3) + pppoe.slice(-8);
+  return `
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--color-text-secondary);margin-bottom:6px;">Bukti Pembayaran</div>
+      <div style="font-size:18px;font-weight:700;color:var(--color-accent);letter-spacing:1px;">PEMBAYARAN LAYANAN INTERNET</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;">Pembayaran layanan Internet Anda telah kami terima</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px;">
+      <tr><td style="padding:8px 0;color:var(--color-text-secondary);width:42%;border-bottom:1px solid var(--color-border);">Nama pelanggan</td><td style="padding:8px 0;font-weight:600;border-bottom:1px solid var(--color-border);">${customer.customer_name}</td></tr>
+      <tr><td style="padding:8px 0;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border);">ID pelanggan</td><td style="padding:8px 0;font-weight:600;border-bottom:1px solid var(--color-border);">${pppoe}</td></tr>
+      <tr><td style="padding:8px 0;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border);">Metode Pembayaran</td><td style="padding:8px 0;font-weight:600;border-bottom:1px solid var(--color-border);">${paymentMethod || 'Virtual Account'}</td></tr>
+      <tr><td style="padding:8px 0;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border);">Paket Layanan</td><td style="padding:8px 0;font-weight:600;border-bottom:1px solid var(--color-border);">${pkg ? pkg.bandwidth : '-'}</td></tr>
+      <tr><td style="padding:8px 0;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border);">Nominal</td><td style="padding:8px 0;font-weight:700;font-size:16px;color:var(--badge-green-fg);border-bottom:1px solid var(--color-border);">${Fmt.rupiah(invoice.billing_amount)}</td></tr>
+      <tr><td style="padding:8px 0;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border);">Jatuh Tempo Sebelumnya</td><td style="padding:8px 0;border-bottom:1px solid var(--color-border);">${Fmt.date(duePrev.toISOString().slice(0,10))}</td></tr>
+      <tr><td style="padding:8px 0;color:var(--color-text-secondary);">Jatuh Tempo Selanjutnya</td><td style="padding:8px 0;font-weight:600;">${Fmt.date(dueNext.toISOString().slice(0,10))}</td></tr>
+    </table>
+    <div style="background:var(--color-background-muted);border:1px solid var(--color-border);border-radius:8px;padding:16px;margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Untuk pembayaran berikutnya dapat melalui Virtual Account:</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">- BCA : ${vaBCA}</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px;">- BRI : ${vaBRI}</div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Atau melalui Indomaret/Alfamart:</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">sampaikan ke kasir "Pembayaran Internet ${partner.partner_name}" lalu gunakan nomor berikut:</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">- Alfamart : ${alfamart}</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);">- Indomaret : ${indomaret}</div>
+    </div>
+    <div style="text-align:center;font-size:12px;color:var(--color-text-secondary);margin-top:20px;">
+      Terima kasih,<br><strong>${partner.partner_name}</strong> &ndash; Solusi Internet Cepat dan Terpercaya!
+    </div>
+  `;
+}
+
+function openCustomerInvoiceModal(customer, invoice, pkg, partner, paymentMethod){
+  const mitraInv = buildPaymentInvoiceHTML(customer, invoice, pkg, partner);
+  const custInv = buildCustomerInvoiceHTML(customer, invoice, pkg, partner, paymentMethod);
+  let activeInvTab = 'mitra';
+
+  function renderBody(){
+    return '<div id="invTabBtns" style="display:flex;gap:6px;margin-bottom:16px;">'
+      + '<button class="btn btn-sm ' + (activeInvTab==='mitra'?'btn-primary':'btn-secondary') + '" data-invtab="mitra">' + ic('receipt') + ' Invoice Mitra</button>'
+      + '<button class="btn btn-sm ' + (activeInvTab==='customer'?'btn-primary':'btn-secondary') + '" data-invtab="customer">' + ic('creditCard') + ' Invoice Customer</button>'
+      + '</div>'
+      + '<div id="invTabContent" style="max-height:55vh;overflow-y:auto;">' + (activeInvTab==='mitra'
+        ? '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;color:#555;line-height:24px;font-size:14px;">' + mitraInv.html + '</div>'
+        : '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;color:#333;line-height:24px;font-size:14px;">' + custInv + '</div>'
+      ) + '</div>';
+  }
+
+  function wireTabs(b){
+    b.querySelectorAll('[data-invtab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeInvTab = btn.dataset.invtab;
+        const content = b.querySelector('#invTabContent');
+        const btns = b.querySelector('#invTabBtns');
+        if(btns) btns.innerHTML = '<button class="btn btn-sm ' + (activeInvTab==='mitra'?'btn-primary':'btn-secondary') + '" data-invtab="mitra">' + ic('receipt') + ' Invoice Mitra</button>'
+          + '<button class="btn btn-sm ' + (activeInvTab==='customer'?'btn-primary':'btn-secondary') + '" data-invtab="customer">' + ic('creditCard') + ' Invoice Customer</button>';
+        if(content) content.innerHTML = activeInvTab==='mitra'
+          ? '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;color:#555;line-height:24px;font-size:14px;">' + mitraInv.html + '</div>'
+          : '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;color:#333;line-height:24px;font-size:14px;">' + custInv + '</div>';
+        wireTabs(b);
+      });
+    });
+  }
+
+  Modal.open({
+    title:'', subtitle:'',
+    size:'lg',
+    bodyHTML: renderBody(),
+    footHTML:'<button class="btn btn-secondary" id="mCloseCustInv">' + ic('x') + ' Tutup</button>',
+    onOpen(b, f){
+      f.querySelector('#mCloseCustInv').addEventListener('click', Modal.close);
+      wireTabs(b);
+    }
+  });
+}
+
+function openVASimulationModal(partner){
+  const custIds = DB.customers.filter(c => c.partner_id === partner.id).map(c => c.id);
+  const unpaidInvoices = DB.invoices.filter(i => custIds.includes(i.customer_id) && i.billing_status !== 'Lunas');
+  if(!unpaidInvoices.length){ toast('Tidak ada invoice yang belum dibayar.'); return; }
+
+  function buildTable(){
+    let rows = '';
+    unpaidInvoices.filter(i => i.billing_status !== 'Lunas').forEach(inv => {
+      const cust = DB.customers.find(c => c.id === inv.customer_id);
+      const pkg = cust ? DB.packages.find(p => p.id === cust.package_id) : null;
+      rows += '<tr><td style="padding:8px;border-bottom:1px solid var(--color-border);">' + (cust ? cust.customer_name : '-') + '</td>'
+        + '<td style="padding:8px;border-bottom:1px solid var(--color-border);font-family:var(--font-family-mono);font-size:12px;">' + inv.invoice_number + '</td>'
+        + '<td style="padding:8px;border-bottom:1px solid var(--color-border);">' + (pkg ? pkg.package_name + ' — ' + pkg.bandwidth : '-') + '</td>'
+        + '<td style="padding:8px;border-bottom:1px solid var(--color-border);text-align:right;font-weight:600;">' + Fmt.rupiah(inv.billing_amount) + '</td>'
+        + '<td style="padding:8px;border-bottom:1px solid var(--color-border);text-align:right;">'
+        + '<button class="btn btn-primary btn-sm act-sim-va" data-inv="' + inv.id + '">' + ic('creditCard') + ' Bayar VA</button></td></tr>';
+    });
+    return '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      + '<thead><tr style="border-bottom:2px solid var(--color-border);">'
+      + '<th style="padding:8px;text-align:left;font-weight:600;">Customer</th>'
+      + '<th style="padding:8px;text-align:left;font-weight:600;">Invoice</th>'
+      + '<th style="padding:8px;text-align:left;font-weight:600;">Paket</th>'
+      + '<th style="padding:8px;text-align:right;font-weight:600;">Tagihan</th>'
+      + '<th style="padding:8px;text-align:right;font-weight:600;">Aksi</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+
+  Modal.open({
+    title:'Simulasi Pembayaran Virtual Account',
+    subtitle:'Pilih invoice yang akan dibayar via VA — saldo utama mitra akan bertambah',
+    size:'lg',
+    bodyHTML:'<div id="simVATableWrap">' + buildTable() + '</div>',
+    footHTML:'<button class="btn btn-secondary" id="mCloseSimVA">' + ic('x') + ' Tutup</button>',
+    onOpen(b, f){
+      f.querySelector('#mCloseSimVA').addEventListener('click', Modal.close);
+      b.querySelectorAll('.act-sim-va').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const inv = unpaidInvoices.find(i => i.id === btn.dataset.inv);
+          if(!inv) return;
+          const cust = DB.customers.find(c => c.id === inv.customer_id);
+          const pkg = cust ? DB.packages.find(p => p.id === cust.package_id) : null;
+          const prevBalance = partner.saldo_utama;
+          partner.saldo_utama += inv.billing_amount;
+          inv.billing_status = 'Lunas';
+          inv.total_paid = inv.billing_amount;
+          inv.settled = false;
+          const vaNum = 'VA-' + (partner.partner_code||'') + '-' + (cust?.pppoe_secret||'').slice(-6) + '-' + Date.now();
+          DB.payments.push({
+            id: nextId('PAY'), invoice_id: inv.id, payment_reference: 'VA-' + Date.now(),
+            virtual_account: vaNum, billing_amount: inv.billing_amount,
+            payment_date: new Date().toISOString(), payment_status: 'Berhasil'
+          });
+          DB.depositHistory.push({
+            id: nextId('DEP'), partner_id: partner.id, ref: 'VA-PAY/' + Date.now(),
+            type: 'Deposit Masuk', amount: inv.billing_amount,
+            balance_before: prevBalance, balance_after: partner.saldo_utama,
+            date: new Date().toISOString().slice(0,10),
+            note: 'Pembayaran VA ' + cust.customer_name + ' — ' + inv.invoice_number,
+            status: 'Berhasil',
+          });
+          pushActivity(CURRENT_USER.name, 'mensimulasikan pembayaran VA ' + cust.customer_name + ' sebesar ' + Fmt.rupiah(inv.billing_amount) + ' (saldo utama bertambah)');
+          toast('Pembayaran VA ' + cust.customer_name + ' berhasil! Saldo utama bertambah ' + Fmt.rupiah(inv.billing_amount) + '.');
+          window.dispatchEvent(new CustomEvent('keuangan-refresh'));
+          Modal.close();
+          setTimeout(() => openCustomerInvoiceModal(cust, inv, pkg, partner, 'Virtual Account'), 300);
+        });
+      });
+    }
+  });
+}
+
 function openPaymentModal(customer, invoice, pkg, extraCharge, totalPayable, partner){
   var inv = buildPaymentInvoiceHTML(customer, invoice, pkg, partner);
   Modal.open({
@@ -302,6 +458,7 @@ function openPaymentModal(customer, invoice, pkg, extraCharge, totalPayable, par
         toast('Pembayaran berhasil dicatat! Saldo utama telah terpotong.');
         window.dispatchEvent(new CustomEvent('keuangan-refresh'));
         Modal.close();
+        setTimeout(() => openCustomerInvoiceModal(customer, invoice, pkg, partner, 'Tunai / Kasir'), 300);
       });
     }
   });
@@ -2472,6 +2629,7 @@ Views['keuangan.mitra'] = function(root){
 
   /* ---- Build combined mutations ---- */
   let activeFilter = 'all';
+  let activePembayaranSubTab = 'belumBayar';
   let dateFilterMode = 'all'; // all | tanggal | bulan | tahun | rentang
   let dateFilterValue = '';
   let dateFilterMonth = '';
@@ -2482,11 +2640,15 @@ Views['keuangan.mitra'] = function(root){
   function buildMutations(){
     const muts = [];
     DB.depositHistory.filter(d => d.partner_id === partner.id).forEach(d => {
-      muts.push({ date:d.date, type:'deposit', badgeType:d.type, badgeColor:d.type==='Deposit Masuk'?'green': d.type==='Withdraw Settlement'?'orange':'red', ref:d.ref, note:d.note, amount:d.amount, balance_after:d.balance_after, raw:d });
+      const isOut = d.amount < 0;
+      const detail = d.type === 'Deposit Masuk' ? 'Deposit Saldo' : 'Penarikan Saldo Settlement';
+      const flow = isOut ? 'uang_keluar' : 'uang_masuk';
+      muts.push({ date:d.date, type:flow, detail:detail, badgeType:detail, badgeColor:isOut?'red':'green', ref:d.ref, note:d.note, amount:d.amount, balance_after:d.balance_after, raw:d });
     });
     DB.settlements.filter(s => s.partner_id === partner.id).forEach(s => {
       if(s.status === 'Selesai'){
-        muts.push({ date:s.date, type:'settlement', badgeType:'Settlement Selesai', badgeColor:'green', ref:s.ref, note:s.period+' — '+s.tx_count+' transaksi', amount:s.net_revenue, balance_after:null, raw:s });
+        const detail = 'Penarikan Saldo Settlement';
+        muts.push({ date:s.date, type:'uang_keluar', detail:detail, badgeType:'Settlement Selesai', badgeColor:'green', ref:s.ref, note:s.period+' — '+s.tx_count+' transaksi', amount:s.net_revenue, balance_after:null, raw:s });
       }
     });
     DB.payments.filter(p => {
@@ -2495,7 +2657,10 @@ Views['keuangan.mitra'] = function(root){
     }).forEach(p => {
       const inv = DB.invoices.find(i => i.id === p.invoice_id);
       const cust = inv ? DB.customers.find(c => c.id === inv.customer_id) : null;
-      muts.push({ date:(p.payment_date||'').slice(0,10), type:'payment', badgeType:'Pembayaran Pelanggan', badgeColor:'blue', ref:p.payment_reference, note:(cust?cust.customer_name:'')+' — '+(inv?inv.invoice_number:''), amount:p.billing_amount, balance_after:null, raw:p });
+      const isCash = p.virtual_account === 'TUNAI/KASIR';
+      const detail = isCash ? 'Pelanggan Bayar Cash' : 'Pelanggan Bayar VA';
+      const flow = isCash ? 'uang_keluar' : 'uang_masuk';
+      muts.push({ date:(p.payment_date||'').slice(0,10), type:flow, detail:detail, badgeType:detail, badgeColor:isCash?'red':'green', ref:p.payment_reference, note:(cust?cust.customer_name:'')+' — '+(inv?inv.invoice_number:''), amount:p.billing_amount, balance_after:null, raw:p });
     });
     muts.sort((a,b) => (b.date||'').localeCompare(a.date||''));
     return muts;
@@ -2530,9 +2695,8 @@ Views['keuangan.mitra'] = function(root){
       </div>
       <div class="filter-chips" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
         <button class="chip ${activeFilter==='all'?'active':''}" data-filter="all">${ic('list')} Semua</button>
-        <button class="chip ${activeFilter==='deposit'?'active':''}" data-filter="deposit">${ic('wallet')} Top Up</button>
-        <button class="chip ${activeFilter==='settlement'?'active':''}" data-filter="settlement">${ic('history')} Settlement</button>
-        <button class="chip ${activeFilter==='payment'?'active':''}" data-filter="payment">${ic('creditCard')} Pembayaran Pelanggan</button>
+        <button class="chip ${activeFilter==='uang_masuk'?'active':''}" data-filter="uang_masuk">${ic('arrowUpCircle')} Uang Masuk</button>
+        <button class="chip ${activeFilter==='uang_keluar'?'active':''}" data-filter="uang_keluar">${ic('arrowDownCircle')} Uang Keluar</button>
       </div>
       <div id="mitraMutationList"></div>
     `;
@@ -2611,7 +2775,7 @@ Views['keuangan.mitra'] = function(root){
       searchFields: ['ref', 'note'],
       columns: [
         {key:'date', header:'Tanggal', sortable:true, sortValue:r=>r.date, render:r => `<span style="white-space:nowrap;">${Fmt.date(r.date)}</span>`},
-        {key:'type', header:'Jenis', sortable:true, render:r => badge(r.badgeType, r.badgeColor)},
+        {key:'type', header:'Jenis', sortable:true, render:r => r.detail},
         {key:'ref', header:'Referensi', sortable:true, render:r => `<span class="cell-mono">${r.ref}</span>`},
         {key:'note', header:'Keterangan', render:r => `<span style="font-size:12px;color:var(--color-text-secondary);max-width:240px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.note}</span>`},
         {key:'amount', header:'Nominal', sortable:true, align:'right', render:r => {
@@ -2668,21 +2832,44 @@ Views['keuangan.mitra'] = function(root){
           <span style="width:${total?unpaidInvoices.length/total*100:0}%;background:var(--badge-orange-fg);"></span>
         </div>
       </div>
-      ${unpaidInvoices.length > 0 ? `
-      <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
-        <div style="font-weight:600;font-size:13px;">Invoice Belum Dibayar</div>
-        <button class="btn btn-primary btn-sm" id="btnBulkPayAll">${ic('creditCard')} Bayar Semua (${unpaidInvoices.length})</button>
-      </div>` : ''}
+      <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="subtab ${activePembayaranSubTab==='belumBayar'?'active':''}" data-stab="belumBayar">${ic('creditCard')} Invoice Belum Dibayar${unpaidInvoices.length > 0 ? ' <span class="badge badge-orange" style="margin-left:4px;font-size:11px;">'+unpaidInvoices.length+'</span>' : ''}</button>
+        <button class="subtab ${activePembayaranSubTab==='historiBayar'?'active':''}" data-stab="historiBayar">${ic('history')} Histori Pembayaran${paidInvoices.length > 0 ? ' <span class="badge badge-green" style="margin-left:4px;font-size:11px;">'+paidInvoices.length+'</span>' : ''}</button>
+      </div>
+      <div id="pembayaranSubContent"></div>
     `;
 
+    container.querySelectorAll('.subtab[data-stab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activePembayaranSubTab = btn.dataset.stab;
+        renderPembayaranTab(container);
+      });
+    });
+
+    const subContent = container.querySelector('#pembayaranSubContent');
+    if(activePembayaranSubTab === 'belumBayar'){
+      renderBelumDibayarSubTab(subContent, unpaidInvoices);
+    } else {
+      renderHistoriBayarSubTab(subContent, paidInvoices);
+    }
+  }
+
+  function renderBelumDibayarSubTab(subContent, unpaidInvoices){
     if(unpaidInvoices.length === 0){
-      container.innerHTML += `<div class="card card-pad"><div class="empty-state">${ic('checkCircle')}<div class="es-title">Semua invoice sudah lunas</div><div class="es-sub">Tidak ada tagihan yang perlu dikonfirmasi saat ini.</div></div></div>`;
+      subContent.innerHTML = '<div class="card card-pad"><div class="empty-state">' + ic('checkCircle') + '<div class="es-title">Semua invoice sudah lunas</div><div class="es-sub">Tidak ada tagihan yang perlu dikonfirmasi saat ini.</div></div></div>';
       return;
     }
-
+    subContent.innerHTML = `
+      <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div style="font-weight:600;font-size:13px;">Invoice Belum Dibayar</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary btn-sm" id="btnSimVA">${ic('creditCard')} Simulasi Bayar VA</button>
+          <button class="btn btn-primary btn-sm" id="btnBulkPayAll">${ic('creditCard')} Bayar Semua (${unpaidInvoices.length})</button>
+        </div>
+      </div>
+    `;
     const payTableDiv = document.createElement('div');
-    container.appendChild(payTableDiv);
-
+    subContent.appendChild(payTableDiv);
     const payTable = DataTable({
       rows: () => unpaidInvoices,
       rowKey: 'id',
@@ -2691,13 +2878,13 @@ Views['keuangan.mitra'] = function(root){
       columns: [
         {key:'customer_name', header:'Customer', sortable:true, render:r => {
           const cust = DB.customers.find(c => c.id === r.customer_id);
-          return cust ? `<span class="cell-strong">${cust.customer_name}</span>` : '-';
+          return cust ? '<span class="cell-strong">' + cust.customer_name + '</span>' : '-';
         }},
-        {key:'invoice_number', header:'No. Invoice', sortable:true, render:r => `<span class="cell-mono">${r.invoice_number}</span>`},
+        {key:'invoice_number', header:'No. Invoice', sortable:true, render:r => '<span class="cell-mono">' + r.invoice_number + '</span>'},
         {key:'billing_period', header:'Periode', sortable:true},
-        {key:'billing_amount', header:'Tagihan', sortable:true, align:'right', render:r => `<span class="cell-num" style="font-weight:700;">${Fmt.rupiah(r.billing_amount)}</span>`},
+        {key:'billing_amount', header:'Tagihan', sortable:true, align:'right', render:r => '<span class="cell-num" style="font-weight:700;">' + Fmt.rupiah(r.billing_amount) + '</span>'},
         {key:'actions', header:'', align:'right', render:r =>
-          `<button class="btn btn-primary btn-sm act-pay-invoice" data-inv="${r.id}">${ic('creditCard')} Bayar</button>`
+          '<button class="btn btn-primary btn-sm act-pay-invoice" data-inv="' + r.id + '">' + ic('creditCard') + ' Bayar</button>'
         },
       ],
       afterRender(wrap, rows){
@@ -2716,7 +2903,8 @@ Views['keuangan.mitra'] = function(root){
     payCard.appendChild(payTable);
     payTableDiv.appendChild(payCard);
 
-    container.querySelector('#btnBulkPayAll')?.addEventListener('click', () => {
+    subContent.querySelector('#btnSimVA')?.addEventListener('click', () => openVASimulationModal(partner));
+    subContent.querySelector('#btnBulkPayAll')?.addEventListener('click', () => {
       const selectedRows = unpaidInvoices.map(inv => {
         const cust = DB.customers.find(c => c.id === inv.customer_id);
         const pkg = cust ? DB.packages.find(p => p.id === cust.package_id) : null;
@@ -2724,6 +2912,92 @@ Views['keuangan.mitra'] = function(root){
       }).filter(r => r.customer && r.pkg);
       if(selectedRows.length > 0) openBulkPaymentModal(selectedRows, partner);
     });
+  }
+
+  function renderHistoriBayarSubTab(subContent, paidInvoices){
+    const months = {};
+    paidInvoices.forEach(inv => {
+      const pay = DB.payments.find(p => p.invoice_id === inv.id && p.payment_status === 'Berhasil');
+      if(pay){
+        const m = (pay.payment_date||'').slice(0,7);
+        if(m) months[m] = true;
+      }
+    });
+    const monthKeys = Object.keys(months).sort().reverse();
+    let histMonthFilter = monthKeys.length > 0 ? monthKeys[0] : '';
+
+    function paint(){
+      const filtered = histMonthFilter ? paidInvoices.filter(inv => {
+        const pay = DB.payments.find(p => p.invoice_id === inv.id && p.payment_status === 'Berhasil');
+        return pay && (pay.payment_date||'').slice(0,7) === histMonthFilter;
+      }) : paidInvoices;
+
+      let monthOpts = '<option value="">Semua Bulan</option>' + monthKeys.map(m => '<option value="' + m + '" ' + (m===histMonthFilter?'selected':'') + '>' + m + '</option>').join('');
+
+      if(!filtered.length){
+        subContent.innerHTML = '<div class="card card-pad" style="margin-bottom:12px;"><div style="display:flex;gap:8px;align-items:end;"><div class="field" style="margin:0;flex:0 0 auto;"><label style="font-size:11px;">Filter Bulan</label><select class="input" id="histMonthFilter" style="font-size:12px;min-width:130px;">' + monthOpts + '</select></div></div></div>'
+          + '<div class="card card-pad"><div class="empty-state">' + ic('history') + '<div class="es-title">Belum ada riwayat pembayaran</div><div class="es-sub">Pembayaran yang sudah diproses akan muncul di sini.</div></div></div>';
+        wireMonthFilter();
+        return;
+      }
+
+      const histTable = DataTable({
+        rows: () => filtered,
+        rowKey: 'id',
+        searchPlaceholder: 'Cari nama customer atau invoice...',
+        searchFields: ['invoice_number'],
+        columns: [
+          {key:'customer_name', header:'Customer', sortable:true, render:r => {
+            const cust = DB.customers.find(c => c.id === r.customer_id);
+            return cust ? '<span class="cell-strong">' + cust.customer_name + '</span>' : '-';
+          }},
+          {key:'invoice_number', header:'No. Invoice', sortable:true, render:r => '<span class="cell-mono">' + r.invoice_number + '</span>'},
+          {key:'billing_period', header:'Periode', sortable:true},
+          {key:'billing_amount', header:'Tagihan', sortable:true, align:'right', render:r => '<span class="cell-num" style="font-weight:700;">' + Fmt.rupiah(r.billing_amount) + '</span>'},
+          {key:'payment_date', header:'Tanggal Bayar', sortable:true, sortValue:r => {
+            const pay = DB.payments.find(p => p.invoice_id === r.id && p.payment_status === 'Berhasil');
+            return pay ? pay.payment_date : '';
+          }, render:r => {
+            const pay = DB.payments.find(p => p.invoice_id === r.id && p.payment_status === 'Berhasil');
+            return pay ? '<span style="white-space:nowrap;">' + Fmt.date((pay.payment_date||'').slice(0,10)) + '</span>' : '-';
+          }},
+          {key:'payment_method', header:'Metode', sortable:true, render:r => {
+            const pay = DB.payments.find(p => p.invoice_id === r.id && p.payment_status === 'Berhasil');
+            return pay ? (pay.virtual_account === 'TUNAI/KASIR' ? badge('Tunai','red') : badge('VA','green')) : '-';
+          }},
+          {key:'status', header:'Status', sortable:true, render:r => badge('Lunas','green')},
+          {key:'actions', header:'', align:'right', render:r =>
+            '<button class="btn btn-ghost btn-sm act-view-cust-inv" data-inv="' + r.id + '">' + ic('eye') + '</button>'
+          },
+        ],
+        afterRender(wrap, rows){
+          wrap.querySelectorAll('.act-view-cust-inv').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const inv = rows.find(r => r.id === btn.dataset.inv);
+              if(!inv) return;
+              const cust = DB.customers.find(c => c.id === inv.customer_id);
+              const pkg = cust ? DB.packages.find(p => p.id === cust.package_id) : null;
+              const pay = DB.payments.find(p => p.invoice_id === inv.id && p.payment_status === 'Berhasil');
+              const method = pay ? (pay.virtual_account === 'TUNAI/KASIR' ? 'Tunai / Kasir' : 'Virtual Account') : 'Virtual Account';
+              if(cust && inv && pkg) openCustomerInvoiceModal(cust, inv, pkg, partner, method);
+            });
+          });
+        }
+      });
+
+      subContent.innerHTML = '<div class="card card-pad" style="margin-bottom:12px;"><div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;"><div class="field" style="margin:0;flex:0 0 auto;"><label style="font-size:11px;">Filter Bulan</label><select class="input" id="histMonthFilter" style="font-size:12px;min-width:130px;">' + monthOpts + '</select></div></div></div>';
+      const histCard = document.createElement('div'); histCard.className = 'card';
+      histCard.appendChild(histTable);
+      subContent.appendChild(histCard);
+      wireMonthFilter();
+    }
+
+    function wireMonthFilter(){
+      const el = subContent.querySelector('#histMonthFilter');
+      if(el) el.addEventListener('change', () => { histMonthFilter = el.value; paint(); });
+    }
+
+    paint();
   }
 
   renderMitraTab();
