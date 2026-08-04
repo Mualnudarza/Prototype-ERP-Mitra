@@ -19,113 +19,161 @@
       "app_data_partnername",
       "app_data_pkgname",
       "app_data_pkgprice",
+      "app_data_users",
       "app_data_wilayah_list"
     ],
     "1": [
       "app_data_fmt",
       "app_modules_activitytimeline",
       "app_modules_afterrender",
-      "app_modules_calculatestats",
+      "app_modules_buildcustomerinvoicehtml",
+      "app_modules_buildpaymentinvoicehtml",
       "app_modules_odpname",
+      "app_modules_onopen",
+      "app_modules_openbulkpaymentmodal",
       "app_modules_opencustomerform",
+      "app_modules_opencustomerinvoicemodal",
       "app_modules_opendetail",
       "app_modules_openpaymentmodal",
+      "app_modules_opensettlementinvoicemodal",
       "app_modules_opensettlementmodal",
-      "app_modules_paint",
-      "app_modules_renderdashboard",
+      "app_modules_renderpartnerfinanceoverview",
       "app_modules_row3wrap",
       "app_modules_showhistorytab",
-      "app_modules_showpaymenttab"
+      "app_modules_showpaymenttab",
+      "app_ui_modal"
     ],
     "2": [
-      "app_data_users",
+      "app_main",
+      "app_main_all_items",
+      "app_main_currentroute",
+      "app_main_fat_keys",
+      "app_main_isfat",
+      "app_main_issuperuser",
+      "app_main_nav_config",
+      "app_main_navwithbadges",
+      "app_main_partnership_keys",
+      "app_main_renderroute",
+      "app_main_super_user_keys",
+      "app_main_syncnavbadge",
+      "app_ui_rendersidebar"
+    ],
+    "3": [
+      "app_modules",
+      "app_modules_buildfilterpanel",
+      "app_modules_calculatestats",
+      "app_modules_countinfra",
+      "app_modules_kpis",
+      "app_modules_matchfilter",
+      "app_modules_modulecard",
+      "app_modules_pageintro",
+      "app_modules_paintbanner",
+      "app_modules_renderdashboard",
+      "app_modules_renderfatkuangan",
+      "app_modules_views"
+    ],
+    "4": [
+      "app_modules_buildmutations",
+      "app_modules_filterbydate",
+      "app_modules_openmitrawithdrawmodal",
+      "app_modules_openvasimulationmodal",
+      "app_modules_paint",
+      "app_modules_renderbelumdibayarsubtab",
+      "app_modules_renderhistoribayarsubtab",
+      "app_modules_rendermitratab",
+      "app_modules_rendermutations",
+      "app_modules_renderpembayarantab",
+      "app_modules_renderringkasantab",
+      "app_modules_wiredatefilters"
+    ],
+    "5": [
       "app_ui",
       "app_ui_badge",
       "app_ui_barchart",
       "app_ui_datatable",
       "app_ui_ic",
       "app_ui_icons",
-      "app_ui_modal",
       "app_ui_renderkpis",
-      "app_ui_rendersidebar",
       "app_ui_status_variant",
       "app_ui_statusbadge",
       "app_ui_toast"
     ],
-    "3": [
-      "app_modules",
-      "app_modules_countinfra",
-      "app_modules_deletenode",
-      "app_modules_findparentarray",
-      "app_modules_kpis",
-      "app_modules_modulecard",
-      "app_modules_nodeicon",
-      "app_modules_pageintro",
-      "app_modules_paintbanner",
-      "app_modules_rendernode",
-      "app_modules_views"
-    ],
-    "4": [
-      "app_main",
-      "app_main_all_items",
-      "app_main_currentroute",
-      "app_main_issuperuser",
-      "app_main_nav_config",
-      "app_main_navwithbadges",
-      "app_main_partnership_keys",
-      "app_main_renderroute",
-      "app_main_syncnavbadge"
-    ],
-    "5": [
+    "6": [
       "app_modules_fieldshtml",
       "app_modules_openaddinputsplitterform",
-      "app_modules_openaddoltform",
       "app_modules_openaddoutputsplitterform",
+      "app_modules_openeditnodeform",
+      "app_modules_openmitratopupmodal",
       "app_modules_openpkgform",
-      "app_modules_painttree",
+      "app_modules_rendermitraform",
       "app_modules_rowwrap"
     ],
-    "6": [
-      "app_modules_findnode",
-      "app_modules_openeditnodeform",
-      "app_modules_paintpanel"
-    ],
     "7": [
+      "app_modules_deletenode",
+      "app_modules_findnode",
+      "app_modules_findparentarray",
+      "app_modules_paintpanel",
       "app_modules_pushactivity",
-      "app_modules_rendermitraform",
       "app_modules_renderregistrationpage"
+    ],
+    "8": [
+      "app_modules_nodeicon",
+      "app_modules_openaddoltform",
+      "app_modules_painttree",
+      "app_modules_rendernode"
     ]
   },
   "cohesion": {
-    "0": 0.1286549707602339,
-    "1": 0.17582417582417584,
-    "2": 0.21794871794871795,
-    "3": 0.2545454545454545,
-    "4": 0.4444444444444444,
-    "5": 0.5238095238095238,
-    "6": 0.6666666666666666,
-    "7": 0.6666666666666666
+    "0": 0.12105263157894737,
+    "1": 0.15789473684210525,
+    "2": 0.3333333333333333,
+    "3": 0.21212121212121213,
+    "4": 0.16666666666666666,
+    "5": 0.26666666666666666,
+    "6": 0.42857142857142855,
+    "7": 0.4,
+    "8": 0.5
   },
   "gods": [
     {
       "id": "app_data_fmt",
       "label": "Fmt",
-      "degree": 12
+      "degree": 22
     },
     {
       "id": "app_modules_fieldshtml",
       "label": "fieldsHTML()",
-      "degree": 9
+      "degree": 10
     },
     {
       "id": "app_modules_rowwrap",
       "label": "rowWrap()",
-      "degree": 9
+      "degree": 10
+    },
+    {
+      "id": "app_main_currentroute",
+      "label": "currentRoute()",
+      "degree": 8
+    },
+    {
+      "id": "app_modules_pushactivity",
+      "label": "pushActivity()",
+      "degree": 7
     },
     {
       "id": "app_modules_painttree",
       "label": "paintTree()",
       "degree": 7
+    },
+    {
+      "id": "app_ui_rendersidebar",
+      "label": "renderSidebar()",
+      "degree": 7
+    },
+    {
+      "id": "app_modules_openpaymentmodal",
+      "label": "openPaymentModal()",
+      "degree": 6
     },
     {
       "id": "app_modules_afterrender",
@@ -136,29 +184,20 @@
       "id": "app_modules_opencustomerform",
       "label": "openCustomerForm()",
       "degree": 6
-    },
-    {
-      "id": "app_modules_paintpanel",
-      "label": "paintPanel()",
-      "degree": 6
-    },
-    {
-      "id": "app_modules_deletenode",
-      "label": "deleteNode()",
-      "degree": 6
-    },
-    {
-      "id": "app_main_currentroute",
-      "label": "currentRoute()",
-      "degree": 5
-    },
-    {
-      "id": "app_modules_pushactivity",
-      "label": "pushActivity()",
-      "degree": 5
     }
   ],
   "surprises": [
+    {
+      "source": "renderSidebar()",
+      "target": "USERS",
+      "source_files": [
+        "app-ui.js",
+        "app-data.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "connects across different repos/directories; bridges separate communities; peripheral node `USERS` unexpectedly reaches hub `renderSidebar()`"
+    },
     {
       "source": "kpis()",
       "target": "Fmt",
@@ -171,7 +210,7 @@
       "why": "connects across different repos/directories; bridges separate communities"
     },
     {
-      "source": "openPaymentModal()",
+      "source": "openMitraWithdrawModal()",
       "target": "Fmt",
       "source_files": [
         "app-modules.js",
@@ -179,7 +218,7 @@
       ],
       "confidence": "EXTRACTED",
       "relation": "references",
-      "why": "connects across different repos/directories; peripheral node `openPaymentModal()` unexpectedly reaches hub `Fmt`"
+      "why": "connects across different repos/directories; bridges separate communities"
     },
     {
       "source": "openSettlementModal()",
@@ -201,18 +240,7 @@
       ],
       "confidence": "EXTRACTED",
       "relation": "references",
-      "why": "connects across different repos/directories; peripheral node `paint()` unexpectedly reaches hub `Fmt`"
-    },
-    {
-      "source": "showHistoryTab()",
-      "target": "Fmt",
-      "source_files": [
-        "app-modules.js",
-        "app-data.js"
-      ],
-      "confidence": "EXTRACTED",
-      "relation": "references",
-      "why": "connects across different repos/directories; peripheral node `showHistoryTab()` unexpectedly reaches hub `Fmt`"
+      "why": "connects across different repos/directories; bridges separate communities"
     }
   ],
   "tokens": {
