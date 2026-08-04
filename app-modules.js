@@ -264,10 +264,6 @@ function buildCustomerInvoiceHTML(customer, invoice, pkg, partner, paymentMethod
   const duePrev = new Date(now); duePrev.setDate(duePrev.getDate() - 1);
   const dueNext = new Date(now); dueNext.setMonth(dueNext.getMonth() + 1);
   const pppoe = (customer.pppoe_secret || '').toUpperCase();
-  const vaBCA = '1900' + (partner.bank_account_no||'').slice(-3) + pppoe.slice(-8);
-  const vaBRI = '142' + (partner.bank_account_no||'').slice(-3) + pppoe.slice(-8);
-  const alfamart = '352220' + (partner.bank_account_no||'').slice(-3) + pppoe.slice(-8);
-  const indomaret = '352221' + (partner.bank_account_no||'').slice(-3) + pppoe.slice(-8);
   return `
     <div style="text-align:center;margin-bottom:20px;">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--color-text-secondary);margin-bottom:6px;">Bukti Pembayaran</div>
@@ -284,13 +280,10 @@ function buildCustomerInvoiceHTML(customer, invoice, pkg, partner, paymentMethod
       <tr><td style="padding:8px 0;color:var(--color-text-secondary);">Jatuh Tempo Selanjutnya</td><td style="padding:8px 0;font-weight:600;">${Fmt.date(dueNext.toISOString().slice(0,10))}</td></tr>
     </table>
     <div style="background:var(--color-background-muted);border:1px solid var(--color-border);border-radius:8px;padding:16px;margin-bottom:16px;">
-      <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Untuk pembayaran berikutnya dapat melalui Virtual Account:</div>
-      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">- BCA : ${vaBCA}</div>
-      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px;">- BRI : ${vaBRI}</div>
-      <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Atau melalui Indomaret/Alfamart:</div>
-      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">sampaikan ke kasir "Pembayaran Internet ${partner.partner_name}" lalu gunakan nomor berikut:</div>
-      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">- Alfamart : ${alfamart}</div>
-      <div style="font-size:12px;color:var(--color-text-secondary);">- Indomaret : ${indomaret}</div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Informasi rekening pembayaran:</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">${partner.bank_name || '-'} : ${partner.bank_account_no || '-'}</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">a.n. ${partner.partner_name || partner.bank_account_name || '-'}</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);">Telepon: ${partner.phone_number || '-'}</div>
     </div>
     <div style="text-align:center;font-size:12px;color:var(--color-text-secondary);margin-top:20px;">
       Terima kasih,<br><strong>${partner.partner_name}</strong> &ndash; Solusi Internet Cepat dan Terpercaya!
