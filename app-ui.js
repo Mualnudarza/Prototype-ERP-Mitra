@@ -61,6 +61,7 @@ const STATUS_VARIANT = {
   'Belum Dibayar':'blue', 'Menunggu Verifikasi':'yellow', 'Penuh':'red',
   'Reguler':'blue', 'Fasum':'purple',
   'Unregistered':'yellow',
+  'Menunggu Proses':'yellow', 'Selesai':'green',
 };
 function statusBadge(text){
   return badge(text, STATUS_VARIANT[text] || 'gray');

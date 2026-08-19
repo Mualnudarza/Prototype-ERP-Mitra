@@ -62,7 +62,7 @@ const WILAYAH_LIST = ['Jabodetabek','Jawa Barat','Jawa Tengah','Jawa Timur','Bal
 const DB = {};
 
 DB.partners = [
-  {id:'PTR-0001', partner_code:'DSR-JKT-01', partner_name:'Mitra Nusantara Net', company_name:'PT Nusantara Net Indonesia', phone_number:'0812-3456-7810', email:'admin@nusantaranet.id', address:'Jl. Sudirman Kav. 21, Jakarta Selatan', operational_area:'Jabodetabek', business_configuration:'Revenue Share 70/30', status:'Aktif', users_count:3, created_at:'2024-02-11', pic_name:'Budi Santoso', cooperation_name:'Kerja Sama Distribusi Fiber', cooperation_doc_no:'PKS/2024/001', cooperation_start:'2024-02-11', cooperation_end:'2027-02-11', cooperation_doc_file:'PKS_NetIndo_2024.pdf', npwp_nib:'01.234.567.8-901.000', bank_name:'Bank Mandiri', bank_account_no:'1230007890123', bank_account_name:'PT Nusantara Net Indonesia', payment_due_type:'Tanggal Tetap', payment_due_value:'10', cashier_deposit_min:500000, cashier_deposit_initial:5000000, saldo_utama:4701000, kso_value:30, kso_type:'percentage', other_deductions:[{name:'Biaya Administrasi',value:2,type:'percentage'}]},
+  {id:'PTR-0001', partner_code:'DSR-JKT-01', partner_name:'Mitra Nusantara Net', company_name:'PT Nusantara Net Indonesia', phone_number:'0812-3456-7810', email:'admin@nusantaranet.id', address:'Jl. Sudirman Kav. 21, Jakarta Selatan', operational_area:'Jabodetabek', business_configuration:'Revenue Share 70/30', status:'Aktif', users_count:3, created_at:'2024-02-11', pic_name:'Budi Santoso', cooperation_name:'Kerja Sama Distribusi Fiber', cooperation_doc_no:'PKS/2024/001', cooperation_start:'2024-02-11', cooperation_end:'2027-02-11', cooperation_doc_file:'PKS_NetIndo_2024.pdf', npwp_nib:'01.234.567.8-901.000', bank_name:'Bank Mandiri', bank_account_no:'1230007890123', bank_account_name:'PT Nusantara Net Indonesia', payment_due_type:'Tanggal Tetap', payment_due_value:'10', cashier_deposit_min:1000000, cashier_deposit_initial:5000000, saldo_settlement:203320, saldo_deposit:4500000, kso_value:30, kso_type:'percentage', other_deductions:[{name:'Biaya Administrasi',value:2,type:'percentage'}]},
 ];
 
 DB.users = [
@@ -94,6 +94,18 @@ DB.settlementHistory = [
 ];
 
 /* ---------------------------------------------------------------------- */
+/* 2b. WORK ORDERS (WO) — Transfer Settlement                              */
+/* ---------------------------------------------------------------------- */
+
+DB.workOrders = [
+  {id:'WO-0001', partner_id:'PTR-0001', type:'Mingguan', period:'Minggu ke-3 Agustus 2026', amount:98500, due_date:'2026-08-18', status:'Menunggu Proses', proof:null, processed_by:null, processed_at:null, completed_at:null},
+  {id:'WO-0002', partner_id:'PTR-0001', type:'Bulanan', period:'Agustus 2026', amount:142500, due_date:'2026-09-01', status:'Menunggu Proses', proof:null, processed_by:null, processed_at:null, completed_at:null},
+  {id:'WO-0003', partner_id:'PTR-0001', type:'Mingguan', period:'Minggu ke-2 Agustus 2026', amount:85200, due_date:'2026-08-11', status:'Selesai', proof:'Transfer ke Mandiri 1230007890123, ref: TF-20260811-001', processed_by:'Tim FAT', processed_at:'2026-08-11T14:30:00', completed_at:'2026-08-11T14:30:00'},
+  {id:'WO-0004', partner_id:'PTR-0001', type:'Mingguan', period:'Minggu ke-4 Juli 2026', amount:112000, due_date:'2026-08-04', status:'Selesai', proof:'Transfer ke Mandiri 1230007890123, ref: TF-20260804-001', processed_by:'Tim FAT', processed_at:'2026-08-04T10:15:00', completed_at:'2026-08-04T10:15:00'},
+  {id:'WO-0005', partner_id:'PTR-0001', type:'Bulanan', period:'Juli 2026', amount:203320, due_date:'2026-08-01', status:'Selesai', proof:'Transfer ke Mandiri 1230007890123, ref: TF-20260801-001', processed_by:'Tim FAT', processed_at:'2026-08-01T09:00:00', completed_at:'2026-08-01T09:00:00'},
+];
+
+/* ---------------------------------------------------------------------- */
 /* 2. CUSTOMER & PACKAGE MANAGEMENT                                       */
 /* ---------------------------------------------------------------------- */
 
@@ -121,6 +133,34 @@ function pkgPrice(pkgId){ const p = DB.packages.find(x=>x.id===pkgId); return p?
 function pkgName(pkgId){ const p = DB.packages.find(x=>x.id===pkgId); return p? p.package_name : '-'; }
 function custName(id){ const c = DB.customers.find(x=>x.id===id); return c? c.customer_name : '-'; }
 function partnerName(id){ const p = DB.partners.find(x=>x.id===id); return p? p.partner_name : '-'; }
+
+/* Hitung potongan dari satu pembayaran VA */
+function calcDeductions(billingAmt, partner){
+  let ksoAmt = 0;
+  if(partner.kso_type === 'percentage') ksoAmt = Math.round(billingAmt * (partner.kso_value / 100));
+  else ksoAmt = partner.kso_value || 0;
+  const pgFee = 3000;
+  let adminAmt = 0;
+  if(partner.other_deductions && partner.other_deductions.length > 0){
+    partner.other_deductions.forEach(d => {
+      adminAmt += d.type === 'percentage' ? Math.round(billingAmt * (d.value / 100)) : d.value;
+    });
+  }
+  const totalPotongan = ksoAmt + pgFee + adminAmt;
+  const netToMitra = billingAmt - totalPotongan;
+  return { ksoAmt, pgFee, adminAmt, totalPotongan, netToMitra };
+}
+
+/* Format periode WO */
+function woPeriodLabel(type, date){
+  const d = date ? new Date(date) : new Date();
+  const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  if(type === 'Bulanan') return months[d.getMonth()] + ' ' + d.getFullYear();
+  // Mingguan: hitung minggu ke- dalam bulan
+  const dayOfMonth = d.getDate();
+  const weekNum = Math.ceil(dayOfMonth / 7);
+  return 'Minggu ke-' + weekNum + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+}
 
 DB.invoices = [
   {id:'INV-880231', customer_id:'CUS-2001', invoice_number:'INV/2026/07/00231', billing_period:'Juli 2026', billing_amount:299000, generated_date:'2026-07-01', due_date:'2026-07-15', billing_status:'Lunas', extra_charge:5980, total_paid:304980, settled:false},

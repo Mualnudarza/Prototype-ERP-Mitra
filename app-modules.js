@@ -116,22 +116,22 @@ function openBulkPaymentModal(selectedRows, partner){
         </table>
       </div>
       <div style="padding:10px;background:var(--color-background-muted);border-radius:6px;font-size:11px;color:var(--color-text-secondary);">
-        <strong>Saldo Utama Mitra:</strong> ${Fmt.rupiah(partner.saldo_utama)} &nbsp;|&nbsp;
-        <strong style="color:var(--badge-green-fg);">Catatan: Saldo utama akan terpotong otomatis saat konfirmasi pembayaran.</strong>
+        <strong>Saldo Deposit Mitra:</strong> ${Fmt.rupiah(partner.saldo_deposit)} &nbsp;|&nbsp;
+        <strong style="color:var(--badge-green-fg);">Catatan: Saldo deposit akan terpotong otomatis saat konfirmasi pembayaran.</strong>
       </div>
     </div>`,
     footHTML:`<button class="btn btn-secondary" id="mCloseBulk">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmBulk">${ic('check')} Konfirmasi Pembayaran Bulk</button>`,
     onOpen(b, f){
       f.querySelector('#mCloseBulk').addEventListener('click', Modal.close);
       f.querySelector('#mConfirmBulk').addEventListener('click', () => {
-        const prevBalance = partner.saldo_utama;
-        partner.saldo_utama -= totalBilling;
+        const prevBalance = partner.saldo_deposit;
+        partner.saldo_deposit -= totalBilling;
         
         let successCount = 0;
         selectedRows.forEach(r => {
           const inv = r.invoice;
-          const prevBal = partner.saldo_utama;
-          partner.saldo_utama -= inv.billing_amount;
+          const prevBal = partner.saldo_deposit;
+          partner.saldo_deposit -= inv.billing_amount;
           inv.billing_status = 'Lunas';
           inv.extra_charge = r.extraCharge;
           inv.total_paid = r.invoice.billing_amount;
@@ -152,7 +152,7 @@ function openBulkPaymentModal(selectedRows, partner){
             type: 'Deposit Keluar',
             amount: -r.invoice.billing_amount,
             balance_before: prevBal,
-            balance_after: partner.saldo_utama,
+            balance_after: partner.saldo_deposit,
             date: new Date().toISOString().slice(0,10),
             note: 'Pembayaran ' + r.customer.customer_name + ' — ' + inv.invoice_number,
             status: 'Berhasil',
@@ -160,8 +160,8 @@ function openBulkPaymentModal(selectedRows, partner){
           successCount++;
         });
         
-        pushActivity(CURRENT_USER.name, `mencatat pembayaran bulk ${successCount} customer sebesar ${Fmt.rupiah(totalBilling)} (saldo utama terpotong)`);
-        toast(`Pembayaran bulk ${successCount} customer berhasil dicatat! Saldo utama telah terpotong.`);
+        pushActivity(CURRENT_USER.name, `mencatat pembayaran bulk ${successCount} customer sebesar ${Fmt.rupiah(totalBilling)} (saldo deposit terpotong)`);
+        toast(`Pembayaran bulk ${successCount} customer berhasil dicatat! Saldo deposit telah terpotong.`);
         window.dispatchEvent(new CustomEvent('keuangan-refresh'));
         Modal.close();
         setTimeout(() => openCustomerInvoiceModal(selectedRows[0].customer, selectedRows[0].invoice, selectedRows[0].pkg, partner, 'Tunai / Kasir (Bulk)'), 300);
@@ -254,7 +254,7 @@ function buildPaymentInvoiceHTML(customer, invoice, pkg, partner){
         </tr>\
       </table>\
       <div style="margin-top:16px;padding:10px;background:var(--color-background-muted);border-radius:6px;font-size:11px;color:var(--color-text-secondary);">\
-        <strong>Metode Pembayaran:</strong> Tunai / Kasir &nbsp;|&nbsp; <strong>Saldo Utama Mitra:</strong> ' + Fmt.rupiah(partner.saldo_utama) + '\
+        <strong>Metode Pembayaran:</strong> Tunai / Kasir &nbsp;|&nbsp; <strong>Saldo Deposit Mitra:</strong> ' + Fmt.rupiah(partner.saldo_deposit) + '\
       </div>'
   };
 }
@@ -364,7 +364,7 @@ function openVASimulationModal(partner){
 
   Modal.open({
     title:'Simulasi Pembayaran Virtual Account',
-    subtitle:'Pilih invoice yang akan dibayar via VA — saldo utama mitra akan bertambah',
+    subtitle:'Pilih invoice yang akan dibayar via VA — bersih masuk ke saldo settlement mitra (setelah potongan KSO/PG/Admin)',
     size:'lg',
     bodyHTML:'<div id="simVATableWrap">' + buildTable() + '</div>',
     footHTML:'<button class="btn btn-secondary" id="mCloseSimVA">' + ic('x') + ' Tutup</button>',
@@ -376,8 +376,9 @@ function openVASimulationModal(partner){
           if(!inv) return;
           const cust = DB.customers.find(c => c.id === inv.customer_id);
           const pkg = cust ? DB.packages.find(p => p.id === cust.package_id) : null;
-          const prevBalance = partner.saldo_utama;
-          partner.saldo_utama += inv.billing_amount;
+          const ded = calcDeductions(inv.billing_amount, partner);
+          const prevBalance = partner.saldo_settlement;
+          partner.saldo_settlement += ded.netToMitra;
           inv.billing_status = 'Lunas';
           inv.total_paid = inv.billing_amount;
           inv.settled = false;
@@ -389,14 +390,14 @@ function openVASimulationModal(partner){
           });
           DB.depositHistory.push({
             id: nextId('DEP'), partner_id: partner.id, ref: 'VA-PAY/' + Date.now(),
-            type: 'Deposit Masuk', amount: inv.billing_amount,
-            balance_before: prevBalance, balance_after: partner.saldo_utama,
+            type: 'Settlement Masuk', amount: ded.netToMitra,
+            balance_before: prevBalance, balance_after: partner.saldo_settlement,
             date: new Date().toISOString().slice(0,10),
-            note: 'Pembayaran VA ' + cust.customer_name + ' — ' + inv.invoice_number,
+            note: 'Pembayaran VA ' + cust.customer_name + ' — ' + inv.invoice_number + ' (potongan: ' + Fmt.rupiah(ded.totalPotongan) + ')',
             status: 'Berhasil',
           });
-          pushActivity(CURRENT_USER.name, 'mensimulasikan pembayaran VA ' + cust.customer_name + ' sebesar ' + Fmt.rupiah(inv.billing_amount) + ' (saldo utama bertambah)');
-          toast('Pembayaran VA ' + cust.customer_name + ' berhasil! Saldo utama bertambah ' + Fmt.rupiah(inv.billing_amount) + '.');
+          pushActivity(CURRENT_USER.name, 'mensimulasikan pembayaran VA ' + cust.customer_name + ' — bersih ' + Fmt.rupiah(ded.netToMitra) + ' masuk saldo settlement (potongan ' + Fmt.rupiah(ded.totalPotongan) + ')');
+          toast('Pembayaran VA ' + cust.customer_name + ' berhasil! Saldo settlement bertambah ' + Fmt.rupiah(ded.netToMitra) + '.');
           window.dispatchEvent(new CustomEvent('keuangan-refresh'));
           Modal.close();
           setTimeout(() => openCustomerInvoiceModal(cust, inv, pkg, partner, 'Virtual Account'), 300);
@@ -416,8 +417,8 @@ function openPaymentModal(customer, invoice, pkg, extraCharge, totalPayable, par
     onOpen: function(b, f){
       f.querySelector('#mClosePay').addEventListener('click', Modal.close);
       f.querySelector('#mConfirmPay').addEventListener('click', function(){
-        const prevBalance = partner.saldo_utama;
-        partner.saldo_utama -= inv.billingAmt;
+        const prevBalance = partner.saldo_deposit;
+        partner.saldo_deposit -= inv.billingAmt;
         
         invoice.billing_status = 'Lunas';
         invoice.extra_charge = extraCharge;
@@ -441,14 +442,14 @@ function openPaymentModal(customer, invoice, pkg, extraCharge, totalPayable, par
           type: 'Deposit Keluar',
           amount: -inv.billingAmt,
           balance_before: prevBalance,
-          balance_after: partner.saldo_utama,
+          balance_after: partner.saldo_deposit,
           date: new Date().toISOString().slice(0,10),
           note: 'Pembayaran ' + invoice.invoice_number + ' - ' + customer.customer_name,
           status: 'Berhasil',
         });
         
-        pushActivity(CURRENT_USER.name, 'mencatat pembayaran ' + customer.customer_name + ' sebesar ' + Fmt.rupiah(inv.billingAmt) + ' (saldo utama terpotong)');
-        toast('Pembayaran berhasil dicatat! Saldo utama telah terpotong.');
+        pushActivity(CURRENT_USER.name, 'mencatat pembayaran ' + customer.customer_name + ' sebesar ' + Fmt.rupiah(inv.billingAmt) + ' (saldo deposit terpotong)');
+        toast('Pembayaran berhasil dicatat! Saldo deposit telah terpotong.');
         window.dispatchEvent(new CustomEvent('keuangan-refresh'));
         Modal.close();
         setTimeout(() => openCustomerInvoiceModal(customer, invoice, pkg, partner, 'Tunai / Kasir'), 300);
@@ -1275,7 +1276,7 @@ Views['deposit.dashboard'] = function(root){
     const keluar = history.filter(d => d.type === 'Deposit Keluar' && d.status === 'Berhasil').reduce((s,d)=>s+Math.abs(d.amount), 0);
 
     root.querySelector('#kpiSlot').outerHTML = `<div id="kpiSlot">${renderKPIs([
-      {label:'Saldo Utama Saat Ini', value:Fmt.rupiah(partner.saldo_utama), icon:'wallet', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
+      {label:'Saldo Deposit Saat Ini', value:Fmt.rupiah(partner.saldo_deposit), icon:'wallet', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
       {label:'Total Deposit Masuk', value:Fmt.rupiah(masuk), icon:'plus', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
       {label:'Total Deposit Keluar', value:Fmt.rupiah(keluar), icon:'minus', bg:'var(--badge-orange-bg)', fg:'var(--badge-orange-fg)'},
       {label:'Total Pembayaran Customer', value:Fmt.rupiah(keluar), icon:'users', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'}
@@ -1405,7 +1406,7 @@ Views['deposit.dashboard'] = function(root){
         </tr>
       </table>
       <div style="margin-top:16px;padding:10px;background:var(--color-background-muted);border-radius:6px;font-size:11px;color:var(--color-text-secondary);">
-        <strong>Metode Pembayaran:</strong> Tunai / Kasir &nbsp;|&nbsp; <strong>Saldo Utama Mitra:</strong> ${Fmt.rupiah(partner.saldo_utama)}
+        <strong>Metode Pembayaran:</strong> Tunai / Kasir &nbsp;|&nbsp; <strong>Saldo Deposit Mitra:</strong> ${Fmt.rupiah(partner.saldo_deposit)}
       </div>
     `};
   }
@@ -1420,8 +1421,8 @@ Views['deposit.dashboard'] = function(root){
       onOpen(b, f){
         f.querySelector('#mClosePay').addEventListener('click', Modal.close);
         f.querySelector('#mConfirmPay').addEventListener('click', () => {
-          const prevBalance = partner.saldo_utama;
-          partner.saldo_utama -= inv.billingAmt;
+          const prevBalance = partner.saldo_deposit;
+          partner.saldo_deposit -= inv.billingAmt;
           
           invoice.billing_status = 'Lunas';
           invoice.extra_charge = extraCharge;
@@ -1445,14 +1446,14 @@ Views['deposit.dashboard'] = function(root){
             type: 'Deposit Keluar',
             amount: -inv.billingAmt,
             balance_before: prevBalance,
-            balance_after: partner.saldo_utama,
+            balance_after: partner.saldo_deposit,
             date: new Date().toISOString().slice(0,10),
             note: 'Pembayaran ' + invoice.invoice_number + ' - ' + customer.customer_name,
             status: 'Berhasil',
           });
           
-          pushActivity(CURRENT_USER.name, `mencatat pembayaran ${customer.customer_name} sebesar ${Fmt.rupiah(inv.billingAmt)} (saldo utama terpotong)`);
-          toast('Pembayaran berhasil dicatat! Saldo utama telah terpotong.');
+          pushActivity(CURRENT_USER.name, `mencatat pembayaran ${customer.customer_name} sebesar ${Fmt.rupiah(inv.billingAmt)} (saldo deposit terpotong)`);
+          toast('Pembayaran berhasil dicatat! Saldo deposit telah terpotong.');
           window.dispatchEvent(new CustomEvent('keuangan-refresh'));
           Modal.close();
         });
@@ -1714,9 +1715,11 @@ function renderPartnerFinanceOverview(container, opts){
         const cnt = DB.customers.filter(c => c.partner_id===r.id && c.customer_status==='Active').length;
         return `<span class="cell-num">${cnt}</span>`;
       }},
-      {key:'saldo_utama', header:'Saldo Utama', sortable:true, align:'right', render:r => {
-        const warn = r.saldo_utama < (r.cashier_deposit_min||0);
-        return `<span class="cell-num" style="font-weight:700;color:${warn ? 'var(--badge-red-fg)' : 'var(--badge-green-fg)'}">${Fmt.rupiah(r.saldo_utama)}</span>`;
+      {key:'saldo_deposit', header:'Saldo Deposit', sortable:true, align:'right', render:r => {
+        return `<span class="cell-num" style="font-weight:700;color:var(--badge-blue-fg);">${Fmt.rupiah(r.saldo_deposit || 0)}</span>`;
+      }},
+      {key:'saldo_settlement', header:'Saldo Settlement', sortable:true, align:'right', render:r => {
+        return `<span class="cell-num" style="font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(r.saldo_settlement || 0)}</span>`;
       }},
       ...(role === 'fat' ? [
         {key:'settlement_available', header:'Saldo Settlement', sortable:true, align:'right', render:r => {
@@ -1739,7 +1742,7 @@ function renderPartnerFinanceOverview(container, opts){
         }}
       ] : []),
       {key:'status_mitra', header:'Status', sortable:true, render:r => {
-        const depWarn = r.saldo_utama < (r.cashier_deposit_min||0);
+        const depWarn = r.saldo_deposit < (r.cashier_deposit_min||0);
         const hasPendingStl = pendingSettlementsAll.some(s => s.partner_id===r.id);
         const hasPendingDep = pendingTopUpsAll.some(t => t.partner_id===r.id);
         let label = 'Normal';
@@ -1775,10 +1778,7 @@ function renderPartnerFinanceOverview(container, opts){
         });
         wrap.querySelectorAll('.act-fat-stl').forEach(btn => {
           btn.addEventListener('click', () => {
-            const pid = btn.dataset.pid;
-            const settlement = pendingSettlementsAll.find(s => s.partner_id===pid);
-            const partner = allP.find(p => p.id===pid);
-            if(settlement && partner) openSettlementVerifyModal(settlement, partner);
+            toast('Proses settlement dilakukan melalui tab WO Transfer Settlement.');
           });
         });
       }
@@ -1827,7 +1827,7 @@ function renderFATKuangan(root){
         <button class="subtab ${activeMode==='overview'?'active':''}" data-mode="overview">${ic('building')}Ringkasan Lintas Mitra</button>
         <button class="subtab ${activeMode==='payment'?'active':''}" data-mode="payment">${ic('wallet')}Historis Pembayaran</button>
         <button class="subtab ${activeMode==='deposit'?'active':''}" data-mode="deposit">${ic('wallet')}Verifikasi Deposit${pendingTopUps.length > 0 ? ` <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">${pendingTopUps.length}</span>` : ''}</button>
-        <button class="subtab ${activeMode==='settlement'?'active':''}" data-mode="settlement">${ic('history')}Monitoring Settlement${pendingSettlements.length > 0 ? ` <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">${pendingSettlements.length}</span>` : ''}</button>
+        <button class="subtab ${activeMode==='wo'?'active':''}" data-mode="wo">${ic('clipboardList')}WO Transfer Settlement</button>
       </div>
       <div id="suModeContent"></div>
     `;
@@ -1850,18 +1850,18 @@ function renderFATKuangan(root){
       renderPaymentMode(modeContent);
     } else if(activeMode === 'deposit'){
       renderDepositVerifyMode(modeContent, pendingTopUps);
-    } else {
-      renderSettlementMode(modeContent, pendingSettlements);
+    } else if(activeMode === 'wo'){
+      renderWOTransferMode(modeContent);
     }
   }
 
   function renderPaymentMode(container){
     const successfulPayments = allPayments.filter(p => p.payment_status === 'Berhasil');
-    const totalDepositAll = allPartners.reduce((s, p) => s + (p.saldo_utama || 0), 0);
+    const totalDepositAll = allPartners.reduce((s, p) => s + (p.saldo_deposit || 0), 0);
 
     let html = `<div id="kpiSlot">${renderKPIs([
       {label:'Total Mitra', value:allPartners.length, icon:'users', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
-      {label:'Total Saldo Utama Mitra', value:Fmt.rupiah(totalDepositAll), icon:'wallet', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'},
+      {label:'Total Saldo Deposit Mitra', value:Fmt.rupiah(totalDepositAll), icon:'wallet', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'},
       {label:'Total Pembayaran Berhasil', value:successfulPayments.length, icon:'checkCircle', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
       {label:'Total Nilai Pembayaran', value:Fmt.rupiah(successfulPayments.reduce((s,p)=>s+p.billing_amount,0)), icon:'wallet', bg:'var(--badge-orange-bg)', fg:'var(--badge-orange-fg)'},
     ])}</div>`;
@@ -1910,7 +1910,7 @@ function renderFATKuangan(root){
       columns: [
         {key:'partner_code', header:'Kode', sortable:true, render:r=>`<span class="cell-mono">${r.partner_code}</span>`},
         {key:'partner_name', header:'Nama Mitra', sortable:true, render:r=>`<span class="cell-strong">${r.partner_name}</span>`},
-        {key:'saldo_utama', header:'Saldo Utama', sortable:true, align:'right', render:r=>`<span class="cell-num" style="color:${r.saldo_utama < 0 ? 'var(--badge-red-fg)' : 'var(--badge-green-fg)'}">${Fmt.rupiah(r.saldo_utama)}</span>`},
+        {key:'saldo_deposit', header:'Saldo Deposit', sortable:true, align:'right', render:r=>`<span class="cell-num" style="color:${r.saldo_deposit < 0 ? 'var(--badge-red-fg)' : 'var(--badge-green-fg)'}">${Fmt.rupiah(r.saldo_deposit)}</span>`},
         {key:'totalPayments', header:'Total Pembayaran', sortable:true, align:'center', render:r=>{
           const cnt = allPayments.filter(p => {
             const mp = getMitraForPayment(p);
@@ -1969,9 +1969,9 @@ function renderFATKuangan(root){
         }},
         {key:'billing_amount', header:'Nominal', sortable:true, align:'right', render:r=>`<span class="cell-num" style="font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(r.billing_amount)}</span>`},
         {key:'payment_date', header:'Tanggal', sortable:true, sortValue:r=>r.payment_date, render:r=>Fmt.datetime(r.payment_date)},
-        {key:'saldo_utama', header:'Saldo Mitra Saat Ini', align:'right', render:r=>{
+        {key:'saldo_deposit', header:'Saldo Deposit Mitra Saat Ini', align:'right', render:r=>{
           const p = getMitraForPayment(r);
-          const balance = p ? p.saldo_utama : 0;
+          const balance = p ? p.saldo_deposit : 0;
           return `<span class="cell-num">${Fmt.rupiah(balance)}</span>`;
         }},
         {key:'actions', header:'', align:'right', render:r=>
@@ -2135,8 +2135,8 @@ function renderFATKuangan(root){
             <tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Mitra</td><td style="padding:6px 8px;text-align:right;font-weight:600;">${partner.partner_name}</td></tr>
             <tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Kode Mitra</td><td style="padding:6px 8px;text-align:right;">${partner.partner_code}</td></tr>
             <tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Nominal Deposit</td><td style="padding:6px 8px;text-align:right;font-weight:700;font-size:16px;color:var(--badge-green-fg);">${Fmt.rupiah(topup.amount)}</td></tr>
-            <tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Saldo Saat Ini</td><td style="padding:6px 8px;text-align:right;">${Fmt.rupiah(partner.saldo_utama)}</td></tr>
-            <tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Saldo Setelah Diverifikasi</td><td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(partner.saldo_utama + topup.amount)}</td></tr>
+            <tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Saldo Saat Ini</td><td style="padding:6px 8px;text-align:right;">${Fmt.rupiah(partner.saldo_deposit)}</td></tr>
+            <tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Saldo Setelah Diverifikasi</td><td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(partner.saldo_deposit + topup.amount)}</td></tr>
           </table>
         </div>
         <div style="background:var(--color-background-muted);border-radius:8px;padding:16px;margin-bottom:16px;">
@@ -2153,8 +2153,8 @@ function renderFATKuangan(root){
       onOpen(b, f){
         f.querySelector('#mCancelVerify').addEventListener('click', Modal.close);
         f.querySelector('#mConfirmVerify').addEventListener('click', ()=>{
-          const prevBalance = partner.saldo_utama;
-          partner.saldo_utama += topup.amount;
+          const prevBalance = partner.saldo_deposit;
+          partner.saldo_deposit += topup.amount;
 
           topup.status = 'Selesai';
           topup.verified_by = CURRENT_USER.name;
@@ -2168,13 +2168,13 @@ function renderFATKuangan(root){
             date: new Date().toISOString().slice(0,10),
             amount: topup.amount,
             balance_before: prevBalance,
-            balance_after: partner.saldo_utama,
+            balance_after: partner.saldo_deposit,
             note: 'Penambahan saldo dari pengajuan ' + topup.ref,
             status: 'Berhasil',
           });
 
-          pushActivity(CURRENT_USER.name, `memverifikasi penambahan saldo ${partner.partner_name} sebesar ${Fmt.rupiah(topup.amount)} — saldo utama bertambah`);
-          toast(`Saldo utama ${partner.partner_name} berhasil ditambahkan sebesar ${Fmt.rupiah(topup.amount)}!`);
+          pushActivity(CURRENT_USER.name, `memverifikasi penambahan saldo deposit ${partner.partner_name} sebesar ${Fmt.rupiah(topup.amount)} — saldo deposit bertambah`);
+          toast(`Saldo deposit ${partner.partner_name} berhasil ditambahkan sebesar ${Fmt.rupiah(topup.amount)}!`);
           window.dispatchEvent(new CustomEvent('keuangan-refresh'));
           Modal.close();
         });
@@ -2240,211 +2240,201 @@ function renderFATKuangan(root){
 
   /* ========== SETTLEMENT MODE ========== */
 
-  function renderSettlementMode(container, pendingSettlements){
-    const completedSettlements = allSettlements.filter(s => s.status === 'Selesai');
-    const totalSettledAll = completedSettlements.reduce((s, x) => s + (x.net_revenue || 0), 0);
-    const filteredPending = fatMitraFilter ? pendingSettlements.filter(s => s.partner_id === fatMitraFilter) : pendingSettlements;
 
-    let html = `<div id="kpiSlot">${renderKPIs([
+  /* ========== WO TRANSFER SETTLEMENT ========== */
+  function renderWOTransferMode(container){
+    const pendingWOs = DB.workOrders.filter(wo => wo.status === 'Menunggu Proses');
+    const filteredPending = fatMitraFilter ? pendingWOs.filter(wo => wo.partner_id === fatMitraFilter) : pendingWOs;
+    const totalPending = filteredPending.reduce((s,wo) => s + (wo.amount||0), 0);
+
+    let html = '<div id="kpiSlot">' + renderKPIs([
       {label:'Total Mitra', value:allPartners.length, icon:'users', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
-      {label:'Menunggu Proses', value:filteredPending.length, icon:'inbox', bg:'var(--badge-yellow-bg)', fg:'var(--badge-yellow-fg)'},
-      {label:'Total Sudah Diselesaikan', value:completedSettlements.length, icon:'checkCircle', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
-      {label:'Total Nilai Settlement', value:Fmt.rupiah(totalSettledAll), icon:'wallet', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'},
-    ])}</div>`;
-    html += `<div class="card card-pad" style="margin-bottom:12px;"><div class="field" style="margin:0;"><label>Filter Mitra</label><select class="input" id="fatFilterMitra" style="min-width:220px;"><option value="">Semua Mitra</option>${allPartners.map(p=>`<option value="${p.id}" ${fatMitraFilter===p.id?'selected':''}>${p.partner_name}</option>`).join('')}</select></div></div>`;
+      {label:'WO Menunggu Proses', value:filteredPending.length, icon:'inbox', bg:'var(--badge-yellow-bg)', fg:'var(--badge-yellow-fg)'},
+      {label:'Total Nilai WO Pending', value:Fmt.rupiah(totalPending), icon:'wallet', bg:'var(--badge-orange-bg)', fg:'var(--badge-orange-fg)'},
+      {label:'WO Mingguan', value:filteredPending.filter(wo=>wo.type==='Mingguan').length, icon:'history', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'},
+    ]) + '</div>';
+    html += '<div class="card card-pad" style="margin-bottom:12px;"><div class="field" style="margin:0;"><label>Filter Mitra</label><select class="input" id="fatFilterMitra" style="min-width:220px;"><option value="">Semua Mitra</option>' + allPartners.map(p=>'<option value="' + p.id + '" ' + (fatMitraFilter===p.id?'selected':'') + '>' + p.partner_name + '</option>').join('') + '</select></div></div>';
 
-    html += `
-      <div class="subtabs" id="suSettleTabs">
-        <button class="subtab ${activeTab==='settle_mitra'?'active':''}" data-tab="settle_mitra">${ic('users')}Ringkasan Per Mitra</button>
-        <button class="subtab ${activeTab==='settle_queue'?'active':''}" data-tab="settle_queue">${ic('inbox')}Antrian Settlement${filteredPending.length > 0 ? ` <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">${filteredPending.length}</span>` : ''}</button>
-      </div>
-      <div id="suSettleTabContent"></div>
-    `;
+    html += '<div class="subtabs" id="suWOTabs">'
+      + '<button class="subtab ' + (activeTab==='wo_pending'?'active':'') + '" data-tab="wo_pending">' + ic('inbox') + 'WO Menunggu Proses' + (filteredPending.length > 0 ? ' <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">' + filteredPending.length + '</span>' : '') + '</button>'
+      + '<button class="subtab ' + (activeTab==='wo_history'?'active':'') + '" data-tab="wo_history">' + ic('history') + 'Histori WO Selesai</button>'
+      + '</div><div id="suWOTabContent"></div>';
     container.innerHTML = html;
 
-    const tabContent = container.querySelector('#suSettleTabContent');
-    const tabs = container.querySelectorAll('#suSettleTabs .subtab');
+    const tabContent = container.querySelector('#suWOTabContent');
+    const tabs = container.querySelectorAll('#suWOTabs .subtab');
 
-    tabs.forEach(btn=>{
-      btn.addEventListener('click', ()=>{
+    tabs.forEach(function(btn){
+      btn.addEventListener('click', function(){
         activeTab = btn.dataset.tab;
         renderRoot();
       });
     });
 
     const filterEl = container.querySelector('#fatFilterMitra');
-    if(filterEl) filterEl.addEventListener('change', ()=>{ fatMitraFilter = filterEl.value; renderRoot(); });
+    if(filterEl) filterEl.addEventListener('change', function(){ fatMitraFilter = filterEl.value; renderRoot(); });
 
-    if(activeTab === 'settle_mitra'){
-      renderSettlementMitraOverview(tabContent, filteredPending);
+    if(activeTab === 'wo_pending'){
+      renderWOPendingQueue(tabContent, filteredPending);
     } else {
-      renderSettlementQueue(tabContent, filteredPending);
+      renderWOHistory(tabContent);
     }
   }
 
-  function renderSettlementMitraOverview(container, pendingSettlements){
-    container.innerHTML = `
-      <div class="section-head"><h3>Ringkasan Per Mitra</h3></div>
-      <div id="settleMitraSlot"></div>
-    `;
-    const mitraSlot = container.querySelector('#settleMitraSlot');
-    const mitraTable = DataTable({
-      rows: () => fatMitraFilter ? allPartners.filter(p => p.id === fatMitraFilter) : allPartners,
-      rowKey: 'id',
-      searchPlaceholder: 'Cari nama mitra...',
-      searchFields: ['partner_name', 'partner_code'],
-      columns: [
-        {key:'partner_code', header:'Kode', sortable:true, render:r=>`<span class="cell-mono">${r.partner_code}</span>`},
-        {key:'partner_name', header:'Nama Mitra', sortable:true, render:r=>`<span class="cell-strong">${r.partner_name}</span>`},
-        {key:'saldo_utama', header:'Saldo Utama', sortable:true, align:'right', render:r=>`<span class="cell-num" style="color:${r.saldo_utama < 0 ? 'var(--badge-red-fg)' : 'var(--badge-green-fg)'}">${Fmt.rupiah(r.saldo_utama)}</span>`},
-        {key:'pendingCount', header:'Antrian', sortable:true, align:'center', render:r=>{
-          const cnt = pendingSettlements.filter(s => s.partner_id === r.id).length;
-          return cnt > 0
-            ? `<span style="font-weight:700;color:var(--badge-yellow-fg);cursor:pointer;" class="act-goto-settle-queue">${cnt} &raquo;</span>`
-            : `<span style="color:var(--color-text-secondary);">0</span>`;
-        }},
-      ],
-      afterRender(wrap){
-        wrap.querySelectorAll('.act-goto-settle-queue').forEach(el=>{
-          el.addEventListener('click', ()=>{
-            activeTab = 'settle_queue';
-            renderRoot();
-          });
-        });
-      }
-    });
-    const mitraCard = document.createElement('div'); mitraCard.className='card';
-    mitraCard.appendChild(mitraTable);
-    mitraSlot.appendChild(mitraCard);
-  }
-
-  function renderSettlementQueue(container, pendingSettlements){
-    container.innerHTML = `
-      <div class="section-head"><h3>Antrian Settlement</h3></div>
-      <div id="settleQueueSlot"></div>
-    `;
-    const queueSlot = container.querySelector('#settleQueueSlot');
-
-    if(pendingSettlements.length === 0){
-      queueSlot.innerHTML = `<div class="empty-state">
-        ${ic('checkCircle')}
-        <div class="es-title">Tidak ada settlement yang menunggu proses.</div>
-      </div>`;
+  function renderWOPendingQueue(container, pendingWOs){
+    if(pendingWOs.length === 0){
+      container.innerHTML = '<div class="empty-state">' + ic('checkCircle') + '<div class="es-title">Tidak ada WO yang menunggu proses</div><div class="es-sub">WO akan muncul ketika ada saldo settlement > 0 dari mitra.</div></div>';
       return;
     }
 
-    const queueTable = DataTable({
-      rows: () => pendingSettlements,
+    container.innerHTML = '<div class="section-head"><h3>Daftar WO Transfer Settlement</h3></div><div id="woQueueSlot"></div>';
+    var queueSlot = container.querySelector('#woQueueSlot');
+
+    var queueTable = DataTable({
+      rows: function(){ return pendingWOs; },
       rowKey: 'id',
-      searchPlaceholder: 'Cari nomor settlement atau mitra...',
-      searchFields: ['ref'],
+      searchPlaceholder: 'Cari nomor WO atau nama mitra...',
+      searchFields: ['id', 'period'],
       columns: [
-        {key:'ref', header:'No. Settlement', sortable:true, render:r=>`<span class="cell-mono">${r.ref}</span>`},
-        {key:'mitra', header:'Mitra', sortable:true, render:r=>{
-          const p = getMitraForSettlement(r);
-          return p ? `<span class="cell-strong">${p.partner_name}</span>` : '-';
+        {key:'id', header:'No. WO', sortable:true, render:function(r){ return '<span class="cell-mono">' + r.id + '</span>'; }},
+        {key:'mitra', header:'Mitra', sortable:true, render:function(r){
+          var p = allPartners.find(function(pt){ return pt.id === r.partner_id; });
+          return p ? '<span class="cell-strong">' + p.partner_name + '</span>' : '-';
         }},
+        {key:'type', header:'Tipe', sortable:true, render:function(r){ return badge(r.type, r.type==='Mingguan'?'purple':'blue'); }},
         {key:'period', header:'Periode', sortable:true},
-        {key:'tx_count', header:'Jumlah Transaksi', sortable:true, align:'right'},
-        {key:'gross_revenue', header:'Gross', sortable:true, align:'right', render:r=>Fmt.rupiah(r.gross_revenue)},
-        {key:'total_deduction', header:'Potongan', sortable:true, align:'right', render:r=>`<span style="color:var(--badge-red-fg);">${Fmt.rupiah(r.total_deduction)}</span>`},
-        {key:'net_revenue', header:'Net', sortable:true, align:'right', render:r=>`<span class="cell-num" style="font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(r.net_revenue)}</span>`},
-        {key:'bank_account', header:'Rekening', render:r=>`<span class="cell-secondary" style="font-size:12px;">${r.bank_account}</span>`},
-        {key:'status', header:'Status', render:r=>statusBadge(r.status)},
-        {key:'actions', header:'', align:'right', render:r=>
-          `<button class="btn btn-primary btn-sm act-process-settle" data-settle="${r.id}">${ic('check')} Proses</button>`
-        },
+        {key:'amount', header:'Nominal', sortable:true, align:'right', render:function(r){ return '<span class="cell-num" style="font-weight:700;color:var(--badge-green-fg);">' + Fmt.rupiah(r.amount) + '</span>'; }},
+        {key:'due_date', header:'Jatuh Tempo', sortable:true, sortValue:function(r){ return r.due_date; }, render:function(r){ return Fmt.date(r.due_date); }},
+        {key:'status', header:'Status', render:function(r){ return statusBadge(r.status); }},
+        {key:'actions', header:'', align:'right', render:function(r){
+          return '<button class="btn btn-primary btn-sm act-process-wo" data-id="' + r.id + '">' + ic('check') + ' Proses</button>';
+        }},
       ],
-      afterRender(wrap, rows){
-        wrap.querySelectorAll('.act-process-settle').forEach(btn=>{
-          btn.addEventListener('click', ()=>{
-            const settleId = btn.dataset.settle;
-            const settlement = rows.find(r=>r.id===settleId);
-            if(!settlement) return;
-            const p = getMitraForSettlement(settlement);
-            openSettlementVerifyModal(settlement, p);
+      afterRender: function(wrap, rows){
+        wrap.querySelectorAll('.act-process-wo').forEach(function(btn){
+          btn.addEventListener('click', function(){
+            var wo = rows.find(function(r){ return r.id === btn.dataset.id; });
+            if(!wo) return;
+            var p = allPartners.find(function(pt){ return pt.id === wo.partner_id; });
+            openWOProcessModal(wo, p);
           });
         });
       }
     });
-    const queueCard = document.createElement('div'); queueCard.className='card';
+    var queueCard = document.createElement('div'); queueCard.className='card';
     queueCard.appendChild(queueTable);
     queueSlot.appendChild(queueCard);
   }
 
-  function openSettlementVerifyModal(settlement, partner){
-    const custIds = allCustomers.filter(c => c.partner_id === partner.id).map(c => c.id);
-    const unsettledInvoices = allInvoices.filter(i => custIds.includes(i.customer_id) && i.billing_status === 'Lunas' && i.settled === false);
-
+  function openWOProcessModal(wo, partner){
+    if(!partner){ toast('Data mitra tidak ditemukan'); return; }
     Modal.open({
-      title:'Proses Settlement',
-      subtitle:`${settlement.ref} — ${partner ? partner.partner_name : '-'}`,
-       bodyHTML:`<div class="detail-grid">
-         <div class="detail-item"><span class="dl">Mitra</span><span class="dv">${partner ? partner.partner_name : '-'}</span></div>
-         <div class="detail-item"><span class="dl">Rekening Tujuan</span><span class="dv">${settlement.bank_account}</span></div>
-         <div class="detail-item"><span class="dl">Periode</span><span class="dv">${settlement.period}</span></div>
-         <div class="detail-item"><span class="dl">Jumlah Transaksi</span><span class="dv">${settlement.tx_count}</span></div>
-         <div class="detail-item"><span class="dl">Gross Revenue</span><span class="dv">${Fmt.rupiah(settlement.gross_revenue)}</span></div>
-         <div class="detail-item"><span class="dl">Total Potongan</span><span class="dv" style="color:var(--badge-red-fg);">-${Fmt.rupiah(settlement.total_deduction)}</span></div>
-         <div class="detail-item" style="font-weight:700;font-size:15px;color:var(--badge-green-fg);"><span class="dl">Net Revenue (Withdraw)</span><span class="dv">${Fmt.rupiah(settlement.net_revenue)}</span></div>
-         <div class="detail-item" style="grid-column:1/-1;">
-           <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Bukti Transfer (teks di prototype, upload di final)</label>
-           <textarea class="input" id="fatProofTransfer" rows="2" style="width:100%;font-size:13px;" placeholder="Contoh: Transfer ke Mandiri 1230007890123, ref: TF-20260729-001 (di final berupa upload foto)"></textarea>
-         </div>
-       </div>`,
-       footHTML:`<button class="btn btn-secondary" id="mCloseSettle">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmSettle">${ic('check')} Proses & Selesaikan</button>`,
-       onOpen(b, f){
-          f.querySelector('#mCloseSettle')?.addEventListener('click', Modal.close);
-          f.querySelector('#mConfirmSettle')?.addEventListener('click', () => {
-            const proof = b.querySelector('#fatProofTransfer').value.trim();
-           if(!proof){
-             toast('Bukti transfer wajib diisi sebelum memproses settlement.');
-             return;
-           }
-           const target = DB.settlements.find(s => s.id === settlement.id);
-           if(target){
-             target.status = 'Selesai';
-             target.verified_at = new Date().toISOString();
-             target.verified_by = CURRENT_USER.id;
-             target.fat_proof_of_transfer = proof;
-             target.fat_processed_by = CURRENT_USER.name;
-              target.fat_processed_at = new Date().toISOString();
-            }
-            const prevBalance = partner.saldo_utama;
-            partner.saldo_utama -= settlement.net_revenue;
-            DB.depositHistory.push({
-              id: nextId('DEP'),
-              partner_id: partner.id,
-              ref: 'WD-FAT/' + settlement.ref,
-              type: 'Withdraw Settlement',
-              amount: -settlement.net_revenue,
-              balance_before: prevBalance,
-              balance_after: partner.saldo_utama,
-              date: new Date().toISOString().slice(0,10),
-              note: 'Settlement disetujui FAT: ' + settlement.ref,
-              status: 'Berhasil',
-            });
-           let remaining = settlement.net_revenue;
-          for(const inv of unsettledInvoices) {
-            const invoiceTotal = (inv.total_paid || inv.billing_amount) + (inv.extra_charge || 0);
-            const alreadySettled = inv.settled_amount || 0;
-            const canSettle = Math.min(invoiceTotal - alreadySettled, remaining);
-            if(canSettle > 0) {
-              inv.settled_amount = alreadySettled + canSettle;
-              remaining -= canSettle;
-              if(inv.settled_amount >= invoiceTotal) inv.settled = true;
-            }
-            if(remaining <= 0) break;
+      title:'Proses WO Transfer Settlement',
+      subtitle: wo.id + ' — ' + wo.type + ' · ' + wo.period,
+      size:'lg',
+      bodyHTML:'<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;color:#555;line-height:24px;font-size:14px;">'
+        + '<div style="background:var(--color-background-muted);border-radius:8px;padding:16px;margin-bottom:16px;">'
+        + '<div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:8px;font-weight:600;">Detail Work Order</div>'
+        + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+        + '<tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Mitra</td><td style="padding:6px 8px;text-align:right;font-weight:600;">' + partner.partner_name + '</td></tr>'
+        + '<tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Tipe</td><td style="padding:6px 8px;text-align:right;">' + badge(wo.type, wo.type==='Mingguan'?'purple':'blue') + '</td></tr>'
+        + '<tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Periode</td><td style="padding:6px 8px;text-align:right;">' + wo.period + '</td></tr>'
+        + '<tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Jatuh Tempo</td><td style="padding:6px 8px;text-align:right;">' + Fmt.date(wo.due_date) + '</td></tr>'
+        + '<tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Nominal Transfer</td><td style="padding:6px 8px;text-align:right;font-weight:700;font-size:16px;color:var(--badge-green-fg);">' + Fmt.rupiah(wo.amount) + '</td></tr>'
+        + '<tr><td style="padding:6px 8px;color:var(--color-text-secondary);">Saldo Settlement Mitra</td><td style="padding:6px 8px;text-align:right;">' + Fmt.rupiah(partner.saldo_settlement || 0) + '</td></tr>'
+        + '</table></div>'
+        + '<div style="background:var(--color-background-muted);border-radius:8px;padding:16px;margin-bottom:16px;">'
+        + '<div style="font-size:11px;text-transform:uppercase;color:var(--color-text-secondary);letter-spacing:1px;margin-bottom:8px;font-weight:600;">Rekening Tujuan Transfer</div>'
+        + '<div style="font-size:13px;"><strong>' + partner.bank_name + '</strong> &mdash; <span class="cell-mono">' + partner.bank_account_no + '</span></div>'
+        + '<div style="font-size:12px;color:var(--color-text-secondary);">Atas Nama: ' + partner.bank_account_name + '</div></div>'
+        + '<div style="margin-top:16px;"><label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;font-weight:600;">Bukti Transfer *</label>'
+        + '<textarea class="input" id="woProofTransfer" rows="3" style="width:100%;font-size:13px;" placeholder="Contoh: Transfer ke Mandiri 1230007890123, ref: TF-20260818-001"></textarea>'
+        + '<div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px;">Wajib diisi — bukti transfer akan muncul di histori mitra.</div></div></div>',
+      footHTML:'<button class="btn btn-secondary" id="mCloseWO">' + ic('x') + ' Batal</button> <button class="btn btn-primary" id="mConfirmWO">' + ic('check') + ' Selesaikan WO</button>',
+      onOpen: function(b, f){
+        f.querySelector('#mCloseWO').addEventListener('click', Modal.close);
+        f.querySelector('#mConfirmWO').addEventListener('click', function(){
+          var proof = b.querySelector('#woProofTransfer').value.trim();
+          if(!proof){
+            toast('Bukti transfer wajib diisi sebelum memproses WO.');
+            return;
           }
-          pushActivity(CURRENT_USER.name, `memproses settlement ${settlement.ref} sebesar ${Fmt.rupiah(settlement.net_revenue)} dari mitra ${partner.partner_name}`);
-          toast('Settlement berhasil diproses! Saldo utama mitra ' + partner.partner_name + ' berkurang ' + Fmt.rupiah(settlement.net_revenue));
+          var target = DB.workOrders.find(function(w){ return w.id === wo.id; });
+          if(target){
+            target.status = 'Selesai';
+            target.proof = proof;
+            target.processed_by = CURRENT_USER.name;
+            target.processed_at = new Date().toISOString();
+            target.completed_at = new Date().toISOString();
+          }
+          var prevBalance = partner.saldo_settlement;
+          partner.saldo_settlement -= wo.amount;
+          DB.depositHistory.push({
+            id: nextId('DEP'),
+            partner_id: partner.id,
+            ref: 'WO/' + wo.id,
+            type: 'Settlement Keluar',
+            amount: -wo.amount,
+            balance_before: prevBalance,
+            balance_after: partner.saldo_settlement,
+            date: new Date().toISOString().slice(0,10),
+            note: 'WO ' + wo.type + ' ' + wo.period + ' — bukti: ' + proof,
+            status: 'Berhasil',
+          });
+          pushActivity(CURRENT_USER.name, 'menyelesaikan WO ' + wo.id + ' sebesar ' + Fmt.rupiah(wo.amount) + ' untuk mitra ' + partner.partner_name + ' — saldo settlement berkurang');
+          toast('WO ' + wo.id + ' berhasil diselesaikan! Saldo settlement ' + partner.partner_name + ' berkurang ' + Fmt.rupiah(wo.amount));
+          window.dispatchEvent(new CustomEvent('keuangan-refresh'));
           Modal.close();
           renderRoot();
-          window.dispatchEvent(new CustomEvent('keuangan-refresh'));
-          setTimeout(()=> openSettlementInvoiceModal(unsettledInvoices, partner, settlement.gross_revenue, settlement.total_deduction, settlement.net_revenue, settlement.ref), 100);
         });
       }
     });
+  }
+
+  function renderWOHistory(container){
+    var completedWOs = DB.workOrders.filter(function(wo){ return wo.status === 'Selesai'; });
+    var filteredWOs = fatMitraFilter ? completedWOs.filter(function(wo){ return wo.partner_id === fatMitraFilter; }) : completedWOs;
+    var totalCompleted = filteredWOs.reduce(function(s,wo){ return s + (wo.amount||0); }, 0);
+
+    var html = '<div id="kpiSlot">' + renderKPIs([
+      {label:'WO Selesai', value:filteredWOs.length, icon:'checkCircle', bg:'var(--badge-green-bg)', fg:'var(--badge-green-fg)'},
+      {label:'Total Nilai WO Selesai', value:Fmt.rupiah(totalCompleted), icon:'wallet', bg:'var(--badge-purple-bg)', fg:'var(--badge-purple-fg)'},
+      {label:'WO Mingguan Selesai', value:filteredWOs.filter(function(wo){ return wo.type==='Mingguan'; }).length, icon:'history', bg:'var(--badge-blue-bg)', fg:'var(--badge-blue-fg)'},
+      {label:'WO Bulanan Selesai', value:filteredWOs.filter(function(wo){ return wo.type==='Bulanan'; }).length, icon:'history', bg:'var(--badge-orange-bg)', fg:'var(--badge-orange-fg)'},
+    ]) + '</div>';
+
+    if(filteredWOs.length === 0){
+      html += '<div class="card card-pad"><div class="empty-state">' + ic('checkCircle') + '<div class="es-title">Belum ada WO yang diselesaikan</div></div></div>';
+      container.innerHTML = html;
+      return;
+    }
+
+    html += '<div class="section-head"><h3>Riwayat WO Transfer Settlement</h3></div><div id="woHistorySlot"></div>';
+    container.innerHTML = html;
+
+    var historySlot = container.querySelector('#woHistorySlot');
+    var historyTable = DataTable({
+      rows: function(){ return filteredWOs.sort(function(a,b){ return (b.completed_at||'').localeCompare(a.completed_at||''); }); },
+      rowKey: 'id',
+      searchPlaceholder: 'Cari nomor WO atau nama mitra...',
+      searchFields: ['id', 'period'],
+      columns: [
+        {key:'id', header:'No. WO', sortable:true, render:function(r){ return '<span class="cell-mono">' + r.id + '</span>'; }},
+        {key:'mitra', header:'Mitra', sortable:true, render:function(r){
+          var p = allPartners.find(function(pt){ return pt.id === r.partner_id; });
+          return p ? '<span class="cell-strong">' + p.partner_name + '</span>' : '-';
+        }},
+        {key:'type', header:'Tipe', sortable:true, render:function(r){ return badge(r.type, r.type==='Mingguan'?'purple':'blue'); }},
+        {key:'period', header:'Periode', sortable:true},
+        {key:'amount', header:'Nominal', sortable:true, align:'right', render:function(r){ return '<span class="cell-num" style="font-weight:700;color:var(--badge-green-fg);">' + Fmt.rupiah(r.amount) + '</span>'; }},
+        {key:'completed_at', header:'Tanggal Selesai', sortable:true, sortValue:function(r){ return r.completed_at; }, render:function(r){ return Fmt.datetime(r.completed_at); }},
+        {key:'proof', header:'Bukti Transfer', render:function(r){ return '<span class="cell-secondary" style="max-width:240px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (r.proof || '-') + '</span>'; }},
+        {key:'processed_by', header:'Diproses Oleh', render:function(r){ return r.processed_by ? '<span class="cell-strong">' + r.processed_by + '</span>' : '-'; }},
+      ]
+    });
+    var histCard = document.createElement('div'); histCard.className='card';
+    histCard.appendChild(historyTable);
+    historySlot.appendChild(histCard);
   }
 
   renderRoot();
@@ -2483,8 +2473,8 @@ Views['keuangan.mitra'] = function(root){
 
   function openMitraTopUpModal(){
     Modal.open({
-      title:'Ajukan Penambahan Saldo',
-      subtitle:'Lakukan transfer ke rekening ISP, lalu lengkapi form di bawah ini',
+      title:'Ajukan Penambahan Saldo Deposit',
+      subtitle:'Lakukan transfer ke rekening ISP, lalu lengkapi form di bawah ini — minimal top up Rp 1.000.000',
       size:'lg',
       bodyHTML:`<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#555;line-height:24px;font-size:14px;">
         <div style="background:var(--color-background-muted);border-radius:8px;padding:16px;margin-bottom:16px;">
@@ -2493,7 +2483,7 @@ Views['keuangan.mitra'] = function(root){
           <div style="font-size:14px;color:var(--color-text-secondary);margin-top:4px;">Bank BCA &mdash; <span class="cell-mono">1234 5678 90</span></div>
         </div>
         ${rowWrap(fieldsHTML([
-          {label:'Nominal Transfer (Rp)', id:'topup_amount', type:'number', placeholder:'Masukkan nominal transfer', hint:'Minimal Rp 100.000'},
+          {label:'Nominal Transfer (Rp)', id:'topup_amount', type:'number', placeholder:'Masukkan nominal transfer', hint:'Minimal Rp 1.000.000'},
         ]))}
         ${fieldsHTML([{label:'Keterangan / Bukti Transfer', id:'topup_proof', type:'textarea', placeholder:'Contoh: Transfer BCA ke BCA 1234567890, ref: TF-20260802-001', hint:'Di final berupa upload foto bukti transfer, prototype cukup teks saja'}])}
       </div>`,
@@ -2503,7 +2493,7 @@ Views['keuangan.mitra'] = function(root){
         f.querySelector('#mSubmitTopUp').addEventListener('click', ()=>{
           const amount = parseFloat(document.getElementById('topup_amount').value);
           const proof = document.getElementById('topup_proof').value.trim();
-          if(!amount || amount < 100000){ toast('Nominal transfer minimal Rp 100.000'); return; }
+          if(!amount || amount < 1000000){ toast('Nominal transfer minimal Rp 1.000.000'); return; }
           if(!proof){ toast('Keterangan / bukti transfer wajib diisi'); return; }
           DB.depositTopUp.push({
             id: nextId('TOPUP'),
@@ -2520,84 +2510,28 @@ Views['keuangan.mitra'] = function(root){
             verified_at: null
           });
           pushActivity(CURRENT_USER.name, `mengajukan penambahan saldo deposit sebesar ${Fmt.rupiah(amount)} — menunggu verifikasi Tim FAT`);
-          toast('Pengajuan penambahan saldo berhasil diajukan! Menunggu verifikasi dari Tim FAT.');
+          toast('Pengajuan penambahan saldo deposit berhasil diajukan! Menunggu verifikasi dari Tim FAT.');
           window.dispatchEvent(new CustomEvent('keuangan-refresh'));
           Modal.close();
-        });
-      }
-    });
-  }
-
-  function openMitraWithdrawModal(){
-    const minBalance = partner.cashier_deposit_min || 0;
-    const availableToWithdraw = Math.max(0, partner.saldo_utama - minBalance);
-    if(availableToWithdraw <= 0){
-      toast('Saldo tidak mencukupi untuk pencairan. Saldo minimal harus ' + Fmt.rupiah(minBalance));
-      return;
-    }
-    Modal.open({
-      title:'Withdraw Settlement', subtitle:`Saldo utama: ${Fmt.rupiah(partner.saldo_utama)} | Minimum: ${Fmt.rupiah(minBalance)}`,
-      bodyHTML:`<div class="detail-grid">
-        <div class="detail-item"><span class="dl">Saldo Utama Saat Ini</span><span class="dv" style="font-weight:700;">${Fmt.rupiah(partner.saldo_utama)}</span></div>
-        <div class="detail-item"><span class="dl">Minimum Saldo</span><span class="dv">${Fmt.rupiah(minBalance)}</span></div>
-        <div class="detail-item"><span class="dl">Tersedia untuk Dicairkan</span><span class="dv" style="font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(availableToWithdraw)}</span></div>
-        <div class="detail-item" style="grid-column:1/-1;">
-          <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Nominal Withdraw (Rp)</label>
-          <input type="number" id="withdrawAmount" class="input" style="width:100%;font-size:14px;" value="${availableToWithdraw}" min="1000" max="${availableToWithdraw}" step="1000">
-          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px;">Min Rp 1.000, Maks ${Fmt.rupiah(availableToWithdraw)}</div>
-        </div>
-        <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--color-text-secondary);">
-          Rekening: ${partner.bank_name} - ${partner.bank_account_no} a.n. ${partner.bank_account_name}
-        </div>
-        <div class="detail-item" style="grid-column:1/-1;font-size:12px;color:var(--badge-orange-fg);"><strong>Catatan: Saldo utama akan berkurang otomatis setelah Tim FAT menyetujui pencairan ini.</strong></div>
-      </div>`,
-      footHTML:`<button class="btn btn-secondary" id="mCloseWithdraw">${ic('x')} Batal</button> <button class="btn btn-primary" id="mConfirmWithdraw">${ic('check')} Ajukan Verifikasi</button>`,
-      onOpen(b, f){
-        f.querySelector('#mCloseWithdraw').addEventListener('click', Modal.close);
-        f.querySelector('#mConfirmWithdraw').addEventListener('click', () => {
-          const amount = parseFloat(b.querySelector('#withdrawAmount').value) || 0;
-          if(amount <= 0 || amount > availableToWithdraw) {
-            toast('Nominal tidak valid. Min Rp 1.000, maks ' + Fmt.rupiah(availableToWithdraw));
-            return;
-          }
-          const setRef = 'SET/2026/07/' + String(DB.settlements.length+1).padStart(4,'0');
-          DB.settlements.push({
-            id: nextId('SET'),
-            partner_id: partner.id,
-            ref: setRef,
-            period: 'Juli 2026',
-            tx_count: unsettledInvoices.length,
-            gross_revenue: stlGross,
-            total_deduction: stlKso + stlPgFee + stlOther,
-            net_revenue: amount,
-            bank_account: `${partner.bank_name} - ${partner.bank_account_no}`,
-            status: 'Menunggu Verifikasi',
-            date: new Date().toISOString().slice(0,10),
-            fat_proof_of_transfer: null,
-            fat_processed_by: null,
-            fat_processed_at: null
-          });
-          pushActivity(CURRENT_USER.name, `mengajukan pencairan settlement ${setRef} sebesar ${Fmt.rupiah(amount)}`);
-          toast('Settlement diajukan untuk verifikasi FAT!');
-          Modal.close();
-          window.dispatchEvent(new CustomEvent('keuangan-refresh'));
         });
       }
     });
   }
 
   /* ---- Render ---- */
-  let activeMitraTab = 'ringkasan';
+  let activeMitraTab = 'settlement';
+  let activeScope = 'settlement';
+  let activeDepositSubTab = 'mutasi';
   let unpaidCount = 0;
   DB.customers.filter(c => c.partner_id === partner.id).forEach(c => {
     unpaidCount += DB.invoices.filter(i => i.customer_id === c.id && i.billing_status !== 'Lunas').length;
   });
 
   root.innerHTML = `
-    ${pageIntro('Manajemen keuangan mitra — ringkasan saldo, mutasi, dan pembayaran customer.')}
+    ${pageIntro('Manajemen keuangan mitra — saldo settlement, saldo deposit, mutasi, dan pembayaran customer.')}
     <div class="subtabs" id="mitraModeTabs">
-      <button class="subtab ${activeMitraTab==='ringkasan'?'active':''}" data-mtab="ringkasan">${ic('wallet')} Ringkasan</button>
-      <button class="subtab ${activeMitraTab==='pembayaran'?'active':''}" data-mtab="pembayaran">${ic('creditCard')} Pembayaran Pelanggan${unpaidCount > 0 ? ` <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">${unpaidCount}</span>` : ''}</button>
+      <button class="subtab ${activeMitraTab==='settlement'?'active':''}" data-mtab="settlement">${ic('wallet')} Settlement</button>
+      <button class="subtab ${activeMitraTab==='deposit'?'active':''}" data-mtab="deposit">${ic('wallet')} Deposit${unpaidCount > 0 ? ` <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">${unpaidCount}</span>` : ''}</button>
     </div>
     <div id="mitraTabContent"></div>
   `;
@@ -2613,10 +2547,12 @@ Views['keuangan.mitra'] = function(root){
   function renderMitraTab(){
     modeTabs.forEach(b => b.classList.toggle('active', b.dataset.mtab === activeMitraTab));
     const container = root.querySelector('#mitraTabContent');
-    if(activeMitraTab === 'ringkasan'){
-      renderRingkasanTab(container);
+    if(activeMitraTab === 'settlement'){
+      activeScope = 'settlement';
+      renderSettlementTab(container);
     } else {
-      renderPembayaranTab(container);
+      activeScope = 'deposit';
+      renderDepositTab(container);
     }
   }
 
@@ -2630,20 +2566,25 @@ Views['keuangan.mitra'] = function(root){
   let dateFilterStart = '';
   let dateFilterEnd = '';
 
-  function buildMutations(){
+  function buildMutations(scope){
     const muts = [];
     DB.depositHistory.filter(d => d.partner_id === partner.id).forEach(d => {
       const isOut = d.amount < 0;
-      const detail = d.type === 'Deposit Masuk' ? 'Deposit Saldo' : 'Penarikan Saldo Settlement';
+      const detail = d.type;
+      /* Scope filter */
+      if(scope === 'settlement'){
+        if(d.type !== 'Settlement Masuk' && d.type !== 'Settlement Keluar') return;
+      } else if(scope === 'deposit'){
+        if(d.type !== 'Deposit Masuk' && d.type !== 'Deposit Keluar') return;
+      }
       const flow = isOut ? 'uang_keluar' : 'uang_masuk';
       muts.push({ date:d.date, type:flow, detail:detail, badgeType:detail, badgeColor:isOut?'red':'green', ref:d.ref, note:d.note, amount:d.amount, balance_after:d.balance_after, raw:d });
     });
-    DB.settlements.filter(s => s.partner_id === partner.id).forEach(s => {
-      if(s.status === 'Selesai'){
-        const detail = 'Penarikan Saldo Settlement';
-        muts.push({ date:s.date, type:'uang_keluar', detail:detail, badgeType:'Settlement Selesai', badgeColor:'green', ref:s.ref, note:s.period+' — '+s.tx_count+' transaksi', amount:s.net_revenue, balance_after:null, raw:s });
-      }
-    });
+    if(scope === 'settlement'){
+      DB.workOrders.filter(wo => wo.partner_id === partner.id && wo.status === 'Selesai').forEach(wo => {
+        muts.push({ date:(wo.completed_at||'').slice(0,10), type:'uang_keluar', detail:'WO Transfer ' + wo.type, badgeType:'WO Selesai', badgeColor:'green', ref:wo.id, note:wo.period+' — '+wo.proof, amount:wo.amount, balance_after:null, raw:wo });
+      });
+    }
     DB.payments.filter(p => {
       const inv = DB.invoices.find(i => i.id === p.invoice_id);
       return inv && custIds.includes(inv.customer_id);
@@ -2651,6 +2592,9 @@ Views['keuangan.mitra'] = function(root){
       const inv = DB.invoices.find(i => i.id === p.invoice_id);
       const cust = inv ? DB.customers.find(c => c.id === inv.customer_id) : null;
       const isCash = p.virtual_account === 'TUNAI/KASIR';
+      /* Scope filter: VA → settlement, Cash → deposit */
+      if(scope === 'settlement' && isCash) return;
+      if(scope === 'deposit' && !isCash) return;
       const detail = isCash ? 'Pelanggan Bayar Cash' : 'Pelanggan Bayar VA';
       const flow = isCash ? 'uang_keluar' : 'uang_masuk';
       muts.push({ date:(p.payment_date||'').slice(0,10), type:flow, detail:detail, badgeType:detail, badgeColor:isCash?'red':'green', ref:p.payment_reference, note:(cust?cust.customer_name:'')+' — '+(inv?inv.invoice_number:''), amount:p.billing_amount, balance_after:null, raw:p });
@@ -2672,31 +2616,110 @@ Views['keuangan.mitra'] = function(root){
     });
   }
 
-  /* ========== TAB: RINGKASAN ========== */
-  function renderRingkasanTab(container){
+  /* ========== TAB: SETTLEMENT ========== */
+  function renderSettlementTab(container){
     container.innerHTML = `
       <div class="balance-cards" style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:16px;">
-        <div class="card card-pad" style="position:relative;">
-          <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">Saldo Utama</div>
-          <div style="font-size:22px;font-weight:700;color:${partner.saldo_utama < (partner.cashier_deposit_min||0) ? 'var(--badge-red-fg)' : 'var(--badge-green-fg)'};">${Fmt.rupiah(partner.saldo_utama)}</div>
-          ${partner.saldo_utama < (partner.cashier_deposit_min||0) ? `<div style="font-size:11px;color:var(--badge-orange-fg);margin-top:2px;">Di bawah minimum (${Fmt.rupiah(partner.cashier_deposit_min||0)})</div>` : ''}
+        <div class="card card-pad" style="position:relative;border-left:3px solid var(--badge-green-fg);">
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">Saldo Settlement</div>
+          <div style="font-size:22px;font-weight:700;color:var(--badge-green-fg);">${Fmt.rupiah(partner.saldo_settlement)}</div>
+          <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px;">Bersih dari pembayaran VA — pencairan otomatis oleh Tim FAT sesuai jadwal periodic</div>
+        </div>
+      </div>
+      ${balanceFilterChipsHTML()}
+      <div id="mitraMutationList"></div>
+    `;
+    wireBalanceFilterChips(container);
+    renderMutations();
+  }
+
+  /* ========== TAB: DEPOSIT ========== */
+  function renderDepositTab(container){
+    const depMin = partner.cashier_deposit_min || 1000000;
+    container.innerHTML = `
+      <div class="balance-cards" style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:16px;">
+        <div class="card card-pad" style="position:relative;border-left:3px solid var(--badge-blue-fg);">
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">Saldo Deposit</div>
+          <div style="font-size:22px;font-weight:700;color:${partner.saldo_deposit < depMin ? 'var(--badge-red-fg)' : 'var(--badge-blue-fg)'};">${Fmt.rupiah(partner.saldo_deposit)}</div>
+          ${partner.saldo_deposit < depMin ? `<div style="font-size:11px;color:var(--badge-orange-fg);margin-top:2px;">Di bawah minimum (${Fmt.rupiah(depMin)})</div>` : `<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px;">Minimum mengendap ${Fmt.rupiah(depMin)}</div>`}
           <div style="display:flex;gap:8px;margin-top:10px;">
             <button class="btn btn-primary btn-sm" id="btnMitraTopUp">${ic('plus')}Top Up Saldo</button>
-            <button class="btn btn-secondary btn-sm" id="btnMitraWithdraw">${ic('send')}Tarik Saldo</button>
           </div>
         </div>
       </div>
-      <div class="filter-chips" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-        <button class="chip ${activeFilter==='all'?'active':''}" data-filter="all">${ic('list')} Semua</button>
-        <button class="chip ${activeFilter==='uang_masuk'?'active':''}" data-filter="uang_masuk">${ic('arrowUpCircle')} Uang Masuk</button>
-        <button class="chip ${activeFilter==='uang_keluar'?'active':''}" data-filter="uang_keluar">${ic('arrowDownCircle')} Uang Keluar</button>
+      <div class="subtabs" id="depositSubTabs">
+        <button class="subtab ${activeDepositSubTab==='mutasi'?'active':''}" data-dstab="mutasi">${ic('history')} Mutasi Saldo</button>
+        <button class="subtab ${activeDepositSubTab==='pembayaran'?'active':''}" data-dstab="pembayaran">${ic('creditCard')} Pembayaran Pelanggan${unpaidCount > 0 ? ` <span class="badge badge-yellow" style="margin-left:4px;font-size:11px;">${unpaidCount}</span>` : ''}</button>
       </div>
-      <div id="mitraMutationList"></div>
+      <div id="depositSubContent"></div>
     `;
-
     container.querySelector('#btnMitraTopUp')?.addEventListener('click', openMitraTopUpModal);
-    container.querySelector('#btnMitraWithdraw')?.addEventListener('click', openMitraWithdrawModal);
+    container.querySelectorAll('#depositSubTabs .subtab[data-dstab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeDepositSubTab = btn.dataset.dstab;
+        renderDepositTab(container);
+      });
+    });
+    const subContent = container.querySelector('#depositSubContent');
+    if(activeDepositSubTab === 'mutasi'){
+      renderDepositMutasiTab(subContent);
+    } else {
+      renderDepositPembayaranTab(subContent);
+    }
+  }
 
+  function renderDepositMutasiTab(subContent){
+    subContent.innerHTML = balanceFilterChipsHTML() + '<div id="mitraMutationList"></div>';
+    wireBalanceFilterChips(subContent);
+    renderMutations();
+  }
+
+  function renderDepositPembayaranTab(subContent){
+    const custIdsPay = DB.customers.filter(c => c.partner_id === partner.id).map(c => c.id);
+    const unpaidInvoices = DB.invoices.filter(i => custIdsPay.includes(i.customer_id) && i.billing_status !== 'Lunas');
+    const paidInvoices = DB.invoices.filter(i => custIdsPay.includes(i.customer_id) && i.billing_status === 'Lunas');
+    const total = unpaidInvoices.length + paidInvoices.length;
+
+    subContent.innerHTML = `
+      <div class="card card-pad" style="margin-bottom:16px;">
+        <div class="donut-legend">
+          <div class="li"><span class="dot" style="background:var(--badge-green-fg)"></span>Lunas<span class="val">${paidInvoices.length}</span></div>
+          <div class="li"><span class="dot" style="background:var(--badge-orange-fg)"></span>Belum Dibayar<span class="val">${unpaidInvoices.length}</span></div>
+        </div>
+        <div style="margin-top:12px;height:8px;border-radius:99px;overflow:hidden;background:var(--color-background-muted);display:flex;">
+          <span style="width:${total?paidInvoices.length/total*100:0}%;background:var(--badge-green-fg);"></span>
+          <span style="width:${total?unpaidInvoices.length/total*100:0}%;background:var(--badge-orange-fg);"></span>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="subtab ${activePembayaranSubTab==='belumBayar'?'active':''}" data-stab="belumBayar">${ic('creditCard')} Invoice Belum Dibayar${unpaidInvoices.length > 0 ? ' <span class="badge badge-orange" style="margin-left:4px;font-size:11px;">'+unpaidInvoices.length+'</span>' : ''}</button>
+        <button class="subtab ${activePembayaranSubTab==='historiBayar'?'active':''}" data-stab="historiBayar">${ic('history')} Histori Pembayaran${paidInvoices.length > 0 ? ' <span class="badge badge-green" style="margin-left:4px;font-size:11px;">'+paidInvoices.length+'</span>' : ''}</button>
+      </div>
+      <div id="pembayaranSubContent"></div>
+    `;
+    subContent.querySelectorAll('.subtab[data-stab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activePembayaranSubTab = btn.dataset.stab;
+        renderDepositPembayaranTab(subContent);
+      });
+    });
+    const pc = subContent.querySelector('#pembayaranSubContent');
+    if(activePembayaranSubTab === 'belumBayar'){
+      renderBelumDibayarSubTab(pc, unpaidInvoices);
+    } else {
+      renderHistoriBayarSubTab(pc, paidInvoices);
+    }
+  }
+
+  function balanceFilterChipsHTML(){
+    return `<div class="filter-chips" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <button class="chip ${activeFilter==='all'?'active':''}" data-filter="all">${ic('list')} Semua</button>
+      <button class="chip ${activeFilter==='uang_masuk'?'active':''}" data-filter="uang_masuk">${ic('arrowUpCircle')} Uang Masuk</button>
+      <button class="chip ${activeFilter==='uang_keluar'?'active':''}" data-filter="uang_keluar">${ic('arrowDownCircle')} Uang Keluar</button>
+    </div>`;
+  }
+
+  function wireBalanceFilterChips(container){
     container.querySelectorAll('.chip[data-filter]').forEach(chip => {
       chip.addEventListener('click', () => {
         container.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
@@ -2705,12 +2728,10 @@ Views['keuangan.mitra'] = function(root){
         renderMutations();
       });
     });
-
-    renderMutations();
   }
 
   function renderMutations(){
-    const allMuts = buildMutations();
+    const allMuts = buildMutations(activeScope);
     const typeFiltered = activeFilter === 'all' ? allMuts : allMuts.filter(m => m.type === activeFilter);
     const filtered = filterByDate(typeFiltered);
     const slot = root.querySelector('#mitraMutationList');
@@ -2997,10 +3018,10 @@ Views['keuangan.mitra'] = function(root){
 
   window.addEventListener('keuangan-refresh', () => {
     if(document.getElementById('mitraModeTabs') && !document.getElementById('suModeTabs')){
-      if(activeMitraTab === 'ringkasan'){
-        renderRingkasanTab(root.querySelector('#mitraTabContent'));
+      if(activeMitraTab === 'settlement'){
+        renderSettlementTab(root.querySelector('#mitraTabContent'));
       } else {
-        renderPembayaranTab(root.querySelector('#mitraTabContent'));
+        renderDepositTab(root.querySelector('#mitraTabContent'));
       }
     }
   });
@@ -4023,5 +4044,10 @@ Views['infra.topologi'] = function(root){
  
 // Ensure global availability
 window.openSettlementModal = openSettlementModal;
+
+/* ========================================================================
+   WORK ORDER (WO) TRANSFER SETTLEMENT — FAT View Functions
+   ======================================================================== */
+
 
 
